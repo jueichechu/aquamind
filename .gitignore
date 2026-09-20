@@ -1,0 +1,56 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Node / Next.js
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+.venv/
+venv/
+
+# Generated ML data / artifacts
+ml/artifacts/*
+!ml/artifacts/.gitkeep
+
+ml/data/generated/*
+!ml/data/generated/.gitkeep
+
+# Generated evaluation reports
+evals/reports/*
+!evals/reports/.gitkeep
+
+# Logs / temporary files
+*.log
+logs/
+tmp/
+.temp/
+
+
+# Operating systems / editors
+.DS_Store
+Thumbs.db
+
+.idea/
+.vscode/
+
+# Credentials
+*.pem
+*.key
+*.p12
+
+credentials.json
+service-account*.json
