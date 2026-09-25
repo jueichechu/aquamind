@@ -38,7 +38,7 @@ export default function DemoPage() {
         </header>
 
         <div className="grid gap-4 py-4 lg:grid-cols-[240px_minmax(0,1fr)_360px]">
-          <HouseholdDashboard dataset={generateHouseholdDataset("overnight-leak")} />
+          <HouseholdDashboard initialDataset={generateHouseholdDataset("overnight-leak")} />
 
           <aside className="flex min-h-[540px] flex-col rounded-2xl border border-white/8 bg-[#0a1521] lg:min-h-[calc(100vh-6.5rem)]">
             <div className="border-b border-white/8 px-5 py-4">

@@ -1,7 +1,11 @@
-import { SCENARIOS } from "@/lib/water";
+"use client";
+
+import { useState } from "react";
+import { generateHouseholdDataset, SCENARIOS } from "@/lib/water";
 import type { HouseholdDataset, MeterReading } from "@/lib/water";
 
-export function HouseholdDashboard({ dataset }: { dataset: HouseholdDataset }) {
+export function HouseholdDashboard({ initialDataset }: { initialDataset: HouseholdDataset }) {
+  const [dataset, setDataset] = useState(initialDataset);
   const { scenario, summary, readings } = dataset;
   const today = readings.slice(-96);
 
@@ -17,9 +21,9 @@ export function HouseholdDashboard({ dataset }: { dataset: HouseholdDataset }) {
             <button
               key={option.id}
               type="button"
-              disabled
+              onClick={() => setDataset(generateHouseholdDataset(option.id))}
               aria-pressed={option.id === scenario.id}
-              className={`w-full rounded-xl border p-3 text-left transition ${
+              className={`w-full cursor-pointer rounded-xl border p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${
                 option.id === scenario.id
                   ? "border-cyan-300/15 bg-cyan-300/[0.06]"
                   : "border-transparent hover:border-white/8 hover:bg-white/[0.025]"
@@ -48,12 +52,16 @@ export function HouseholdDashboard({ dataset }: { dataset: HouseholdDataset }) {
           </p>
           <p className="mt-1.5 text-xs leading-5 text-slate-600">
             Seven synthetic days, seeded household events, and a rule-defined
-            anomaly window. Scenario switching is coming next.
+            anomaly window. Select a scenario to compare usage in the same household.
           </p>
         </div>
       </aside>
 
-      <section className="min-w-0 space-y-4">
+      <section className="min-w-0 space-y-4" aria-label="Household usage dashboard">
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {scenario.title}: {summary.todayGallons.toFixed(1)} gallons.
+          {summary.anomalyDetected ? ` ${summary.excessGallons.toFixed(1)} gallons of generated excess usage.` : " No generated anomaly."}
+        </p>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
           <SummaryCard
             label="Simulated day"
@@ -84,7 +92,7 @@ export function HouseholdDashboard({ dataset }: { dataset: HouseholdDataset }) {
               </p>
             </div>
 
-            <span className="w-fit rounded-full border border-amber-300/10 bg-amber-300/[0.06] px-3 py-1 text-xs text-amber-200">
+            <span className={`w-fit rounded-full border px-3 py-1 text-xs ${summary.anomalyDetected ? "border-amber-300/10 bg-amber-300/[0.06] text-amber-200" : "border-cyan-300/10 bg-cyan-300/[0.06] text-cyan-200"}`}>
               {summary.anomalyDetected ? "Rule-defined anomaly" : "Normal usage"}
             </span>
           </div>
@@ -96,7 +104,7 @@ export function HouseholdDashboard({ dataset }: { dataset: HouseholdDataset }) {
           <InfoPanel
             eyebrow="Synthetic scenario"
             title={scenario.title}
-            body={scenario.description}
+            body={`${scenario.description} ${scenario.id === "irrigation-after-rain" ? "This is a conservation opportunity, not evidence of a physical leak." : "Anomaly flags are defined by the simulator, not a machine-learning prediction."}`}
           />
 
           <InfoPanel
@@ -106,7 +114,6 @@ export function HouseholdDashboard({ dataset }: { dataset: HouseholdDataset }) {
           />
         </div>
       </section>
-
     </>
   );
 }
