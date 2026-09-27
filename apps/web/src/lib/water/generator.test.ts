@@ -28,6 +28,24 @@ describe.each(scenarioIds)("%s dataset", (scenarioId) => {
     expect(generateHouseholdDataset(scenarioId)).toEqual(generateHouseholdDataset(scenarioId, 42));
   });
 
+  it("isolates scenario metadata from other datasets and the registry", () => {
+    const originalScenario = { ...SCENARIOS[scenarioId] };
+    const dataset = generateHouseholdDataset(scenarioId);
+    const otherDataset = generateHouseholdDataset(scenarioId);
+
+    try {
+      dataset.scenario.title = "Edited household scenario";
+      dataset.scenario.rainfallInchesLast24h = 100;
+
+      expect(SCENARIOS[scenarioId]).toEqual(originalScenario);
+      expect(otherDataset.scenario).toEqual(originalScenario);
+      expect(generateHouseholdDataset(scenarioId).scenario).toEqual(originalScenario);
+    } finally {
+      // Keep a regression failure from contaminating subsequent scenario tests.
+      Object.assign(SCENARIOS[scenarioId], originalScenario);
+    }
+  });
+
   it.each([0, 42, 123, 4294967295])("has finite, non-negative attributed usage for seed %i", (seed) => {
     for (const reading of generateHouseholdDataset(scenarioId, seed).readings) {
       expect(Number.isFinite(reading.gallons)).toBe(true);

@@ -24,7 +24,7 @@ export function generateHouseholdDataset(
   seed = DEFAULT_SEED,
 ): HouseholdDataset {
   const random = createRandom(seed);
-  const scenario = SCENARIOS[scenarioId];
+  const scenario = { ...SCENARIOS[scenarioId] };
 
   const start = new Date("2026-06-15T00:00:00.000Z");
 
