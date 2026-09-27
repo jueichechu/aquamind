@@ -9,3 +9,6 @@ export type {
   ScenarioDefinition,
   ScenarioId,
 } from "./types";
+
+export { createMeterWindows } from "./windows";
+export type { MeterWindow } from "./windows";

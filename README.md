@@ -42,6 +42,14 @@ Summary calculations use the final simulated day as “today” and the precedin
 
 These are transparent simulation assumptions, not a scientifically validated household model or an evaluated leak detector.
 
+## Preparing meter sequences
+
+`createMeterWindows(dataset.readings)` produces seven non-overlapping 96-reading windows by default. Optional `windowSize` and `stride` arguments allow shorter or overlapping sequences. Incomplete tails are dropped, and missing, duplicate, or out-of-order intervals and invalid flow rates are rejected. Window timestamps identify the first and last included readings.
+
+Each window contains only interval-average flow values in `flowRatesGpm`, with synthetic `hasAnomaly` ground truth stored separately. This label includes irrigation conservation opportunities; it must not be treated as a physical-leak label. Values are not normalized yet. Before training, split households/seeds into train, validation, and test groups **before** creating windows, keep scenario variants of the same seed together, and fit any normalization only on training data to avoid evaluation leakage.
+
+This is data preparation for future sequence-model experiments, not a trained model or an evaluation result.
+
 ## Checks
 
 Run from the repository root:
