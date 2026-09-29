@@ -12,3 +12,6 @@ export type {
 
 export { createMeterWindows } from "./windows";
 export type { MeterWindow } from "./windows";
+
+export { splitHouseholdSeeds } from "./splits";
+export type { HouseholdSeedSplit } from "./splits";

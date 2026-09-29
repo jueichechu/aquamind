@@ -48,6 +48,17 @@ These are transparent simulation assumptions, not a scientifically validated hou
 
 Each window contains only interval-average flow values in `flowRatesGpm`, with synthetic `hasAnomaly` ground truth stored separately. This label includes irrigation conservation opportunities; it must not be treated as a physical-leak label. Values are not normalized yet. Before training, split households/seeds into train, validation, and test groups **before** creating windows, keep scenario variants of the same seed together, and fit any normalization only on training data to avoid evaluation leakage.
 
+`splitHouseholdSeeds(seeds)` returns sorted, deduplicated `train`, `validation`, and `test` seed lists. A fixed integer hash assigns approximately 70%/15%/15%; assignments stay stable when seeds are reordered or added. Small collections can have empty splits. Only unsigned 32-bit integers are accepted, avoiding aliases introduced by the simulator's seed coercion.
+
+```ts
+import { splitHouseholdSeeds } from "@/lib/water";
+
+const split = splitHouseholdSeeds(Array.from({ length: 1000 }, (_, seed) => seed));
+// Generate every scenario for a seed within that seed's assigned split.
+```
+
+Persist the returned seed lists with future experiment artifacts. All current seeds still use the same household assumptions, so holding out seeds tests unseen simulated usage, not generalization to real households.
+
 This is data preparation for future sequence-model experiments, not a trained model or an evaluation result.
 
 ## Checks
