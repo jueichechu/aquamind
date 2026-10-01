@@ -15,3 +15,6 @@ export type { MeterWindow } from "./windows";
 
 export { splitHouseholdSeeds } from "./splits";
 export type { HouseholdSeedSplit } from "./splits";
+
+export { createMeterExperimentDataset } from "./experiments";
+export type { ExperimentWindow, MeterExperimentDataset } from "./experiments";
