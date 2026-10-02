@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "data:export": "tsc -p tsconfig.export.json && node out/dataset/scripts/export-dataset.js"
   },
   "dependencies": {
     "next": "16.3.5",
