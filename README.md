@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. PyTorch, FastAPI, LLMs, MCP, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. An untrained PyTorch autoencoder is implemented separately; FastAPI, LLMs, MCP, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -105,7 +105,21 @@ test_features = normalizer.transform(dataset.test)
 parameters = asdict(normalizer)  # JSON-serializable; save with future model artifacts.
 ```
 
-The global mean and population standard deviation use only training flow values. Constant training data uses a scale of one. The same frozen parameters apply to every split without clipping; held-out outliers may exceed the training range. Transform results contain only numerical flow features, with labels and provenance retained separately in the immutable loaded windows. Parameters include the source file's SHA-256 and training value count. This module does not train a model or calculate evaluation metrics; PyTorch integration is the next step.
+The global mean and population standard deviation use only training flow values. Constant training data uses a scale of one. The same frozen parameters apply to every split without clipping; held-out outliers may exceed the training range. Transform results contain only numerical flow features, with labels and provenance retained separately in the immutable loaded windows. Parameters include the source file's SHA-256 and training value count. This module does not train a model or calculate evaluation metrics.
+
+## PyTorch model
+
+`ml/aquamind_ml/model.py` implements an LSTM autoencoder: a 32-unit encoder compresses a sequence into an 8-value latent vector; an LSTM decoder reconstructs the flow sequence from that vector. Input and output shapes are `[batch, time, 1]` with normalized float32 flow values. The decoder does not receive the original observations. `reconstruction_errors` returns squared errors per interval and mean squared error per window, not leak probabilities or classifications. No threshold or trained production weights exist yet.
+
+Create an isolated environment and run all Python tests from the repository root:
+
+```sh
+python3 -m venv ml/.venv
+ml/.venv/bin/python -m pip install -r ml/requirements.txt
+PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -v
+```
+
+The model tests check gradients, sequence reconstruction learning on a simple fixture, and saved-weight round trips. These tests do not establish held-out leak accuracy. Reproducible training, validation-based threshold selection, and test-set evaluation remain to be implemented.
 
 ## Checks
 
@@ -134,4 +148,4 @@ The existing `next/font` configuration fetches Google Fonts during builds, so an
 - `apps/web/src/app/demo/`: demo shell and interactive household dashboard.
 - `apps/web/src/lib/water/`: domain types, scenario definitions, generator, and tests.
 
-The repository is a pnpm workspace. Backend and model work remain future development; the current runnable application is `apps/web`.
+The repository is a pnpm workspace. Python data preparation and the untrained LSTM autoencoder live in `ml/`; backend serving and model training remain future development. The current runnable web application is `apps/web`.
