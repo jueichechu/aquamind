@@ -83,6 +83,30 @@ The JSON contains the dataset schema version, synthetic disclosure, seed assignm
 python3 -c 'import json; from pathlib import Path; d = json.loads(Path("ml/data/generated/meter-experiment.json").read_text()); print({s: len(d[s]) for s in ("train", "validation", "test")})'
 ```
 
+## Python loading and normalization
+
+The dependency-free Python module in `ml/aquamind_ml/data.py` loads schema-v1 exports, validates nonempty disjoint seed groups, 96-value sequences, UTC window boundaries, and synthetic labels, and rejects anomalous training windows. Use Python 3.12 or newer. From the repository root:
+
+```sh
+PYTHONPATH=ml python3 -m unittest discover -s ml/tests -v
+```
+
+For a Python script run with `PYTHONPATH=ml`:
+
+```python
+from dataclasses import asdict
+from aquamind_ml.data import FlowNormalizer, load_dataset
+
+dataset = load_dataset("ml/data/generated/meter-experiment.json")
+normalizer = FlowNormalizer.fit(dataset)
+train_features = normalizer.transform(dataset.train)
+validation_features = normalizer.transform(dataset.validation)
+test_features = normalizer.transform(dataset.test)
+parameters = asdict(normalizer)  # JSON-serializable; save with future model artifacts.
+```
+
+The global mean and population standard deviation use only training flow values. Constant training data uses a scale of one. The same frozen parameters apply to every split without clipping; held-out outliers may exceed the training range. Transform results contain only numerical flow features, with labels and provenance retained separately in the immutable loaded windows. Parameters include the source file's SHA-256 and training value count. This module does not train a model or calculate evaluation metrics; PyTorch integration is the next step.
+
 ## Checks
 
 Run from the repository root:
