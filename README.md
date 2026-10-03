@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. An untrained PyTorch autoencoder is implemented separately; FastAPI, LLMs, MCP, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder and local training command are implemented separately; FastAPI, LLMs, MCP, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -109,7 +109,7 @@ The global mean and population standard deviation use only training flow values.
 
 ## PyTorch model
 
-`ml/aquamind_ml/model.py` implements an LSTM autoencoder: a 32-unit encoder compresses a sequence into an 8-value latent vector; an LSTM decoder reconstructs the flow sequence from that vector. Input and output shapes are `[batch, time, 1]` with normalized float32 flow values. The decoder does not receive the original observations. `reconstruction_errors` returns squared errors per interval and mean squared error per window, not leak probabilities or classifications. No threshold or trained production weights exist yet.
+`ml/aquamind_ml/model.py` implements an LSTM autoencoder: a 32-unit encoder compresses a sequence into an 8-value latent vector; an LSTM decoder reconstructs the flow sequence from that vector. Input and output shapes are `[batch, time, 1]` with normalized float32 flow values. The decoder does not receive the original observations. `reconstruction_errors` returns squared errors per interval and mean squared error per window, not leak probabilities or classifications. No threshold or validated production model exists yet.
 
 Create an isolated environment and run all Python tests from the repository root:
 
@@ -119,7 +119,17 @@ ml/.venv/bin/python -m pip install -r ml/requirements.txt
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -v
 ```
 
-The model tests check gradients, sequence reconstruction learning on a simple fixture, and saved-weight round trips. These tests do not establish held-out leak accuracy. Reproducible training, validation-based threshold selection, and test-set evaluation remain to be implemented.
+The model tests check gradients, sequence reconstruction learning on a simple fixture, and saved-weight round trips. These tests do not establish held-out leak accuracy.
+
+Train on the exported dataset:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.train --dataset ml/data/generated/meter-experiment.json --output ml/artifacts/lstm-v1 --epochs 20
+```
+
+Training uses one CPU thread, seed 42 by default, deterministic PyTorch algorithms, Adam, and shuffled normal training windows. The saved checkpoint is the epoch with lowest normal-validation reconstruction MSE; test windows are never transformed or scored during training. Validation anomalies are reserved for future threshold calibration. The command refuses an existing output directory. It writes `weights.pt` and then `training.json`, the completion marker containing configuration, normalization, epoch losses, selected epoch, environment, and dataset/source/weight checksums. Keep both files together. Incomplete directories without the report are not usable artifacts.
+
+Use the same source, dataset, configuration, and environment to reproduce a run. Cross-platform or cross-version bitwise reproducibility is not promised. Training tests verify identical weights on repeated CPU runs and independence from test windows. Validation-based threshold selection and held-out precision/recall/F1 evaluation remain to be implemented; reconstruction loss alone does not establish held-out leak-detection accuracy.
 
 ## Checks
 
@@ -148,4 +158,4 @@ The existing `next/font` configuration fetches Google Fonts during builds, so an
 - `apps/web/src/app/demo/`: demo shell and interactive household dashboard.
 - `apps/web/src/lib/water/`: domain types, scenario definitions, generator, and tests.
 
-The repository is a pnpm workspace. Python data preparation and the untrained LSTM autoencoder live in `ml/`; backend serving and model training remain future development. The current runnable web application is `apps/web`.
+The repository is a pnpm workspace. Python data preparation, the LSTM autoencoder, and its training command live in `ml/`; backend serving and held-out model evaluation remain future development. The current runnable web application is `apps/web`.
