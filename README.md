@@ -129,7 +129,19 @@ PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.train --dataset ml/data/generat
 
 Training uses one CPU thread, seed 42 by default, deterministic PyTorch algorithms, Adam, and shuffled normal training windows. The saved checkpoint is the epoch with lowest normal-validation reconstruction MSE; test windows are never transformed or scored during training. Validation anomalies are reserved for future threshold calibration. The command refuses an existing output directory. It writes `weights.pt` and then `training.json`, the completion marker containing configuration, normalization, epoch losses, selected epoch, environment, and dataset/source/weight checksums. Keep both files together. Incomplete directories without the report are not usable artifacts.
 
-Use the same source, dataset, configuration, and environment to reproduce a run. Cross-platform or cross-version bitwise reproducibility is not promised. Training tests verify identical weights on repeated CPU runs and independence from test windows. Validation-based threshold selection and held-out precision/recall/F1 evaluation remain to be implemented; reconstruction loss alone does not establish held-out leak-detection accuracy.
+Use the same source, dataset, configuration, and environment to reproduce a run. Cross-platform or cross-version bitwise reproducibility is not promised. Training tests verify identical weights on repeated CPU runs and independence from test windows. Reconstruction loss alone does not establish held-out leak-detection accuracy.
+
+Calibrate and evaluate a completed training run:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.evaluate --dataset ml/data/generated/meter-experiment.json --checkpoint ml/artifacts/lstm-v1 --output evals/reports/lstm-v1.json
+```
+
+The evaluator verifies dataset and weight checksums and training-only normalization. It selects a daily-window reconstruction-MSE threshold by maximizing physical-leak F1 on validation windows, using the higher threshold to break ties and `score >= threshold` for classification. Only then does it score test windows. Overnight leaks and running toilets are positives; normal days and irrigation conservation opportunities are negatives. Undefined precision/recall/F1 denominators produce zero.
+
+The generated JSON records validation and test precision/recall/F1, confusion counts, per-scenario breakdowns, individual test predictions, the frozen threshold, a weight-derived model version, and training provenance. Output files cannot overwrite earlier reports. The report is synthetic seed-holdout evidence, not field validation, a plumbing diagnosis, or an interval-level detection benchmark. Validation results are optimistic because validation selects both the checkpoint and threshold. Once inspected, test results must not drive hyperparameter selection; use validation for development and reserve fresh unseen seeds for a later confirmatory evaluation.
+
+The first 20-epoch baseline is recorded in the generated [baseline summary](evals/baselines/lstm-v1.json): test precision 0.2420, recall 0.6905, and F1 0.3583 across 1,470 daily windows. This baseline does **not** provide adequate leak discrimination. There are 636 false positives and 91 missed leak windows. Treat this as an initial measured baseline requiring improvement, not a validated leak detector. Reproduction commands in the summary assume fresh output paths; full per-window reports and weights remain in ignored local artifact directories.
 
 ## Checks
 
@@ -158,4 +170,4 @@ The existing `next/font` configuration fetches Google Fonts during builds, so an
 - `apps/web/src/app/demo/`: demo shell and interactive household dashboard.
 - `apps/web/src/lib/water/`: domain types, scenario definitions, generator, and tests.
 
-The repository is a pnpm workspace. Python data preparation, the LSTM autoencoder, and its training command live in `ml/`; backend serving and held-out model evaluation remain future development. The current runnable web application is `apps/web`.
+The repository is a pnpm workspace. Python data preparation, the LSTM autoencoder, training, and held-out evaluation live in `ml/`; backend serving remains future development. The current runnable web application is `apps/web`.

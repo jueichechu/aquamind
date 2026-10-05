@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "source": "synthetic",
+  "unit": "96-interval daily window",
+  "target": "physical leak; irrigation-after-rain is negative",
+  "score": "mean squared reconstruction error in normalized flow units",
+  "threshold": 0.6213623881340027,
+  "comparison": ">=",
+  "selection": "maximum validation F1; higher threshold breaks ties",
+  "dataset_sha256": "15b8b1e4a10b7b4ae4edd4fd0d7bc4e5bde63d16d6d47fdf21b78c68a7e17d16",
+  "weights_sha256": "90727cc54eb5c2c3a700ad7d869936f25c8a6f5b23ad0987a229454eca7d32fb",
+  "model_version": "lstm-90727cc54eb5",
+  "evaluation_source_sha256": "f8e123a320d6e667f493c4827528d4795b59788ca46859b286c35a700e1cdfc5",
+  "evaluation_torch": "2.14.1",
+  "validation": {
+    "count": 1440,
+    "tp": 195,
+    "fp": 617,
+    "fn": 93,
+    "tn": 535,
+    "precision": 0.24014778325123154,
+    "recall": 0.6770833333333334,
+    "f1": 0.35454545454545455
+  },
+  "test": {
+    "count": 1470,
+    "tp": 203,
+    "fp": 636,
+    "fn": 91,
+    "tn": 540,
+    "precision": 0.24195470798569726,
+    "recall": 0.6904761904761905,
+    "f1": 0.35834068843777583
+  },
+  "test_by_scenario": {
+    "irrigation-after-rain": {
+      "count": 147,
+      "tp": 0,
+      "fp": 134,
+      "fn": 0,
+      "tn": 13,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "normal": {
+      "count": 1029,
+      "tp": 0,
+      "fp": 502,
+      "fn": 0,
+      "tn": 527,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "overnight-leak": {
+      "count": 147,
+      "tp": 129,
+      "fp": 0,
+      "fn": 18,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 0.8775510204081632,
+      "f1": 0.9347826086956522
+    },
+    "running-toilet": {
+      "count": 147,
+      "tp": 74,
+      "fp": 0,
+      "fn": 73,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 0.5034013605442177,
+      "f1": 0.669683257918552
+    }
+  },
+  "limitations": [
+    "Synthetic seed holdout, not real-world field validation",
+    "Scenario variants within each split are correlated",
+    "Validation selects both checkpoint and threshold; validation F1 is optimistic",
+    "Daily reconstruction score is not an interval-level diagnosis or probability"
+  ],
+  "full_report_sha256": "25481551b8931304d9d726f58b41a8641db4bd8dcc237d2846ed13138a133378",
+  "training_config": {
+    "seed": 42,
+    "epochs": 20,
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "hidden_size": 32,
+    "latent_size": 8
+  },
+  "training_environment": {
+    "python": "3.14.2",
+    "torch": "2.14.1",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "device": "cpu",
+    "threads": 1
+  },
+  "selected_epoch": 20,
+  "reproduction": [
+    "pnpm data:export",
+    "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.train --dataset ml/data/generated/meter-experiment.json --output ml/artifacts/lstm-baseline-v1 --epochs 20",
+    "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.evaluate --dataset ml/data/generated/meter-experiment.json --checkpoint ml/artifacts/lstm-baseline-v1 --output evals/reports/lstm-baseline-v1.json"
+  ]
+}
