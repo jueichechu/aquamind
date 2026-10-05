@@ -41,7 +41,8 @@ def select_threshold(scores: list[float], labels: list[bool]) -> float:
     ))
 
 
-def evaluate(dataset_path: Path, checkpoint: Path) -> dict:
+def load_checkpoint(dataset_path: Path, checkpoint: Path):
+    """Load and verify a trained checkpoint without scoring any split."""
     dataset = load_dataset(dataset_path)
     training = json.loads((checkpoint / "training.json").read_text())
     weights = checkpoint / "weights.pt"
@@ -56,6 +57,11 @@ def evaluate(dataset_path: Path, checkpoint: Path) -> dict:
     model = LSTMAutoencoder(training["config"]["hidden_size"], training["config"]["latent_size"])
     model.load_state_dict(torch.load(weights, map_location="cpu", weights_only=True))
     model.eval()
+    return dataset, model, normalizer, training, weights_hash
+
+
+def evaluate(dataset_path: Path, checkpoint: Path) -> dict:
+    dataset, model, normalizer, training, weights_hash = load_checkpoint(dataset_path, checkpoint)
 
     def score(windows):
         flows = torch.tensor(normalizer.transform(windows), dtype=torch.float32).unsqueeze(-1)

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "source": "synthetic",
+  "split": "validation",
+  "dataset_sha256": "15b8b1e4a10b7b4ae4edd4fd0d7bc4e5bde63d16d6d47fdf21b78c68a7e17d16",
+  "weights_sha256": "90727cc54eb5c2c3a700ad7d869936f25c8a6f5b23ad0987a229454eca7d32fb",
+  "source_sha256": {
+    "calibration.py": "ebfb9e6b8be7542cb3473468ee4eef50afeacc3ee7d4141294277cd9fbe8eebb",
+    "validate_scoring.py": "9f8ec48ad0f4892f318e99f8023659bf8b94a5d34f53e24065e9e3db04c67615"
+  },
+  "test_evaluated": false,
+  "limitations": [
+    "Development results, not held-out performance",
+    "All seeds share fixed household schedules and leak patterns",
+    "Requires midnight UTC alignment; household/time-zone variation untested",
+    "Fresh unseen seeds required for confirmatory testing"
+  ],
+  "results": {
+    "daily_mse": {
+      "threshold": 0.6213623881340027,
+      "metrics": {
+        "count": 1440,
+        "tp": 195,
+        "fp": 617,
+        "fn": 93,
+        "tn": 535,
+        "precision": 0.24014778325123154,
+        "recall": 0.6770833333333334,
+        "f1": 0.35454545454545455
+      }
+    },
+    "positive_standardized_residual": {
+      "threshold": 7.725719451904297,
+      "metrics": {
+        "count": 1440,
+        "tp": 288,
+        "fp": 0,
+        "fn": 0,
+        "tn": 1152,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      }
+    }
+  },
+  "full_report_sha256": "5a79d83e5aa667f6baf3e808f9bfb71b70c82ea1a624e883a116b3e96658fd0b",
+  "command": "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.validate_scoring --dataset ml/data/generated/meter-experiment.json --checkpoint ml/artifacts/lstm-baseline-v1 --output evals/reports/calibrated-validation.json"
+}

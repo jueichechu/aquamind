@@ -143,6 +143,16 @@ The generated JSON records validation and test precision/recall/F1, confusion co
 
 The first 20-epoch baseline is recorded in the generated [baseline summary](evals/baselines/lstm-v1.json): test precision 0.2420, recall 0.6905, and F1 0.3583 across 1,470 daily windows. This baseline does **not** provide adequate leak discrimination. There are 636 false positives and 91 missed leak windows. Treat this as an initial measured baseline requiring improvement, not a validated leak detector. Reproduction commands in the summary assume fresh output paths; full per-window reports and weights remain in ignored local artifact directories.
 
+### Validation-only scoring development
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.validate_scoring --dataset ml/data/generated/meter-experiment.json --checkpoint ml/artifacts/lstm-baseline-v1 --output evals/reports/calibrated-validation.json
+```
+
+This compares daily MSE with positive standardized reconstruction residuals, using the same trained LSTM weights. For each of 96 daily slots, calibration fits residual mean and population standard deviation on normal training windows only. The standard deviation has a fixed 0.01 floor in normalized-flow units. The daily score is the mean squared positive standardized residual. This reduces the influence of naturally variable fixture-use periods without using scenario labels as input features. Windows must align to midnight UTC; adapting the daily baseline to local household schedules remains future work.
+
+The generated [validation comparison](evals/baselines/calibrated-validation.json) reports F1 improving from 0.3545 to 1.0000 on 1,440 validation windows. This is **development evidence, not held-out accuracy**. Threshold selection uses validation labels, all seeds share simple fixed simulator schedules, and the test split is never scored by this command. The prior held-out result remains unchanged. Freeze the scoring method, calibration, and threshold before a confirmatory evaluation on fresh unseen seeds.
+
 ## Checks
 
 Run from the repository root:
