@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "source": "synthetic",
+  "split": "fresh-seed test",
+  "model_version": "detector-69f56d5eb7184a9c",
+  "dataset_sha256": "abc5908e346439ca4be95bceb8fd54b9eb1086fdd1b15763e3b8afdd04c27307",
+  "detector_manifest_sha256": "69f56d5eb7184a9cd3e9e8e4a5e2e94d387c38c1161fa4f43a1ec230b6e1b526",
+  "weights_sha256": "90727cc54eb5c2c3a700ad7d869936f25c8a6f5b23ad0987a229454eca7d32fb",
+  "threshold": 7.725719451904297,
+  "refitted": false,
+  "export_seed_count": 1000,
+  "test_seed_count": 145,
+  "test": {
+    "count": 1450,
+    "tp": 287,
+    "fp": 0,
+    "fn": 3,
+    "tn": 1160,
+    "precision": 1.0,
+    "recall": 0.9896551724137931,
+    "f1": 0.9948006932409013
+  },
+  "by_scenario": {
+    "irrigation-after-rain": {
+      "count": 145,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "tn": 145,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "normal": {
+      "count": 1015,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "tn": 1015,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "overnight-leak": {
+      "count": 145,
+      "tp": 145,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "running-toilet": {
+      "count": 145,
+      "tp": 142,
+      "fp": 0,
+      "fn": 3,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 0.9793103448275862,
+      "f1": 0.9895470383275261
+    }
+  },
+  "limitations": [
+    "Unseen seeds from the same fixed synthetic household model",
+    "Not real-world or unseen-household validation",
+    "Daily window classification; not interval-level localization",
+    "Calibration requires midnight UTC alignment"
+  ],
+  "test_seeds_sha256": "02403634d79144a85f8719661d5fc0c3b971de76c6be533f29301df97bac02a3",
+  "export_seed_range": [
+    10000,
+    10999
+  ],
+  "source_sha256": {
+    "detector.py": "85600ae57d342a525db131090daa6637d31784956fd7150de2701caed08a3002",
+    "confirm.py": "ed914fa765282510aa2b0ca9f9df5a1ef3a4a6603809f557457f027ef4ab51f8",
+    "calibration.py": "ebfb9e6b8be7542cb3473468ee4eef50afeacc3ee7d4141294277cd9fbe8eebb",
+    "model.py": "a10a597c5c5fb63ffe9033e88ddfbef6196c67e12814d2390c3cb5ecf1beabd1"
+  },
+  "reproduction": [
+    "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.detector --dataset ml/data/generated/meter-experiment.json --checkpoint ml/artifacts/lstm-baseline-v1 --output ml/artifacts/detector-v1",
+    "pnpm data:export --seed-start 10000 --seed-count 1000 --output ml/data/generated/confirm-v1.json",
+    "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.confirm --dataset ml/data/generated/confirm-v1.json --detector ml/artifacts/detector-v1 --output evals/reports/confirm-v1.json"
+  ]
+}

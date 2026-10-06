@@ -153,6 +153,22 @@ This compares daily MSE with positive standardized reconstruction residuals, usi
 
 The generated [validation comparison](evals/baselines/calibrated-validation.json) reports F1 improving from 0.3545 to 1.0000 on 1,440 validation windows. This is **development evidence, not held-out accuracy**. Threshold selection uses validation labels, all seeds share simple fixed simulator schedules, and the test split is never scored by this command. The prior held-out result remains unchanged. Freeze the scoring method, calibration, and threshold before a confirmatory evaluation on fresh unseen seeds.
 
+### Frozen detector and fresh-seed confirmation
+
+After reproducing the baseline training run, freeze its calibrated scoring parameters before generating confirmation data:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.detector --dataset ml/data/generated/meter-experiment.json --checkpoint ml/artifacts/lstm-baseline-v1 --output ml/artifacts/detector-v1
+pnpm data:export --seed-start 10000 --seed-count 1000 --output ml/data/generated/confirm-v1.json
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.confirm --dataset ml/data/generated/confirm-v1.json --detector ml/artifacts/detector-v1 --output evals/reports/confirm-v1.json
+```
+
+The detector directory contains `weights.pt` and `detector.json`: model dimensions, training-only normalization and residual calibration, the validation-selected threshold, development seed exclusions, and source/weight checksums. Its version hashes the manifest, so changing calibration or the threshold also changes the version. `FrozenDetector.predict` loads these parameters and never fits them; it uses flow values and UTC window alignment, not scenario or anomaly labels. Keep both files together. This is a local inference interface, not yet a deployed API.
+
+Confirmation rejects overlap with any original training, validation, or previously inspected test seed. Only the new export's test split is scored. The generated [confirmation summary](evals/baselines/confirm-v1.json) records **precision 1.0000, recall 0.9897, and F1 0.9948** across **1,450 daily windows from 145 unseen synthetic seeds**, using a frozen threshold of 7.725719451904297. There were 287 true positives, 1,160 true negatives, no false positives, and three false negatives. No refitting occurred.
+
+This supports a PyTorch LSTM autoencoder **with training-calibrated reconstruction scores on a synthetic seed holdout**. It does not demonstrate generalization to different household schedules or real-world meters. Interpret these results only as synthetic evaluation, with the dataset and protocol qualifications above. Earlier baseline results remain recorded for comparison; confirmation results must not be used to retune this detector.
+
 ## Checks
 
 Run from the repository root:
