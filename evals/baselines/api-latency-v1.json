@@ -1,0 +1,56 @@
+{
+  "requests": 1000,
+  "concurrency": 4,
+  "warmup_requests": 50,
+  "successful_requests": 1000,
+  "failed_requests": 0,
+  "errors": {},
+  "latency": {
+    "p50_ms": 7.847292,
+    "p95_ms": 15.360792,
+    "p99_ms": 38.62125
+  },
+  "all_attempt_latency": {
+    "p50_ms": 7.847292,
+    "p95_ms": 15.360792,
+    "p99_ms": 38.62125
+  },
+  "duration_seconds": 2.311702499864623,
+  "requests_per_second": 432.5816146578384,
+  "schema_version": 1,
+  "model_version": "detector-69f56d5eb7184a9c",
+  "dataset_sha256": "15b8b1e4a10b7b4ae4edd4fd0d7bc4e5bde63d16d6d47fdf21b78c68a7e17d16",
+  "path": "POST /v1/anomaly/predict",
+  "transport": "HTTP/1.1 over loopback TCP",
+  "timing": "client POST call through full response body; includes JSON encoding, TCP, validation, queueing, inference and response serialization",
+  "warmup": "sequential requests before measurement; excludes server startup/model loading",
+  "load": "closed-loop concurrent workers with a shared keep-alive pool; no retries",
+  "percentile_method": "nearest rank on successful requests; all-attempt percentiles also recorded",
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.14.2",
+    "logical_cpus": 10,
+    "packages": {
+      "torch": "2.14.1",
+      "fastapi": "0.142.2",
+      "uvicorn": "0.54.0",
+      "httpx": "0.28.1"
+    },
+    "server_workers": 1,
+    "torch_threads": 1,
+    "inference_serialized": true
+  },
+  "source_sha256": {
+    "api.py": "5153786669df252fc63898f1012f9d1653aeed857c1c2db3db022b34b75b7a13",
+    "benchmark.py": "3cf64c58a3fdc0db446fee5b8cc507623311335f362fc8c809fb5cbb2e303b8d"
+  },
+  "limitations": [
+    "Local warm-server measurement, not deployed internet latency",
+    "Load generator and server share one machine",
+    "Cold start excluded"
+  ],
+  "full_report_sha256": "9c51ef1bcb08fe97a7981c2875ba2a0209c9ae0a99707de9fadf1d9bfad13c96",
+  "payloads": "Validation daily windows in export order, cycling if requests exceed window count; one 96-reading window per request",
+  "reproduction": "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.benchmark --dataset ml/data/generated/meter-experiment.json --detector ml/artifacts/detector-v1 --requests 1000 --concurrency 4 --warmup 50 --output evals/reports/api-latency-v1.json"
+}

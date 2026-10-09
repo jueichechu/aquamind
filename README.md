@@ -182,7 +182,19 @@ Open `http://127.0.0.1:8001/docs` for the typed API contract. `GET /health` repo
 
 The response includes `score`, `is_leak`, `threshold`, `model_version`, `request_id`, and synthetic training-data disclosure. Scores are calibrated reconstruction errors, not probabilities. They classify a whole day and do not localize individual leak intervals. Model loading occurs once at startup; inference uses one PyTorch CPU thread and serialized model access. Validation errors omit raw input, and structured log events contain identifiers/status/timing or error types, not meter readings. Responses include `X-Request-ID` and disable caching.
 
-This service is local-only at this stage. Public request-size/rate limits, deployment configuration, and the measured HTTP latency benchmark remain future work. No cross-origin browser access is enabled, and the dashboard is not yet connected to this API. No API keys are needed for local inference.
+This service is local-only at this stage. Public request-size/rate limits and deployment configuration remain future work. No cross-origin browser access is enabled, and the dashboard is not yet connected to this API. No API keys are needed for local inference.
+
+### HTTP latency benchmark
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.benchmark --dataset ml/data/generated/meter-experiment.json --detector ml/artifacts/detector-v1 --requests 1000 --concurrency 4 --warmup 50 --output evals/reports/api-latency-v1.json
+```
+
+The command starts and stops its own Uvicorn process on loopback port 8002 (change with `--port`). It waits for readiness, sends sequential warm-up requests, then uses concurrent HTTP clients to submit one 96-reading window per request to `POST /v1/anomaly/predict`. Payloads cycle through validation windows in export order. Timings cover the client POST call through receipt of the full response, including JSON encoding, TCP, server validation, queueing, inference, and response serialization. Startup/model loading and client-side response-schema checks are outside the latency timer. Server JSON request logging remains enabled, with output captured to a temporary file.
+
+Percentiles use nearest rank. The report records all timed samples, failures without retries, warm-up count, concurrency, throughput, source hashes, model version, and environment. Failures cause a nonzero exit after the report is saved; successful-request and all-attempt percentiles are reported separately. Existing report files cannot be overwritten.
+
+The generated [local latency baseline](evals/baselines/api-latency-v1.json) measured **p50 7.85 ms, p95 15.36 ms, p99 38.62 ms**, with **1,000/1,000 successful requests**, concurrency 4, and 50 warm-up requests. This supports a local warm-server p95 below 100 ms through the actual FastAPI HTTP path. It does not establish deployed internet latency, cold-start behavior, or performance on different hardware; client and server shared the same macOS ARM machine with one server worker and one PyTorch CPU thread.
 
 ## Checks
 
