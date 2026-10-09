@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder and local training command are implemented separately; FastAPI, LLMs, MCP, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, and local FastAPI inference service are implemented separately; LLMs, MCP, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -115,7 +115,7 @@ Create an isolated environment and run all Python tests from the repository root
 
 ```sh
 python3 -m venv ml/.venv
-ml/.venv/bin/python -m pip install -r ml/requirements.txt
+ml/.venv/bin/python -m pip install -r ml/requirements-api.txt
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -v
 ```
 
@@ -169,6 +169,21 @@ Confirmation rejects overlap with any original training, validation, or previous
 
 This supports a PyTorch LSTM autoencoder **with training-calibrated reconstruction scores on a synthetic seed holdout**. It does not demonstrate generalization to different household schedules or real-world meters. Interpret these results only as synthetic evaluation, with the dataset and protocol qualifications above. Earlier baseline results remain recorded for comparison; confirmation results must not be used to retune this detector.
 
+## Local inference API
+
+After creating `ml/artifacts/detector-v1`, install the API dependencies and start the server from the repository root:
+
+```sh
+ml/.venv/bin/python -m pip install -r ml/requirements-api.txt
+PYTHONPATH=ml AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 ml/.venv/bin/python -m uvicorn aquamind_ml.api:app --host 127.0.0.1 --port 8001
+```
+
+Open `http://127.0.0.1:8001/docs` for the typed API contract. `GET /health` reports process liveness; `GET /ready` returns 503 if the model could not load. `POST /v1/anomaly/predict` accepts `start_timestamp` (midnight UTC) and `flow_rates_gpm` (exactly 96 finite numeric values from 0 to 1,000 GPM, representing consecutive 15-minute intervals). Unknown fields, numeric strings, booleans, negative values, and misaligned windows are rejected. Labels are neither required nor accepted.
+
+The response includes `score`, `is_leak`, `threshold`, `model_version`, `request_id`, and synthetic training-data disclosure. Scores are calibrated reconstruction errors, not probabilities. They classify a whole day and do not localize individual leak intervals. Model loading occurs once at startup; inference uses one PyTorch CPU thread and serialized model access. Validation errors omit raw input, and structured log events contain identifiers/status/timing or error types, not meter readings. Responses include `X-Request-ID` and disable caching.
+
+This service is local-only at this stage. Public request-size/rate limits, deployment configuration, and the measured HTTP latency benchmark remain future work. No cross-origin browser access is enabled, and the dashboard is not yet connected to this API. No API keys are needed for local inference.
+
 ## Checks
 
 Run from the repository root:
@@ -196,4 +211,4 @@ The existing `next/font` configuration fetches Google Fonts during builds, so an
 - `apps/web/src/app/demo/`: demo shell and interactive household dashboard.
 - `apps/web/src/lib/water/`: domain types, scenario definitions, generator, and tests.
 
-The repository is a pnpm workspace. Python data preparation, the LSTM autoencoder, training, and held-out evaluation live in `ml/`; backend serving remains future development. The current runnable web application is `apps/web`.
+The repository is a pnpm workspace. Python data preparation, the LSTM autoencoder, training, evaluation, and local FastAPI serving live in `ml/`. The current runnable web application is `apps/web`.
