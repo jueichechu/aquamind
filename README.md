@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, local FastAPI inference, and read-only MCP anomaly/meter tools are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, local FastAPI inference, and read-only MCP anomaly/meter/utility tools are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -206,7 +206,7 @@ PYTHONPATH=ml AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 AQUAMIND_MCP_SCOPE
 
 The tool `detect_water_anomaly` accepts a `request` object with the same `start_timestamp` and `flow_rates_gpm` fields as the HTTP API. Its advertised input and output schemas are generated from the shared Pydantic contracts. It returns real frozen-model predictions with model version, threshold, request ID, and synthetic-training disclosure. Tool annotations identify it as read-only, non-destructive, and closed-world. Standard output is reserved for MCP protocol messages.
 
-Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read` or `meter:read`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. No state-changing tools are exposed yet, so approval workflows remain future work.
+Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read`, `meter:read`, or `utility:read`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. No state-changing tools are exposed yet, so approval workflows remain future work.
 
 Tests negotiate an actual MCP session with a subprocess, discover the tool and output schema, and compare its result with direct PyTorch inference. Additional protocol tests cover denied permissions, malformed requests, and unavailable models. These are development checks, not an end-to-end agent evaluation.
 
@@ -227,6 +227,32 @@ Supply a window identity from the export, for example the first normal training 
 Both tools return the synthetic-source disclosure, dataset SHA-256, window identity, exclusive end time, reading count, total gallons, mean GPM, and peak fifteen-minute average GPM. Series also returns the 96 readings in chronological order. Gallons are calculated as the sum of average GPM × 15 minutes. Simulator anomaly/leak labels are omitted; a usage summary is not a model diagnosis. UTC timestamp spellings normalize to the same instant.
 
 The dataset is loaded once at startup. Missing windows, absent files, and invalid exports produce tool errors. Callers cannot select filesystem paths. Grant both scopes as `anomaly:read,meter:read` and configure both artifact paths to enable model inference alongside meter reads. These are local synthetic-window tools; household authentication, window discovery, and dashboard/agent integration are not implemented yet. The export's test split remains ML evaluation data, not an independent agent benchmark.
+
+### Utility estimates
+
+Three read-only tools require `utility:read`: `get_utility_rate`, `estimate_water_cost`, and `estimate_conservation_savings`. Enable them with `AQUAMIND_MCP_SCOPES=utility:read` (or add that scope to the comma-separated list). They need no model artifact, dataset, or API key.
+
+The versioned `demo-flat-usd-v1` rate is an **illustrative assumption of $5.00 per 1,000 gallons**, not a real utility tariff. Every result discloses the rate and excludes sewer, fixed fees, taxes, and tiered pricing. Money is returned as a decimal string, rounded half-up to cents after calculation.
+
+Example tool arguments:
+
+```json
+{}
+```
+
+for `get_utility_rate`, and:
+
+```json
+{"request":{"gallons":1000}}
+```
+
+for `estimate_water_cost` (returns $5.00). To project savings:
+
+```json
+{"request":{"baseline_daily_gallons":200,"proposed_daily_gallons":150,"days":30}}
+```
+
+`estimate_conservation_savings` returns 1,500 saved gallons and $7.50 estimated water-only savings. It assumes the 50-gallon daily reduction persists for all 30 days; this is not measured or guaranteed savings. Inputs are caller-supplied, so an agent must obtain meter evidence separately and explain proposed reductions. Volumes must be finite non-negative numbers at most 1,000,000 gallons; durations are integer days from 1 to 366; proposed usage cannot exceed baseline usage. Caller-supplied rates and extra fields are rejected. These tools do not change goals, alerts, or household equipment. Real provider tariffs and billing integration remain unimplemented.
 
 ## Checks
 

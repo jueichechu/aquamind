@@ -16,13 +16,15 @@ from .api import PredictionRequest, PredictionResponse
 from .data import MeterWindow
 from .detector import FrozenDetector
 from .meter import MeterQuery, MeterSeries, MeterStore, MeterSummary
+from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate,
+                      UtilityRate, estimate_cost, estimate_savings)
 
 
 def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset(),
                   meter_path: Path | None = None) -> MCPServer:
     # Copy policy into this server; it cannot be changed through an MCP request.
     granted_scopes = frozenset(scopes)
-    if granted_scopes - {"anomaly:read", "meter:read"}:
+    if granted_scopes - {"anomaly:read", "meter:read", "utility:read"}:
         raise ValueError("Unsupported MCP scope")
     server = MCPServer("AquaMind", version="0.1.0", log_level="WARNING")
     detector = None
@@ -32,6 +34,44 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
         except Exception:
             logging.getLogger(__name__).error("AquaMind MCP detector unavailable")
     lock = Lock()
+
+    def require_utility_scope():
+        if "utility:read" not in granted_scopes:
+            raise ToolError("Permission denied: utility:read required")
+
+    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                           idempotentHint=True, openWorldHint=False))
+    def get_utility_rate() -> UtilityRate:
+        """Return the illustrative USD flat water rate, not a real utility tariff.
+
+        Requires utility:read. Excludes sewer, fixed fees, taxes and tiered pricing.
+        """
+        require_utility_scope()
+        return UtilityRate()
+
+    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                           idempotentHint=True, openWorldHint=False))
+    def estimate_water_cost(request: CostRequest) -> CostEstimate:
+        """Estimate water-only cost for supplied gallons using the illustrative rate.
+
+        Requires utility:read. Returns USD rounded half-up to cents, not a bill.
+        Input volume is caller-supplied; this tool does not retrieve meter data.
+        """
+        require_utility_scope()
+        return estimate_cost(request)
+
+    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                           idempotentHint=True, openWorldHint=False))
+    def estimate_conservation_savings(request: SavingsRequest) -> SavingsEstimate:
+        """Project gallons and water-only USD saved from a proposed daily reduction.
+
+        Requires utility:read. Uses the illustrative rate and caller-supplied daily
+        volumes over 1–366 days. Savings are conditional, not measured or guaranteed.
+        Does not set a goal, change a fixture, or execute a conservation action.
+        """
+        require_utility_scope()
+        return estimate_savings(request)
+
     meter = None
     if meter_path is not None and "meter:read" in granted_scopes:
         try:
