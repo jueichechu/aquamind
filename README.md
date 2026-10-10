@@ -335,3 +335,7 @@ The existing `next/font` configuration fetches Google Fonts during builds, so an
 - `apps/web/src/lib/water/`: domain types, scenario definitions, generator, and tests.
 
 The repository is a pnpm workspace. Python data preparation, the LSTM autoencoder, training, evaluation, and local FastAPI serving live in `ml/`. The current runnable web application is `apps/web`.
+
+## External data foundation
+
+The first real-data integration is a checksum-pinned AMPds2 water-file inspector. See [source, license, limitations and reproduction](docs/datasets/ampds2.md). It inspects real consumption without inventing leak labels; the trained detector and existing reported metrics still use synthetic data. Bill-first inputs and hybrid-data evaluation are planned under the expanded product scope, not implemented yet.

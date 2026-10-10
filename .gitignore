@@ -54,3 +54,5 @@ Thumbs.db
 
 credentials.json
 service-account*.json
+# External research datasets (download locally; retain provenance manifests)
+ml/data/external/

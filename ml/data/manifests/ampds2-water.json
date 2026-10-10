@@ -1,0 +1,13 @@
+{
+  "dataset_doi": "10.7910/DVN/FIE0S4",
+  "dataset_version": "3.1",
+  "file_id": 2699405,
+  "filename": "Water_WHW.csv",
+  "download_url": "https://dataverse.harvard.edu/api/access/datafile/2699405?format=original",
+  "license": "CC-BY-4.0",
+  "citation": "Makonin, S., Ellert, B., Bajic, I. V., and Popowich, F. (2016). Electricity, water, and natural gas consumption of a residential house in Canada from 2012 to 2014. Scientific Data 3, 160037. https://doi.org/10.1038/sdata.2016.37",
+  "bytes": 29692968,
+  "md5": "9ed1418d155baff629e90f88a4a99935",
+  "sha256": "60f958ee1654e1c0ae3262e62228098eb922ea6f55a3ac1eeb5b8e0380693bda",
+  "expected_rows": 1051200
+}

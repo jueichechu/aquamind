@@ -1,0 +1,18 @@
+{
+  "source": "AMPds2",
+  "source_type": "real_residential_precleaned",
+  "sha256": "60f958ee1654e1c0ae3262e62228098eb922ea6f55a3ac1eeb5b8e0380693bda",
+  "rows": 1051200,
+  "interval_seconds": 60,
+  "first_timestamp_utc": "2012-04-01T07:00:00+00:00",
+  "last_timestamp_utc": "2014-04-01T06:59:00+00:00",
+  "nonzero_average_rate_rows": 140240,
+  "max_average_rate_liters_per_minute": 35.0,
+  "counter_rate_discrepancies_over_0_002_liters": 0,
+  "leak_labels": "not_provided",
+  "transformations": [],
+  "anomalies_injected": false,
+  "dataset_doi": "10.7910/DVN/FIE0S4",
+  "file_id": 2699405,
+  "license": "CC-BY-4.0"
+}
