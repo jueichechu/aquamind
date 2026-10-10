@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, local FastAPI inference, and a read-only MCP anomaly tool are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, local FastAPI inference, and read-only MCP anomaly/meter tools are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -196,7 +196,7 @@ Percentiles use nearest rank. The report records all timed samples, failures wit
 
 The generated [local latency baseline](evals/baselines/api-latency-v1.json) measured **p50 7.85 ms, p95 15.36 ms, p99 38.62 ms**, with **1,000/1,000 successful requests**, concurrency 4, and 50 warm-up requests. This supports a local warm-server p95 below 100 ms through the actual FastAPI HTTP path. It does not establish deployed internet latency, cold-start behavior, or performance on different hardware; client and server shared the same macOS ARM machine with one server worker and one PyTorch CPU thread.
 
-## Local MCP anomaly tool
+## Local MCP tools
 
 Install `ml/requirements-mcp.txt` to use the official MCP Python SDK 2.3.0. The server uses the SDK's `MCPServer` and stdio transport. From the repository root, an MCP host can launch:
 
@@ -204,11 +204,29 @@ Install `ml/requirements-mcp.txt` to use the official MCP Python SDK 2.3.0. The 
 PYTHONPATH=ml AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 AQUAMIND_MCP_SCOPES=anomaly:read ml/.venv/bin/python -m aquamind_ml.mcp_server
 ```
 
-The single tool, `detect_water_anomaly`, accepts a `request` object with the same `start_timestamp` and `flow_rates_gpm` fields as the HTTP API. Its advertised input and output schemas are generated from the shared Pydantic contracts. It returns real frozen-model predictions with model version, threshold, request ID, and synthetic-training disclosure. Tool annotations identify it as read-only, non-destructive, and closed-world. Standard output is reserved for MCP protocol messages.
+The tool `detect_water_anomaly` accepts a `request` object with the same `start_timestamp` and `flow_rates_gpm` fields as the HTTP API. Its advertised input and output schemas are generated from the shared Pydantic contracts. It returns real frozen-model predictions with model version, threshold, request ID, and synthetic-training disclosure. Tool annotations identify it as read-only, non-destructive, and closed-world. Standard output is reserved for MCP protocol messages.
 
-Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. No state-changing tools are exposed yet, so approval workflows remain future work.
+Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read` or `meter:read`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. No state-changing tools are exposed yet, so approval workflows remain future work.
 
 Tests negotiate an actual MCP session with a subprocess, discover the tool and output schema, and compare its result with direct PyTorch inference. Additional protocol tests cover denied permissions, malformed requests, and unavailable models. These are development checks, not an end-to-end agent evaluation.
+
+### Meter reads
+
+`get_meter_series` and `get_meter_summary` require the separate `meter:read` scope. They read a host-selected snapshot from the existing TypeScript simulator export; they do not regenerate data in Python. To enable them, run `pnpm data:export` and launch:
+
+```sh
+PYTHONPATH=ml AQUAMIND_METER_DATASET_PATH=ml/data/generated/meter-experiment.json AQUAMIND_MCP_SCOPES=meter:read ml/.venv/bin/python -m aquamind_ml.mcp_server
+```
+
+Supply a window identity from the export, for example the first normal training day for seed 0:
+
+```json
+{"request":{"seed":0,"scenario_id":"normal","start_timestamp":"2026-06-15T00:00:00Z"}}
+```
+
+Both tools return the synthetic-source disclosure, dataset SHA-256, window identity, exclusive end time, reading count, total gallons, mean GPM, and peak fifteen-minute average GPM. Series also returns the 96 readings in chronological order. Gallons are calculated as the sum of average GPM × 15 minutes. Simulator anomaly/leak labels are omitted; a usage summary is not a model diagnosis. UTC timestamp spellings normalize to the same instant.
+
+The dataset is loaded once at startup. Missing windows, absent files, and invalid exports produce tool errors. Callers cannot select filesystem paths. Grant both scopes as `anomaly:read,meter:read` and configure both artifact paths to enable model inference alongside meter reads. These are local synthetic-window tools; household authentication, window discovery, and dashboard/agent integration are not implemented yet. The export's test split remains ML evaluation data, not an independent agent benchmark.
 
 ## Checks
 

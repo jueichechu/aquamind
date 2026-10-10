@@ -39,8 +39,9 @@ class McpTests(unittest.IsolatedAsyncioTestCase):
         async with asyncio.timeout(30):
             async with Client(params) as client:
                 tools = await client.list_tools()
-                self.assertEqual([tool.name for tool in tools.tools], ["detect_water_anomaly"])
-                self.assertIsNotNone(tools.tools[0].output_schema)
+                self.assertEqual({tool.name for tool in tools.tools},
+                                 {"detect_water_anomaly", "get_meter_series", "get_meter_summary"})
+                self.assertTrue(all(tool.output_schema is not None for tool in tools.tools))
                 result = await client.call_tool("detect_water_anomaly", self.arguments)
                 self.assertFalse(result.is_error)
                 expected = FrozenDetector(self.detector_path).predict((self.window,))[0]
