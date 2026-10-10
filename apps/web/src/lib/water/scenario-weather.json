@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "source": "synthetic",
+  "scenarios": {
+    "normal": { "rainfallInchesLast24h": 0, "temperatureF": 76 },
+    "overnight-leak": { "rainfallInchesLast24h": 0, "temperatureF": 72 },
+    "running-toilet": { "rainfallInchesLast24h": 0, "temperatureF": 74 },
+    "irrigation-after-rain": { "rainfallInchesLast24h": 0.68, "temperatureF": 69 }
+  }
+}

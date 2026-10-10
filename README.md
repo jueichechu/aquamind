@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, local FastAPI inference, and read-only MCP anomaly/meter/utility tools are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, local FastAPI inference, and read-only MCP anomaly/meter/utility/weather tools are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -206,7 +206,7 @@ PYTHONPATH=ml AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 AQUAMIND_MCP_SCOPE
 
 The tool `detect_water_anomaly` accepts a `request` object with the same `start_timestamp` and `flow_rates_gpm` fields as the HTTP API. Its advertised input and output schemas are generated from the shared Pydantic contracts. It returns real frozen-model predictions with model version, threshold, request ID, and synthetic-training disclosure. Tool annotations identify it as read-only, non-destructive, and closed-world. Standard output is reserved for MCP protocol messages.
 
-Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read`, `meter:read`, or `utility:read`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. No state-changing tools are exposed yet, so approval workflows remain future work.
+Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read`, `meter:read`, `utility:read`, or `weather:read`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. No state-changing tools are exposed yet, so approval workflows remain future work.
 
 Tests negotiate an actual MCP session with a subprocess, discover the tool and output schema, and compare its result with direct PyTorch inference. Additional protocol tests cover denied permissions, malformed requests, and unavailable models. These are development checks, not an end-to-end agent evaluation.
 
@@ -253,6 +253,18 @@ for `estimate_water_cost` (returns $5.00). To project savings:
 ```
 
 `estimate_conservation_savings` returns 1,500 saved gallons and $7.50 estimated water-only savings. It assumes the 50-gallon daily reduction persists for all 30 days; this is not measured or guaranteed savings. Inputs are caller-supplied, so an agent must obtain meter evidence separately and explain proposed reductions. Volumes must be finite non-negative numbers at most 1,000,000 gallons; durations are integer days from 1 to 366; proposed usage cannot exceed baseline usage. Caller-supplied rates and extra fields are rejected. These tools do not change goals, alerts, or household equipment. Real provider tariffs and billing integration remain unimplemented.
+
+### Synthetic weather context
+
+`get_weather_context` requires `weather:read`. Enable it with `AQUAMIND_MCP_SCOPES=weather:read` (or add the scope to the comma-separated list). Example arguments:
+
+```json
+{"request":{"scenario_id":"irrigation-after-rain"}}
+```
+
+The response includes 0.68 inches of scenario rainfall over the prior 24 hours, 69°F, `source: "synthetic"`, and the shared snapshot's SHA-256. These are static scenario assumptions, not observations, current weather, or a forecast for a real location/date. Rainfall context alone does not establish whether irrigation is needed.
+
+The frontend and Python tool both read `apps/web/src/lib/water/scenario-weather.json`; there is no duplicate Python weather table. The server loads this repository-relative snapshot once at startup. Keep it available when packaging the server. A missing or malformed snapshot returns an unavailable tool error; unknown scenarios and extra request fields are rejected. No provider credentials are needed for this synthetic pathway. Live weather integration remains future work.
 
 ## Checks
 

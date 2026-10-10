@@ -16,15 +16,17 @@ from .api import PredictionRequest, PredictionResponse
 from .data import MeterWindow
 from .detector import FrozenDetector
 from .meter import MeterQuery, MeterSeries, MeterStore, MeterSummary
+from .weather import DEFAULT_WEATHER_PATH, WeatherContext, WeatherQuery, WeatherStore
 from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate,
                       UtilityRate, estimate_cost, estimate_savings)
 
 
 def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset(),
-                  meter_path: Path | None = None) -> MCPServer:
+                  meter_path: Path | None = None,
+                  weather_path: Path = DEFAULT_WEATHER_PATH) -> MCPServer:
     # Copy policy into this server; it cannot be changed through an MCP request.
     granted_scopes = frozenset(scopes)
-    if granted_scopes - {"anomaly:read", "meter:read", "utility:read"}:
+    if granted_scopes - {"anomaly:read", "meter:read", "utility:read", "weather:read"}:
         raise ValueError("Unsupported MCP scope")
     server = MCPServer("AquaMind", version="0.1.0", log_level="WARNING")
     detector = None
@@ -34,6 +36,27 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
         except Exception:
             logging.getLogger(__name__).error("AquaMind MCP detector unavailable")
     lock = Lock()
+    weather = None
+    if "weather:read" in granted_scopes:
+        try:
+            weather = WeatherStore(weather_path)
+        except Exception:
+            logging.getLogger(__name__).error("AquaMind MCP weather context unavailable")
+
+    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                           idempotentHint=True, openWorldHint=False))
+    def get_weather_context(request: WeatherQuery) -> WeatherContext:
+        """Read synthetic rainfall and temperature for the selected demo scenario.
+
+        Requires weather:read. Static scenario context, not live weather, a forecast,
+        or an observation for a real location/date. Rainfall alone does not prove
+        irrigation is unnecessary; soil, plants and local conditions also matter.
+        """
+        if "weather:read" not in granted_scopes:
+            raise ToolError("Permission denied: weather:read required")
+        if weather is None:
+            raise ToolError("Weather context unavailable")
+        return weather.context(request)
 
     def require_utility_scope():
         if "utility:read" not in granted_scopes:

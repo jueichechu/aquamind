@@ -5,6 +5,7 @@
     "moduleResolution": "Node",
     "strict": true,
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "rootDir": ".",
     "outDir": "out/dataset",
