@@ -206,7 +206,7 @@ PYTHONPATH=ml AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 AQUAMIND_MCP_SCOPE
 
 The tool `detect_water_anomaly` accepts a `request` object with the same `start_timestamp` and `flow_rates_gpm` fields as the HTTP API. Its advertised input and output schemas are generated from the shared Pydantic contracts. It returns real frozen-model predictions with model version, threshold, request ID, and synthetic-training disclosure. Tool annotations identify it as read-only, non-destructive, and closed-world. Standard output is reserved for MCP protocol messages.
 
-Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read`, `meter:read`, `utility:read`, or `weather:read`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. No state-changing tools are exposed yet, so approval workflows remain future work.
+Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read`, `meter:read`, `utility:read`, `weather:read`, or `goals:write`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. The goal tool below creates an approval proposal; goal execution is reserved for a separate trusted host decision.
 
 Tests negotiate an actual MCP session with a subprocess, discover the tool and output schema, and compare its result with direct PyTorch inference. Additional protocol tests cover denied permissions, malformed requests, and unavailable models. These are development checks, not an end-to-end agent evaluation.
 
@@ -265,6 +265,16 @@ for `estimate_water_cost` (returns $5.00). To project savings:
 The response includes 0.68 inches of scenario rainfall over the prior 24 hours, 69°F, `source: "synthetic"`, and the shared snapshot's SHA-256. These are static scenario assumptions, not observations, current weather, or a forecast for a real location/date. Rainfall context alone does not establish whether irrigation is needed.
 
 The frontend and Python tool both read `apps/web/src/lib/water/scenario-weather.json`; there is no duplicate Python weather table. The server loads this repository-relative snapshot once at startup. Keep it available when packaging the server. A missing or malformed snapshot returns an unavailable tool error; unknown scenarios and extra request fields are rejected. No provider credentials are needed for this synthetic pathway. Live weather integration remains future work.
+
+### Conservation-goal approval boundary
+
+`set_conservation_goal` requires `goals:write` and accepts `{"request":{"daily_gallons":150}}`. It returns an `approval_required` proposal containing an opaque approval ID, exact arguments, human-readable summary, expected goal revision, and a ten-minute expiry. **This response does not mean the goal was set.** Invalid values and extra arguments such as `approved: true` are rejected.
+
+An embedded trusted host supplies one `GoalApprovals` instance to `create_server(..., goal_approvals=store)`. After displaying the exact proposal and receiving a human choice, the host calls `store.decide(approval_id, "approve")` or `"reject"`. There is deliberately no MCP approval/execution tool, so the agent cannot grant itself approval. The host must bind each store to its own user/session; these Python methods are not authentication endpoints.
+
+Approval atomically sets the session's goal. Rejection and expiry do not change it. Retries return the original outcome without executing again. If another goal was approved since a proposal was created, the stale proposal returns `conflict` and requires a new proposal and approval. Each session retains at most 100 proposal/outcome records; reaching capacity rejects further proposals. State is in memory and disappears on restart.
+
+This is the tested backend approval boundary, **not a completed human-approval product flow**. The standalone stdio server can propose but has no approval UI or decision transport. Authenticated host integration, the frontend Approve/Reject controls, persistent goals/audit storage, and agent continuation with the decision result remain to be implemented. No database or API credentials are needed for this local implementation.
 
 ## Checks
 

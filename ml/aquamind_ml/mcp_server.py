@@ -1,4 +1,4 @@
-"""Local stdio MCP server with a server-owned read-only scope boundary."""
+"""Local MCP tools with host-owned scopes and approval-only goal proposals."""
 
 import logging
 import os
@@ -15,6 +15,7 @@ import torch
 from .api import PredictionRequest, PredictionResponse
 from .data import MeterWindow
 from .detector import FrozenDetector
+from .approvals import GoalApprovals, GoalProposal, GoalRequest
 from .meter import MeterQuery, MeterSeries, MeterStore, MeterSummary
 from .weather import DEFAULT_WEATHER_PATH, WeatherContext, WeatherQuery, WeatherStore
 from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate,
@@ -23,12 +24,31 @@ from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate
 
 def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset(),
                   meter_path: Path | None = None,
-                  weather_path: Path = DEFAULT_WEATHER_PATH) -> MCPServer:
+                  weather_path: Path = DEFAULT_WEATHER_PATH,
+                  goal_approvals: GoalApprovals | None = None) -> MCPServer:
     # Copy policy into this server; it cannot be changed through an MCP request.
     granted_scopes = frozenset(scopes)
-    if granted_scopes - {"anomaly:read", "meter:read", "utility:read", "weather:read"}:
+    if granted_scopes - {"anomaly:read", "meter:read", "utility:read", "weather:read", "goals:write"}:
         raise ValueError("Unsupported MCP scope")
     server = MCPServer("AquaMind", version="0.1.0", log_level="WARNING")
+    approvals = goal_approvals if goal_approvals is not None else GoalApprovals()
+
+    @server.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                           idempotentHint=False, openWorldHint=False))
+    def set_conservation_goal(request: GoalRequest) -> GoalProposal:
+        """Propose a daily water goal; requires goals:write and human approval.
+
+        Returns approval_required, not an executed goal. Only the trusted host can
+        approve the exact proposal. Never claim the goal changed from this result.
+        No plumbing equipment is controlled. Proposals expire after ten minutes.
+        """
+        if "goals:write" not in granted_scopes:
+            raise ToolError("Permission denied: goals:write required")
+        try:
+            return approvals.propose(request)
+        except ValueError:
+            raise ToolError("Goal proposal unavailable") from None
+
     detector = None
     if detector_path is not None and "anomaly:read" in granted_scopes:
         try:

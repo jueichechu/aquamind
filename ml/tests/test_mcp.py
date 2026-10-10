@@ -42,7 +42,7 @@ class McpTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual({tool.name for tool in tools.tools},
                                  {"detect_water_anomaly", "get_meter_series", "get_meter_summary",
                                   "get_utility_rate", "estimate_water_cost", "estimate_conservation_savings",
-                                  "get_weather_context"})
+                                  "get_weather_context", "set_conservation_goal"})
                 self.assertTrue(all(tool.output_schema is not None for tool in tools.tools))
                 result = await client.call_tool("detect_water_anomaly", self.arguments)
                 self.assertFalse(result.is_error)
