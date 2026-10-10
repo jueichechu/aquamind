@@ -1,0 +1,2 @@
+-r requirements-api.txt
+mcp==2.3.0

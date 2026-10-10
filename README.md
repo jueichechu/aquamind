@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, and local FastAPI inference service are implemented separately; LLMs, MCP, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, local FastAPI inference, and a read-only MCP anomaly tool are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -115,7 +115,7 @@ Create an isolated environment and run all Python tests from the repository root
 
 ```sh
 python3 -m venv ml/.venv
-ml/.venv/bin/python -m pip install -r ml/requirements-api.txt
+ml/.venv/bin/python -m pip install -r ml/requirements-mcp.txt
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -v
 ```
 
@@ -195,6 +195,20 @@ The command starts and stops its own Uvicorn process on loopback port 8002 (chan
 Percentiles use nearest rank. The report records all timed samples, failures without retries, warm-up count, concurrency, throughput, source hashes, model version, and environment. Failures cause a nonzero exit after the report is saved; successful-request and all-attempt percentiles are reported separately. Existing report files cannot be overwritten.
 
 The generated [local latency baseline](evals/baselines/api-latency-v1.json) measured **p50 7.85 ms, p95 15.36 ms, p99 38.62 ms**, with **1,000/1,000 successful requests**, concurrency 4, and 50 warm-up requests. This supports a local warm-server p95 below 100 ms through the actual FastAPI HTTP path. It does not establish deployed internet latency, cold-start behavior, or performance on different hardware; client and server shared the same macOS ARM machine with one server worker and one PyTorch CPU thread.
+
+## Local MCP anomaly tool
+
+Install `ml/requirements-mcp.txt` to use the official MCP Python SDK 2.3.0. The server uses the SDK's `MCPServer` and stdio transport. From the repository root, an MCP host can launch:
+
+```sh
+PYTHONPATH=ml AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 AQUAMIND_MCP_SCOPES=anomaly:read ml/.venv/bin/python -m aquamind_ml.mcp_server
+```
+
+The single tool, `detect_water_anomaly`, accepts a `request` object with the same `start_timestamp` and `flow_rates_gpm` fields as the HTTP API. Its advertised input and output schemas are generated from the shared Pydantic contracts. It returns real frozen-model predictions with model version, threshold, request ID, and synthetic-training disclosure. Tool annotations identify it as read-only, non-destructive, and closed-world. Standard output is reserved for MCP protocol messages.
+
+Scopes are fixed by the trusted host's startup configuration; an empty `AQUAMIND_MCP_SCOPES` denies calls. Tool arguments cannot grant `anomaly:read`. This process-level permission boundary is for local stdio use, not remote user authentication. Model failures produce tool errors, never fabricated predictions. No state-changing tools are exposed yet, so approval workflows remain future work.
+
+Tests negotiate an actual MCP session with a subprocess, discover the tool and output schema, and compare its result with direct PyTorch inference. Additional protocol tests cover denied permissions, malformed requests, and unavailable models. These are development checks, not an end-to-end agent evaluation.
 
 ## Checks
 
