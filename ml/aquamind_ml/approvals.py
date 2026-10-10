@@ -63,6 +63,20 @@ class GoalApprovals:
             self._entries[proposal.approval_id] = _Entry(proposal, self._clock() + 600)
             return proposal
 
+    def review(self, approval_id: str) -> GoalProposal:
+        """Return the exact stored proposal with a current expiry countdown."""
+        with self._lock:
+            entry = self._entries.get(approval_id)
+            if entry is None:
+                raise LookupError("Unknown approval")
+            proposal = entry.proposal
+            remaining = max(0, entry.deadline - self._clock())
+            if proposal.status == "approval_required" and remaining == 0:
+                proposal = proposal.model_copy(update={"status": "expired", "expires_in_seconds": 0})
+                self._entries[approval_id] = replace(entry, proposal=proposal)
+            return proposal.model_copy(update={"expires_in_seconds": remaining
+                                       if proposal.status == "approval_required" else 0})
+
     def decide(self, approval_id: str, decision: Literal["approve", "reject"]) -> GoalProposal:
         """Trusted host entry point after a human decision; never register as a tool.
 

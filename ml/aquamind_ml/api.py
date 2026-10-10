@@ -19,6 +19,7 @@ import torch
 
 from .data import MeterWindow
 from .detector import FrozenDetector
+from .sessions import DemoSessions, approval_router
 
 logger = logging.getLogger("aquamind.api")
 if not logger.handlers:
@@ -58,7 +59,7 @@ class PredictionResponse(BaseModel):
     unit: Literal["daily_window"] = "daily_window"
 
 
-def create_app(detector_path: Path | None = None) -> FastAPI:
+def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | None = None) -> FastAPI:
     lock = Lock()
 
     @asynccontextmanager
@@ -79,6 +80,8 @@ def create_app(detector_path: Path | None = None) -> FastAPI:
             torch.set_num_threads(previous_threads)
 
     app = FastAPI(title="AquaMind inference", version="0.1.0", lifespan=lifespan)
+    app.state.sessions = sessions if sessions is not None else DemoSessions()
+    app.include_router(approval_router(app.state.sessions))
 
     @app.middleware("http")
     async def trace(request: Request, call_next):
@@ -96,7 +99,7 @@ def create_app(detector_path: Path | None = None) -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, error):
         # Do not reflect raw input, NaN, or exception objects in validation errors.
-        return JSONResponse(status_code=422, content={"detail": "Invalid prediction request",
+        return JSONResponse(status_code=422, content={"detail": "Invalid request",
                             "request_id": request.state.request_id})
 
     @app.get("/health")

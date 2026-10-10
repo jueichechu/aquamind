@@ -274,7 +274,23 @@ An embedded trusted host supplies one `GoalApprovals` instance to `create_server
 
 Approval atomically sets the session's goal. Rejection and expiry do not change it. Retries return the original outcome without executing again. If another goal was approved since a proposal was created, the stale proposal returns `conflict` and requires a new proposal and approval. Each session retains at most 100 proposal/outcome records; reaching capacity rejects further proposals. State is in memory and disappears on restart.
 
-This is the tested backend approval boundary, **not a completed human-approval product flow**. The standalone stdio server can propose but has no approval UI or decision transport. Authenticated host integration, the frontend Approve/Reject controls, persistent goals/audit storage, and agent continuation with the decision result remain to be implemented. No database or API credentials are needed for this local implementation.
+This is the tested backend approval boundary, **not a completed human-approval product flow**. The standalone stdio server can propose but has no approval UI or decision transport. The frontend Approve/Reject controls, persistent goals/audit storage, and agent continuation with the decision result remain to be implemented. No database or API credentials are needed for this local implementation.
+
+### Session-bound approval API
+
+FastAPI now exposes anonymous, ephemeral demo sessions and human-decision endpoints:
+
+- `POST /v1/sessions`: returns a random `session_token` valid for one hour.
+- `GET /v1/approvals/{approval_id}`: reviews the exact stored proposal and remaining expiry.
+- `POST /v1/approvals/{approval_id}/decision`: accepts only `{"decision":"approve"}` or `{"decision":"reject"}`.
+- `GET /v1/goals/current`: returns the session's approved goal, or null.
+- `DELETE /v1/session`: revokes the session credential.
+
+All except creation require `Authorization: Bearer <session_token>`. Responses use `Cache-Control: no-store`; request logs omit credentials and bodies. A different session receives 404 for a proposal, and missing, expired, or revoked credentials receive 401. Browser cookies are not used and cross-origin access is not enabled. Use HTTPS and a same-origin host/proxy when connecting the browser; keep the credential out of agent prompts, tool arguments, traces, and URLs.
+
+The trusted host obtains the session store via `app.state.sessions.approvals(token)` and injects it into `create_server(..., goal_approvals=store)`. There is no HTTP endpoint that lets the agent grant itself consent. The decision endpoint is for the human UI; it must never be registered as an agent tool. Bearer possession authenticates the demo session, not a real-world identity or proof of a physical click. The host must stop using cached stores/MCP servers when a session expires or is revoked.
+
+The API retains at most 100 sessions, evicts expired sessions on creation, and returns 503 at capacity. State is process-local: use one worker for this local prototype. Production rate limiting, shared storage, browser approval UI, and agent/session lifecycle integration remain outstanding. Tests run an actual MCP proposal followed by HTTP review/approval and cover cross-session denial, rejection, malformed decisions, expiry, revocation, and capacity recovery.
 
 ## Checks
 
