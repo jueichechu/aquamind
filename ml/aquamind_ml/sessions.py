@@ -94,6 +94,15 @@ def approval_router(sessions: DemoSessions) -> APIRouter:
     def current_goal(request: Request):
         return GoalState(goal=store_for(request).goal)
 
+    @router.post("/v1/goals/proposals", response_model=GoalProposal, status_code=201)
+    def propose_goal(body: GoalRequest, request: Request):
+        """Manual demo entry point; proposes only, never grants approval."""
+        store = store_for(request)
+        try:
+            return store.propose(body)
+        except ValueError:
+            raise HTTPException(409, "Proposal capacity reached") from None
+
     @router.get("/v1/approvals/{approval_id}", response_model=GoalProposal)
     def review(approval_id: str, request: Request):
         store = store_for(request)

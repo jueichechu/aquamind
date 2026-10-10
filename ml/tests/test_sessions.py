@@ -45,6 +45,19 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.client.get('/v1/goals/current', headers=headers).json()['goal'], {'daily_gallons': 150})
         self.assertEqual(self.client.post(path + '/decision', headers=headers, json={'decision': 'approve'}).json(), approved.json())
 
+    async def test_manual_proposal_still_requires_separate_decision(self):
+        token, headers = self.new_session()
+        self.assertEqual(self.client.post('/v1/goals/proposals', json={'daily_gallons': 150}).status_code, 401)
+        response = self.client.post('/v1/goals/proposals', headers=headers, json={'daily_gallons': 150})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['status'], 'approval_required')
+        self.assertIsNone(self.sessions.approvals(token).goal)
+        self.assertEqual(self.client.post('/v1/goals/proposals', headers=headers,
+                         json={'daily_gallons': 150, 'approved': True}).status_code, 422)
+        path = '/v1/approvals/' + response.json()['approval_id'] + '/decision'
+        self.assertEqual(self.client.post(path, headers=headers, json={'decision': 'approve'}).json()['status'], 'approved')
+        self.assertEqual(self.sessions.approvals(token).goal.daily_gallons, 150)
+
     async def test_other_session_cannot_read_or_decide(self):
         token, headers = self.new_session()
         _, stranger = self.new_session()

@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The assistant panel is an inactive placeholder. A PyTorch autoencoder, training commands, local FastAPI inference, and read-only MCP anomaly/meter/utility/weather tools are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The side panel provides a manual conservation-goal approval demo; no live assistant is connected. A PyTorch autoencoder, training commands, local FastAPI inference, and read-only MCP anomaly/meter/utility/weather tools are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -274,7 +274,7 @@ An embedded trusted host supplies one `GoalApprovals` instance to `create_server
 
 Approval atomically sets the session's goal. Rejection and expiry do not change it. Retries return the original outcome without executing again. If another goal was approved since a proposal was created, the stale proposal returns `conflict` and requires a new proposal and approval. Each session retains at most 100 proposal/outcome records; reaching capacity rejects further proposals. State is in memory and disappears on restart.
 
-This is the tested backend approval boundary, **not a completed human-approval product flow**. The standalone stdio server can propose but has no approval UI or decision transport. The frontend Approve/Reject controls, persistent goals/audit storage, and agent continuation with the decision result remain to be implemented. No database or API credentials are needed for this local implementation.
+This is the tested backend approval boundary, **not a completed human-approval product flow**. The standalone stdio server can propose but has no approval UI or decision transport. Persistent goals/audit storage and agent continuation with the decision result remain to be implemented. No database or API credentials are needed for this local implementation.
 
 ### Session-bound approval API
 
@@ -290,7 +290,22 @@ All except creation require `Authorization: Bearer <session_token>`. Responses u
 
 The trusted host obtains the session store via `app.state.sessions.approvals(token)` and injects it into `create_server(..., goal_approvals=store)`. There is no HTTP endpoint that lets the agent grant itself consent. The decision endpoint is for the human UI; it must never be registered as an agent tool. Bearer possession authenticates the demo session, not a real-world identity or proof of a physical click. The host must stop using cached stores/MCP servers when a session expires or is revoked.
 
-The API retains at most 100 sessions, evicts expired sessions on creation, and returns 503 at capacity. State is process-local: use one worker for this local prototype. Production rate limiting, shared storage, browser approval UI, and agent/session lifecycle integration remain outstanding. Tests run an actual MCP proposal followed by HTTP review/approval and cover cross-session denial, rejection, malformed decisions, expiry, revocation, and capacity recovery.
+The API retains at most 100 sessions, evicts expired sessions on creation, and returns 503 at capacity. State is process-local: use one worker for this local prototype. Production rate limiting, shared storage, and agent/session lifecycle integration remain outstanding. Tests run an actual MCP proposal followed by HTTP review/approval and cover cross-session denial, rejection, malformed decisions, expiry, revocation, and capacity recovery.
+
+### Browser approval demo
+
+The `/demo` side panel lets a visitor enter a daily target, review the server's exact proposal, and explicitly Approve or Reject. This is a manual demonstration, not an LLM recommendation. The new `POST /v1/goals/proposals` endpoint creates only a pending proposal; it cannot apply a goal or accept an approval flag.
+
+Start the single-worker backend and frontend from the repository root in separate terminals:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_ml.api:app --host 127.0.0.1 --port 8000
+AQUAMIND_API_URL=http://127.0.0.1:8000 pnpm dev
+```
+
+`AQUAMIND_API_URL` is a server-only backend address, not an API key. The Next.js relay exposes only the session, goal-proposal, goal-read, and approval endpoints. Session credentials remain in browser memory and are sent in authorization headers; they are not stored in URLs or local storage. Reloading starts fresh. Pending decisions stay available for safe retry after a connection failure; the UI reports an approved goal only after server confirmation. Missing backend configuration returns unavailable rather than simulating success.
+
+This path uses the same approval store as MCP but manual proposals enter through HTTP. Live agent-to-browser proposal delivery remains future work. The UI and storage are session-local and not ready for multi-worker production deployment.
 
 ## Checks
 
