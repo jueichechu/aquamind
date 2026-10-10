@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from mcp import Client
 
 from aquamind_ml.api import create_app
-from aquamind_ml.approvals import GoalRequest
+from aquamind_ml.approvals import ApprovalSessionUnavailable, GoalRequest
 from aquamind_ml.mcp_server import create_server
 from aquamind_ml.sessions import DemoSessions
 
@@ -90,6 +90,58 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
             'Origin': 'https://untrusted.example', 'Access-Control-Request-Method': 'POST',
             'Access-Control-Request-Headers': 'authorization,content-type'})
         self.assertNotIn('access-control-allow-origin', preflight.headers)
+
+    async def test_cached_mcp_store_loses_access_on_revoke_and_expiry(self):
+        for ending in ("revoke", "expire", "evict"):
+            with self.subTest(ending=ending):
+                self.now[0] = 0
+                token, headers = self.new_session()
+                store = self.sessions.approvals(token)
+                proposal = store.propose(GoalRequest(daily_gallons=150))
+                async with Client(create_server(None, frozenset({"goals:write"}), goal_approvals=store)) as mcp:
+                    if ending == "revoke":
+                        self.assertEqual(self.client.delete('/v1/session', headers=headers).status_code, 204)
+                    else:
+                        self.now[0] = 3600
+                        if ending == "evict":
+                            self.sessions.create()
+                    result = await mcp.call_tool("set_conservation_goal", {"request": {"daily_gallons": 100}})
+                    self.assertTrue(result.is_error)
+                    self.assertIn("Session unavailable", str(result.content))
+                    for operation in (lambda: store.goal, lambda: store.review(proposal.approval_id),
+                                      lambda: store.decide(proposal.approval_id, "approve"),
+                                      lambda: store.decide(proposal.approval_id, "reject")):
+                        with self.assertRaises(ApprovalSessionUnavailable):
+                            operation()
+                    # A replacement session never reactivates the cached store.
+                    replacement = self.sessions.create()
+                    self.assertIsNone(self.sessions.approvals(replacement).goal)
+                    with self.assertRaises(ApprovalSessionUnavailable):
+                        store.propose(GoalRequest(daily_gallons=100))
+
+    def test_proposal_expiry_is_capped_by_session_lifetime(self):
+        token, headers = self.new_session()
+        self.now[0] = 3590
+        proposal = self.sessions.approvals(token).propose(GoalRequest(daily_gallons=100))
+        self.assertEqual(proposal.expires_in_seconds, 10)
+        self.now[0] = 3595
+        response = self.client.get('/v1/approvals/' + proposal.approval_id, headers=headers)
+        self.assertEqual(response.json()['expires_in_seconds'], 5)
+
+    def test_revoke_between_lookup_and_decision_returns_401(self):
+        token, headers = self.new_session()
+        store = self.sessions.approvals(token)
+        proposal = store.propose(GoalRequest(daily_gallons=150))
+        original = self.sessions.approvals
+        def revoke_after_lookup(value):
+            result = original(value)
+            self.sessions.revoke(value)
+            return result
+        self.sessions.approvals = revoke_after_lookup
+        response = self.client.post('/v1/approvals/' + proposal.approval_id + '/decision',
+                                    headers=headers, json={'decision': 'approve'})
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['detail'], 'Session unavailable')
 
     def test_session_capacity_recovers_after_expiry(self):
         for _ in range(100):

@@ -15,7 +15,7 @@ import torch
 from .api import PredictionRequest, PredictionResponse
 from .data import MeterWindow
 from .detector import FrozenDetector
-from .approvals import GoalApprovals, GoalProposal, GoalRequest
+from .approvals import ApprovalSessionUnavailable, GoalApprovals, GoalProposal, GoalRequest
 from .meter import MeterQuery, MeterSeries, MeterStore, MeterSummary
 from .weather import DEFAULT_WEATHER_PATH, WeatherContext, WeatherQuery, WeatherStore
 from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate,
@@ -46,6 +46,8 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
             raise ToolError("Permission denied: goals:write required")
         try:
             return approvals.propose(request)
+        except ApprovalSessionUnavailable:
+            raise ToolError("Session unavailable") from None
         except ValueError:
             raise ToolError("Goal proposal unavailable") from None
 

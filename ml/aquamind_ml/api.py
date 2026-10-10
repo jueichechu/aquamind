@@ -20,6 +20,7 @@ import torch
 from .data import MeterWindow
 from .detector import FrozenDetector
 from .sessions import DemoSessions, approval_router
+from .approvals import ApprovalSessionUnavailable
 
 logger = logging.getLogger("aquamind.api")
 if not logger.handlers:
@@ -95,6 +96,12 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
                                 "status": response.status_code,
                                 "elapsed_ms": round((perf_counter() - start) * 1000, 3)}))
         return response
+
+    @app.exception_handler(ApprovalSessionUnavailable)
+    async def inactive_session(request: Request, error):
+        # Handles expiry/revocation after registry lookup but before store use.
+        return JSONResponse(status_code=401, content={"detail": "Session unavailable",
+                            "request_id": request.state.request_id})
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, error):

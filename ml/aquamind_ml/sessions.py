@@ -27,11 +27,14 @@ class DemoSessions:
     def create(self) -> str:
         with self._lock:
             now = self._clock()
+            for session in self._sessions.values():
+                if session.deadline <= now:
+                    session.approvals.invalidate()
             self._sessions = {key: value for key, value in self._sessions.items() if value.deadline > now}
             if len(self._sessions) >= 100:
                 raise ValueError("Session capacity reached")
             token = token_urlsafe(32)
-            self._sessions[token] = _Session(GoalApprovals(clock=self._clock), now + 3600)
+            self._sessions[token] = _Session(GoalApprovals(clock=self._clock, session_deadline=now + 3600), now + 3600)
             return token
 
     def approvals(self, token: str) -> GoalApprovals:
@@ -39,13 +42,17 @@ class DemoSessions:
         with self._lock:
             session = self._sessions.get(token)
             if session is None or self._clock() >= session.deadline:
+                if session is not None:
+                    session.approvals.invalidate()
                 self._sessions.pop(token, None)
                 raise LookupError("Session unavailable")
             return session.approvals
 
     def revoke(self, token: str) -> None:
         with self._lock:
-            self._sessions.pop(token, None)
+            session = self._sessions.pop(token, None)
+            if session is not None:
+                session.approvals.invalidate()
 
 
 class SessionResponse(BaseModel):
