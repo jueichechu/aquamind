@@ -1,0 +1,27 @@
+{
+  "schema": "aquamind-ampds2-unlabeled-v1",
+  "source_sha256": "60f958ee1654e1c0ae3262e62228098eb922ea6f55a3ac1eeb5b8e0380693bda",
+  "output_sha256": "214eeccd22b5879bc731df3bdbc1c23b1464328af63a763f8d71132cad348a47",
+  "discarded_edge_minute_rows": 1440,
+  "purged_days": [
+    "2013-08-25T00:00:00+00:00",
+    "2013-12-12T00:00:00+00:00"
+  ],
+  "splits": {
+    "train": {
+      "windows": 510,
+      "first_day": "2012-04-02T00:00:00+00:00",
+      "last_day": "2013-08-24T00:00:00+00:00"
+    },
+    "validation": {
+      "windows": 108,
+      "first_day": "2013-08-26T00:00:00+00:00",
+      "last_day": "2013-12-11T00:00:00+00:00"
+    },
+    "test": {
+      "windows": 109,
+      "first_day": "2013-12-13T00:00:00+00:00",
+      "last_day": "2014-03-31T00:00:00+00:00"
+    }
+  }
+}

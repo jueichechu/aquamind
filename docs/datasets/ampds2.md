@@ -18,4 +18,23 @@ PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.ampds2 --input ml/data/external
 
 Compare the output with [the checked-in inspection](../../ml/data/manifests/ampds2-water-inspection.json). The original CSV must match both the repository MD5 and our pinned SHA-256 before a report is emitted. The inspector checks column layout, finite non-negative measurements, monotonic counters and exact minute spacing. Counter/rate discrepancies above 0.002 liters are counted, not repaired. It performs no resampling, normalization, anomaly injection, or labeling. No raw dataset is committed.
 
-The file contains no leak-label column. **Do not assume every reading is leak-free or assign normal labels automatically.** This inspection does not train or evaluate a detector, and does not change the existing synthetic benchmark. The next data increment should define chronological splits and interval alignment before any real-data-derived ML experiment. Real-base sequences with injected leaks must be described as hybrid evaluation, not field-validated leak detection. WEUSEDTO and the WRF educational dataset remain uninvestigated in this increment.
+The file contains no leak-label column. **Do not assume every reading is leak-free or assign normal labels automatically.** This inspection does not train or evaluate a detector, and does not change the existing synthetic benchmark. The preprocessing step below defines chronological splits and interval alignment; real-data-derived ML experiments are still outstanding. Real-base sequences with injected leaks must be described as hybrid evaluation, not field-validated leak detection. WEUSEDTO and the WRF educational dataset remain uninvestigated in this increment.
+
+
+## Unlabeled 15-minute windows
+
+Run the checksum-verified preprocessor after downloading the original file:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.ampds2_windows --input ml/data/external/ampds2/Water_WHW.csv --output ml/data/external/ampds2/windows-v1.json
+```
+
+The export uses a separate `aquamind-ampds2-unlabeled-v1` schema. It cannot be passed to the synthetic labeled dataset loader. Every window remains **unlabeled**, including the nominal training split; selecting a split does not assert normal or leak-free behavior. There is no normalization, injection, threshold selection, or model training in this command.
+
+Because `avg_rate` is based on the counter difference from the preceding reading, a reading at time `t` is assigned to the preceding minute `(t-60,t]`. The first row is discarded because this input has no preceding counter. Fifteen minute volumes are summed and divided by 15 and 3.785411784 liters per US gallon to produce interval-average GPM. Windows use start timestamps at midnight UTC, with 96 intervals covering the day. UTC days are not local household days; local nighttime analysis must account for timezone and daylight saving separately.
+
+Only complete 1,440-minute UTC days are retained; partial edge days are dropped without filling. Invalid, duplicate, or missing minute timestamps fail validation. The 729 complete days are split chronologically at floor(70% × days) and floor(85% × days), with the first day after each cut withheld as a gap. This yields 510 training, 108 validation, and 109 test windows, with two purged days. An additional 1,440 source rows are excluded at the edges, including the first row.
+
+The [generated manifest](../../ml/data/manifests/ampds2-windows-v1.json) records dates, counts, and source/output hashes. Repeating the transformation produced byte-identical output. Output files are never overwritten and full derived sequences stay ignored.
+
+The one-day gaps prevent adjacent windows across partitions; they do not establish household independence or eliminate seasonal dependence. All partitions come from one house. Future fitting must use training data only, with validation for development and the final period reserved for evaluation. Before adapting the LSTM, investigate temporal distribution shifts and establish a defensible normal-data selection/injection policy without inspecting test outcomes to tune it.
