@@ -1,0 +1,34 @@
+{
+  "protocol": "ampds2-hybrid-v1",
+  "base_export_sha256": "214eeccd22b5879bc731df3bdbc1c23b1464328af63a763f8d71132cad348a47",
+  "output_sha256": "2348641bc654c5bfc4fe55a04ad7078bb603ff97e227d158f3e6bd2cf9b272ae",
+  "splits": {
+    "train": {
+      "base_days": 510,
+      "variants": 510,
+      "kinds": {
+        "unmodified": 510,
+        "continuous_injection": 0,
+        "demand_confounder": 0
+      }
+    },
+    "validation": {
+      "base_days": 108,
+      "variants": 1512,
+      "kinds": {
+        "unmodified": 108,
+        "continuous_injection": 1296,
+        "demand_confounder": 108
+      }
+    },
+    "test": {
+      "base_days": 109,
+      "variants": 1526,
+      "kinds": {
+        "unmodified": 109,
+        "continuous_injection": 1308,
+        "demand_confounder": 109
+      }
+    }
+  }
+}

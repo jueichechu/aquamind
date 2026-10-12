@@ -61,4 +61,19 @@ The first hybrid experiment is specified before validation/test scoring:
 - Select the threshold using validation only. For this first protocol, maximize F1 for continuous-injection detection against the unmodified and demand-confounder references, breaking ties toward the higher threshold. Freeze the checkpoint, normalization, scoring method, threshold, and protocol before opening test outcomes.
 - Report injection-detection precision/recall/F1 and counts alongside sensitivity by rate/duration, unmodified-reference alarm rate, demand-confounder alarm rate, and paired score changes. These references are nominal negatives for a constructed task, not verified leak-free ground truth. Aggregate uncertainty by base day, not by treating related variants as independent households.
 
-This protocol is not an executed experiment. Pattern generation, model fitting, validation selection, and held-out scoring remain subsequent increments. Any protocol changes before test execution must be versioned and explained; after test outcomes are inspected, that test period cannot be reused as fresh confirmation for further tuning. Even a successful result would support only a one-house chronological hybrid experiment, not real household leak F1 or household-to-household generalization.
+Pattern generation is implemented below. Model fitting, validation selection, and held-out scoring remain subsequent increments; no hybrid performance results exist yet. Any protocol changes before test execution must be versioned and explained; after test outcomes are inspected, that test period cannot be reused as fresh confirmation for further tuning. Even a successful result would support only a one-house chronological hybrid experiment, not real household leak F1 or household-to-household generalization.
+
+
+## Deterministic hybrid export
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.ampds2_hybrid --input ml/data/external/ampds2/windows-v1.json --output ml/data/external/ampds2/hybrid-v1.json
+```
+
+The command verifies the pinned base export, refuses to overwrite output, and prints counts and checksums. Full sequences remain in the ignored external-data directory. The [checked-in generation manifest](../../ml/data/manifests/ampds2-hybrid-v1.json) records 510 unmodified training rows, 1,512 validation variants from 108 base days, and 1,526 test variants from 109 base days. Two runs produced byte-identical exports. Generation does not fit a model or inspect held-out model outcomes.
+
+Each validation/test base day produces one original, 12 continuous-injection variants, and one demand confounder. Start selection hashes the compact JSON array `["ampds2-hybrid-v1", start_timestamp, added_gpm, duration_intervals]` with SHA-256, interprets its bytes as an unsigned big-endian integer, and takes modulo `97 - duration_intervals`. Duration is measured in 15-minute intervals. The resulting start/end interval bounds are zero-based, with an exclusive end; full-day injections start at zero. The original has zero added volume and empty bounds `[0,0)`.
+
+`injection_present` is true for both continuous injections and the demand confounder. `is_continuous_injection` is the constructed classification target; the confounder is false for that target. `physical_leak_label` remains `unknown` for every row. Added gallons are `added_gpm × duration_intervals × 15`; original values are neither clipped nor replaced. The source export hash and base-day ID allow grouping all related variants for analysis.
+
+The 12 positive variants per base day deliberately cover the protocol grid; they are **not a realistic leak prevalence estimate**. Report class composition and reference/confounder alarm rates beside any future aggregate F1. Randomly splitting variant rows would leak base patterns across partitions and is prohibited by this export's design. Tests cover volume conservation, interval bounds, the complete pattern grid, immutable base sequences, deterministic generation, split independence, and rejection of overlapping partitions or missing boundary gaps.
