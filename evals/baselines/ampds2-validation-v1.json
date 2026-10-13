@@ -1,0 +1,135 @@
+{
+  "schema": "aquamind-hybrid-validation-v1",
+  "protocol": "ampds2-hybrid-v1",
+  "target": "controlled continuous-injection detection; physical leak labels unknown",
+  "score": "daily mean squared reconstruction error in normalized flow units",
+  "selection": "maximum validation F1; higher threshold breaks ties",
+  "dataset_sha256": "2348641bc654c5bfc4fe55a04ad7078bb603ff97e227d158f3e6bd2cf9b272ae",
+  "weights_sha256": "32599c6a6b6d8b7564f6b139d955a0a613046e100b78eb8925df1acd2a532d2f",
+  "model_version": "ampds2-lstm-32599c6a6b6d",
+  "selected_epoch": 17,
+  "normalizer": {
+    "mean_gpm": 0.13675254382949303,
+    "scale_gpm": 0.32166709295714746,
+    "training_value_count": 48960,
+    "dataset_sha256": "2348641bc654c5bfc4fe55a04ad7078bb603ff97e227d158f3e6bd2cf9b272ae",
+    "training_sha256": "738ce5c5426e8199344b58c88e5a981519fa2742ee339df7929e5d6ec87f4ca0"
+  },
+  "validation_base_days": 108,
+  "test_evaluated": false,
+  "evaluation_source_sha256": {
+    "hybrid_validate.py": "a205829930f829464f34c7634ebae1e3da569c9aa69178a570e163bd419cac9c",
+    "evaluate.py": "bb1552fdd93ae5071f67dcb84b6a5552fe01defd2fd5f714d9026a6414f2e4bb",
+    "calibration.py": "ebfb9e6b8be7542cb3473468ee4eef50afeacc3ee7d4141294277cd9fbe8eebb"
+  },
+  "limitations": [
+    "Validation selects checkpoint and threshold; results are optimistic",
+    "One real household with controlled synthetic injections",
+    "Unmodified and demand-confounder references are nominal negatives, not verified leak-free data",
+    "Related variants are correlated; this is not real-world leak F1",
+    "Grid composition favors positive class; report reference alarm rates alongside F1"
+  ],
+  "threshold": 0.3039536774158478,
+  "comparison": ">=",
+  "validation": {
+    "count": 1512,
+    "tp": 1296,
+    "fp": 216,
+    "fn": 0,
+    "tn": 0,
+    "precision": 0.8571428571428571,
+    "recall": 1.0,
+    "f1": 0.9230769230769231,
+    "balanced_accuracy": 0.5
+  },
+  "always_positive_reference": {
+    "count": 1512,
+    "tp": 1296,
+    "fp": 216,
+    "fn": 0,
+    "tn": 0,
+    "precision": 0.8571428571428571,
+    "recall": 1.0,
+    "f1": 0.9230769230769231
+  },
+  "by_variant_kind": {
+    "unmodified": {
+      "count": 108,
+      "alarms": 108,
+      "alarm_rate": 1.0
+    },
+    "continuous_injection": {
+      "count": 1296,
+      "alarms": 1296,
+      "alarm_rate": 1.0
+    },
+    "demand_confounder": {
+      "count": 108,
+      "alarms": 108,
+      "alarm_rate": 1.0
+    }
+  },
+  "by_injection_pattern": {
+    "0.01gpm/240min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.01gpm/720min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.01gpm/1440min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.03gpm/240min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.03gpm/720min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.03gpm/1440min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.1gpm/240min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.1gpm/720min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.1gpm/1440min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.3gpm/240min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.3gpm/720min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    },
+    "0.3gpm/1440min": {
+      "count": 108,
+      "detected": 108,
+      "sensitivity": 1.0
+    }
+  },
+  "reproduction": "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_validate --dataset ml/data/external/ampds2/hybrid-v1.json --checkpoint ml/artifacts/ampds2-lstm-v1 --output evals/reports/ampds2-validation-v1.json"
+}

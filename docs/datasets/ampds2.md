@@ -61,7 +61,7 @@ The first hybrid experiment is specified before validation/test scoring:
 - Select the threshold using validation only. For this first protocol, maximize F1 for continuous-injection detection against the unmodified and demand-confounder references, breaking ties toward the higher threshold. Freeze the checkpoint, normalization, scoring method, threshold, and protocol before opening test outcomes.
 - Report injection-detection precision/recall/F1 and counts alongside sensitivity by rate/duration, unmodified-reference alarm rate, demand-confounder alarm rate, and paired score changes. These references are nominal negatives for a constructed task, not verified leak-free ground truth. Aggregate uncertainty by base day, not by treating related variants as independent households.
 
-Pattern generation and model fitting are implemented below. Threshold selection and held-out scoring remain subsequent increments; no hybrid classification metrics exist yet. Any protocol changes before test execution must be versioned and explained; after test outcomes are inspected, that test period cannot be reused as fresh confirmation for further tuning. Even a successful result would support only a one-house chronological hybrid experiment, not real household leak F1 or household-to-household generalization.
+Pattern generation and model fitting are implemented below. Validation threshold selection is described below; held-out scoring remains outstanding. Any protocol changes before test execution must be versioned and explained; after test outcomes are inspected, that test period cannot be reused as fresh confirmation for further tuning. Even a successful result would support only a one-house chronological hybrid experiment, not real household leak F1 or household-to-household generalization.
 
 
 ## Deterministic hybrid export
@@ -108,7 +108,21 @@ The adapter trains the existing PyTorch LSTM autoencoder on all 510 unmodified A
 
 The ignored artifact directory contains `weights.pt` and `training.json`, including the configuration, history, chosen epoch, frozen normalization, dataset/source/weight hashes, label disclosure, and execution environment. Existing directories are never overwritten. Tests verify reproducible model tensors, unchanged training results when test data and validation injections are removed, checkpoint selection, artifact reloading, and rejection of missing validation references.
 
-This training run produces reconstruction weights only. Validation threshold selection, injection-detection scoring, and held-out evaluation remain subsequent increments. Reconstruction MSE is not precision, recall, F1, or a leak probability. The trained hybrid model is not yet connected to FastAPI/MCP or the dashboard; the existing synthetic detector remains separately versioned.
+This training run produces reconstruction weights only. Validation threshold selection and injection-detection scoring are described below; held-out evaluation remains outstanding. Reconstruction MSE is not precision, recall, F1, or a leak probability. The trained hybrid model is not yet connected to FastAPI/MCP or the dashboard; the existing synthetic detector remains separately versioned.
 
 
 The first 20-epoch run is recorded in [the generated training baseline](../../evals/baselines/ampds2-training-v1.json). It selected epoch 17, with unmodified-validation MSE 0.7224179484 in normalized squared-error units. A second complete run produced identical model tensors and loss history. This is reproducible training evidence, not a classification benchmark; no validation injection scores or test scores have been calculated.
+
+## Validation-only scoring baseline
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_validate --dataset ml/data/external/ampds2/hybrid-v1.json --checkpoint ml/artifacts/ampds2-lstm-v1 --output evals/reports/ampds2-validation-v1.json
+```
+
+The command verifies checkpoint weights, dataset provenance, and the saved training-only normalization. It scores validation windows using daily mean squared reconstruction error in normalized units. The threshold maximizes validation F1, with a higher threshold breaking ties. Test sequences are structurally loaded but are never transformed or scored. Tests enforce a validation-only access boundary and verify that changing target labels does not change reconstruction scores.
+
+The [generated validation baseline](../../evals/baselines/ampds2-validation-v1.json) records threshold 0.3039536774 and F1 0.9231 across 1,512 variants, but **this is a failed discrimination baseline**: all 1,512 variants trigger an alarm. It exactly matches the always-positive reference. Both unmodified-reference and demand-confounder alarm rates are 100%, and balanced accuracy is 0.5. The 12:2 positive/reference composition makes aggregate F1 look high even when the detector provides no useful separation at its chosen threshold.
+
+The report includes sensitivity for every rate/duration, nominal confusion counts, reference/confounder alarm rates, and per-variant score changes from the same base day's unmodified reference. Full per-variant evidence is saved locally under ignored `evals/reports/`. Paired deltas are diagnostic metadata only; the standalone score does not assume access to a household's counterfactual unmodified day. No confidence intervals or held-out results are claimed.
+
+This result does not establish real household leak-detection performance. Keep the held-out test period unopened while diagnosing scoring/calibration on training and validation data. The current threshold is recorded for reproducibility, but no production detector has been frozen from it. Any change to scoring, threshold objective, or pattern protocol must be documented before test evaluation; a useful detector must demonstrate acceptable reference and confounder alarm behavior alongside aggregate injection-detection metrics.
