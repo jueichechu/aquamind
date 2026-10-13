@@ -77,3 +77,23 @@ Each validation/test base day produces one original, 12 continuous-injection var
 `injection_present` is true for both continuous injections and the demand confounder. `is_continuous_injection` is the constructed classification target; the confounder is false for that target. `physical_leak_label` remains `unknown` for every row. Added gallons are `added_gpm × duration_intervals × 15`; original values are neither clipped nor replaced. The source export hash and base-day ID allow grouping all related variants for analysis.
 
 The 12 positive variants per base day deliberately cover the protocol grid; they are **not a realistic leak prevalence estimate**. Report class composition and reference/confounder alarm rates beside any future aggregate F1. Randomly splitting variant rows would leak base patterns across partitions and is prohibited by this export's design. Tests cover volume conservation, interval bounds, the complete pattern grid, immutable base sequences, deterministic generation, split independence, and rejection of overlapping partitions or missing boundary gaps.
+
+
+## Hybrid loading and normalization
+
+`aquamind_ml.hybrid_data.load_hybrid_dataset` returns immutable `HybridDataset` and `HybridWindow` records. The loader checks schema, units, protocol, source hashes, UTC daily ordering, boundary gaps and purged-day metadata. It reconstructs each protocol variant from its unmodified reference to verify the complete grid, exact added flow/volume, interval bounds, variant identities, and target labels. Training permits only unmodified references. Physical leak labels stay `unknown`; there is no `has_leak` field.
+
+```python
+from dataclasses import asdict
+from aquamind_ml.hybrid_data import load_hybrid_dataset, HybridFlowNormalizer
+
+dataset = load_hybrid_dataset("ml/data/external/ampds2/hybrid-v1.json")
+normalizer = HybridFlowNormalizer.fit(dataset)
+training_features = normalizer.transform(dataset.train)
+validation_features = normalizer.transform(dataset.validation)
+# Save asdict(normalizer) with the future training artifact.
+```
+
+The normalizer reuses the existing global z-score transformation and fits mean/population standard deviation on unmodified training features only. This does not assert that those real baseline days are leak-free. Constant training input uses unit scale; no clipping is applied. Transformations return features only, leaving the immutable source records unchanged. Parameters include full-dataset and training-only hashes.
+
+The [generated normalization summary](../../ml/data/manifests/ampds2-hybrid-normalizer-v1.json) records 48,960 training values, mean 0.1367525438 GPM, and scale 0.3216670930 GPM. Held-out sequences were validated structurally but were not used to fit parameters or scored by a model. Tests verify parameter independence from held-out flow changes, frozen application, serialization round-trip, constant-input handling, and rejection of corrupted patterns or split manifests. A hybrid training adapter remains to be implemented; the existing synthetic trainer's assumptions are unchanged.

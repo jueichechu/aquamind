@@ -1,0 +1,17 @@
+{
+  "source": "AMPds2 real baseline with controlled injections",
+  "normalizer": {
+    "mean_gpm": 0.13675254382949303,
+    "scale_gpm": 0.32166709295714746,
+    "training_value_count": 48960,
+    "dataset_sha256": "2348641bc654c5bfc4fe55a04ad7078bb603ff97e227d158f3e6bd2cf9b272ae",
+    "training_sha256": "738ce5c5426e8199344b58c88e5a981519fa2742ee339df7929e5d6ec87f4ca0"
+  },
+  "training_label_scope": "unmodified and unlabeled; not verified normal",
+  "training_windows": 510,
+  "training_values": 48960,
+  "validation_windows": 1512,
+  "test_windows": 1526,
+  "model_trained": false,
+  "test_scored": false
+}
