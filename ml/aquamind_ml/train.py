@@ -42,6 +42,20 @@ def fit_model(dataset: MeterDataset, config: TrainingConfig):
         raise ValueError("Normal validation windows are required for checkpoint selection")
     train = torch.tensor(normalizer.transform(dataset.train), dtype=torch.float32).unsqueeze(-1)
     validation = torch.tensor(normalizer.transform(normal_validation), dtype=torch.float32).unsqueeze(-1)
+    model, report = fit_sequences(train, validation, config)
+    report["normal_validation_windows"] = report.pop("validation_windows")
+    for row in report["history"]:
+        row["normal_validation_mse"] = row.pop("validation_mse")
+    return model, normalizer, report
+
+
+def fit_sequences(train: torch.Tensor, validation: torch.Tensor, config: TrainingConfig):
+    """Shared deterministic optimizer; callers choose training/validation features."""
+    for values in (train, validation):
+        if (values.ndim != 3 or values.shape[0] < 1 or values.shape[1:] != (96, 1) or
+                values.dtype != torch.float32 or values.device.type != "cpu" or
+                not torch.isfinite(values).all()):
+            raise ValueError("Expected finite nonempty CPU float32 [batch, 96, 1] tensors")
     previous_threads = torch.get_num_threads()
     previous_determinism = torch.are_deterministic_algorithms_enabled()
     previous_warn_only = torch.is_deterministic_algorithms_warn_only_enabled()
@@ -77,14 +91,13 @@ def fit_model(dataset: MeterDataset, config: TrainingConfig):
                 if not math.isfinite(validation_loss):
                     raise ValueError("Non-finite validation loss")
                 history.append({"epoch": epoch, "train_mse": total / len(train),
-                                "normal_validation_mse": validation_loss})
+                                "validation_mse": validation_loss})
                 if validation_loss < best_loss:
                     best_loss, best_epoch = validation_loss, epoch
                     best_state = deepcopy(model.state_dict())
             model.load_state_dict(best_state)
-            return model, normalizer, {"history": history, "selected_epoch": best_epoch,
-                                      "training_windows": len(train),
-                                      "normal_validation_windows": len(validation)}
+            return model, {"history": history, "selected_epoch": best_epoch,
+                           "training_windows": len(train), "validation_windows": len(validation)}
     finally:
         torch.set_num_threads(previous_threads)
         torch.use_deterministic_algorithms(previous_determinism, warn_only=previous_warn_only)

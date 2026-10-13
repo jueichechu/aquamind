@@ -18,7 +18,7 @@ PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.ampds2 --input ml/data/external
 
 Compare the output with [the checked-in inspection](../../ml/data/manifests/ampds2-water-inspection.json). The original CSV must match both the repository MD5 and our pinned SHA-256 before a report is emitted. The inspector checks column layout, finite non-negative measurements, monotonic counters and exact minute spacing. Counter/rate discrepancies above 0.002 liters are counted, not repaired. It performs no resampling, normalization, anomaly injection, or labeling. No raw dataset is committed.
 
-The file contains no leak-label column. **Do not assume every reading is leak-free or assign normal labels automatically.** This inspection does not train or evaluate a detector, and does not change the existing synthetic benchmark. The preprocessing step below defines chronological splits and interval alignment; real-data-derived ML experiments are still outstanding. Real-base sequences with injected leaks must be described as hybrid evaluation, not field-validated leak detection. WEUSEDTO and the WRF educational dataset remain uninvestigated in this increment.
+The file contains no leak-label column. **Do not assume every reading is leak-free or assign normal labels automatically.** This inspection does not train or evaluate a detector, and does not change the existing synthetic benchmark. The preprocessing step below defines chronological splits and interval alignment; hybrid training is described below; classification evaluation is still outstanding. Real-base sequences with injected leaks must be described as hybrid evaluation, not field-validated leak detection. WEUSEDTO and the WRF educational dataset remain uninvestigated in this increment.
 
 
 ## Unlabeled 15-minute windows
@@ -61,7 +61,7 @@ The first hybrid experiment is specified before validation/test scoring:
 - Select the threshold using validation only. For this first protocol, maximize F1 for continuous-injection detection against the unmodified and demand-confounder references, breaking ties toward the higher threshold. Freeze the checkpoint, normalization, scoring method, threshold, and protocol before opening test outcomes.
 - Report injection-detection precision/recall/F1 and counts alongside sensitivity by rate/duration, unmodified-reference alarm rate, demand-confounder alarm rate, and paired score changes. These references are nominal negatives for a constructed task, not verified leak-free ground truth. Aggregate uncertainty by base day, not by treating related variants as independent households.
 
-Pattern generation is implemented below. Model fitting, validation selection, and held-out scoring remain subsequent increments; no hybrid performance results exist yet. Any protocol changes before test execution must be versioned and explained; after test outcomes are inspected, that test period cannot be reused as fresh confirmation for further tuning. Even a successful result would support only a one-house chronological hybrid experiment, not real household leak F1 or household-to-household generalization.
+Pattern generation and model fitting are implemented below. Threshold selection and held-out scoring remain subsequent increments; no hybrid classification metrics exist yet. Any protocol changes before test execution must be versioned and explained; after test outcomes are inspected, that test period cannot be reused as fresh confirmation for further tuning. Even a successful result would support only a one-house chronological hybrid experiment, not real household leak F1 or household-to-household generalization.
 
 
 ## Deterministic hybrid export
@@ -96,4 +96,19 @@ validation_features = normalizer.transform(dataset.validation)
 
 The normalizer reuses the existing global z-score transformation and fits mean/population standard deviation on unmodified training features only. This does not assert that those real baseline days are leak-free. Constant training input uses unit scale; no clipping is applied. Transformations return features only, leaving the immutable source records unchanged. Parameters include full-dataset and training-only hashes.
 
-The [generated normalization summary](../../ml/data/manifests/ampds2-hybrid-normalizer-v1.json) records 48,960 training values, mean 0.1367525438 GPM, and scale 0.3216670930 GPM. Held-out sequences were validated structurally but were not used to fit parameters or scored by a model. Tests verify parameter independence from held-out flow changes, frozen application, serialization round-trip, constant-input handling, and rejection of corrupted patterns or split manifests. A hybrid training adapter remains to be implemented; the existing synthetic trainer's assumptions are unchanged.
+The [generated normalization summary](../../ml/data/manifests/ampds2-hybrid-normalizer-v1.json) records 48,960 training values, mean 0.1367525438 GPM, and scale 0.3216670930 GPM. Held-out sequences were validated structurally but were not used to fit parameters or scored by a model. Tests verify parameter independence from held-out flow changes, frozen application, serialization round-trip, constant-input handling, and rejection of corrupted patterns or split manifests. The hybrid training adapter is described below; the existing synthetic trainer retains its label assumptions.
+
+## Hybrid LSTM training
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_train --dataset ml/data/external/ampds2/hybrid-v1.json --output ml/artifacts/ampds2-lstm-v1 --epochs 20
+```
+
+The adapter trains the existing PyTorch LSTM autoencoder on all 510 unmodified AMPds2 training days. These days are unlabeled and may contain unknown anomalies. It selects the checkpoint by minimum reconstruction MSE on the 108 unmodified validation references, with earliest epoch breaking ties. Injected validation variants and every test variant are excluded from training and checkpoint selection. The shared CPU optimizer uses fixed seeds, deterministic PyTorch operations, Adam, gradient clipping, and training-only normalization.
+
+The ignored artifact directory contains `weights.pt` and `training.json`, including the configuration, history, chosen epoch, frozen normalization, dataset/source/weight hashes, label disclosure, and execution environment. Existing directories are never overwritten. Tests verify reproducible model tensors, unchanged training results when test data and validation injections are removed, checkpoint selection, artifact reloading, and rejection of missing validation references.
+
+This training run produces reconstruction weights only. Validation threshold selection, injection-detection scoring, and held-out evaluation remain subsequent increments. Reconstruction MSE is not precision, recall, F1, or a leak probability. The trained hybrid model is not yet connected to FastAPI/MCP or the dashboard; the existing synthetic detector remains separately versioned.
+
+
+The first 20-epoch run is recorded in [the generated training baseline](../../evals/baselines/ampds2-training-v1.json). It selected epoch 17, with unmodified-validation MSE 0.7224179484 in normalized squared-error units. A second complete run produced identical model tensors and loss history. This is reproducible training evidence, not a classification benchmark; no validation injection scores or test scores have been calculated.

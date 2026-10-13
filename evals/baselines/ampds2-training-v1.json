@@ -1,0 +1,148 @@
+{
+  "history": [
+    {
+      "epoch": 1,
+      "train_mse": 1.0044666266908833,
+      "unmodified_validation_mse": 0.8257538102291249
+    },
+    {
+      "epoch": 2,
+      "train_mse": 1.0008494825924144,
+      "unmodified_validation_mse": 0.8267391743483367
+    },
+    {
+      "epoch": 3,
+      "train_mse": 1.0006431703474008,
+      "unmodified_validation_mse": 0.8254702047065452
+    },
+    {
+      "epoch": 4,
+      "train_mse": 0.9996099761888093,
+      "unmodified_validation_mse": 0.8251588499104535
+    },
+    {
+      "epoch": 5,
+      "train_mse": 0.9983492215474447,
+      "unmodified_validation_mse": 0.8247806010422883
+    },
+    {
+      "epoch": 6,
+      "train_mse": 0.9958378614163866,
+      "unmodified_validation_mse": 0.8248832203723766
+    },
+    {
+      "epoch": 7,
+      "train_mse": 0.9916696221220727,
+      "unmodified_validation_mse": 0.8248656723234389
+    },
+    {
+      "epoch": 8,
+      "train_mse": 0.9889318124920714,
+      "unmodified_validation_mse": 0.8250946667459276
+    },
+    {
+      "epoch": 9,
+      "train_mse": 0.9874347855063046,
+      "unmodified_validation_mse": 0.8236444327566359
+    },
+    {
+      "epoch": 10,
+      "train_mse": 0.9871760697925792,
+      "unmodified_validation_mse": 0.8221881786982218
+    },
+    {
+      "epoch": 11,
+      "train_mse": 0.9861458857854207,
+      "unmodified_validation_mse": 0.8206559905299434
+    },
+    {
+      "epoch": 12,
+      "train_mse": 0.9839161947661755,
+      "unmodified_validation_mse": 0.8188204478334498
+    },
+    {
+      "epoch": 13,
+      "train_mse": 0.9760647077186435,
+      "unmodified_validation_mse": 0.8020480032320376
+    },
+    {
+      "epoch": 14,
+      "train_mse": 0.9405888959473254,
+      "unmodified_validation_mse": 0.7601037577346519
+    },
+    {
+      "epoch": 15,
+      "train_mse": 0.9111041279400096,
+      "unmodified_validation_mse": 0.7375140123897128
+    },
+    {
+      "epoch": 16,
+      "train_mse": 0.9001321495748034,
+      "unmodified_validation_mse": 0.7330949637624953
+    },
+    {
+      "epoch": 17,
+      "train_mse": 0.8957445686938716,
+      "unmodified_validation_mse": 0.7224179484226085
+    },
+    {
+      "epoch": 18,
+      "train_mse": 0.8919350439426945,
+      "unmodified_validation_mse": 0.7232625042950666
+    },
+    {
+      "epoch": 19,
+      "train_mse": 0.886788727722916,
+      "unmodified_validation_mse": 0.7234353864634478
+    },
+    {
+      "epoch": 20,
+      "train_mse": 0.884810430395837,
+      "unmodified_validation_mse": 0.7226278958497224
+    }
+  ],
+  "selected_epoch": 17,
+  "training_windows": 510,
+  "unmodified_validation_windows": 108,
+  "schema": "aquamind-hybrid-training-v1",
+  "source": "AMPds2 real baseline",
+  "training_label_scope": "unmodified and unlabeled; not verified normal",
+  "architecture": "LSTM autoencoder",
+  "config": {
+    "seed": 42,
+    "epochs": 20,
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "hidden_size": 32,
+    "latent_size": 8
+  },
+  "normalizer": {
+    "mean_gpm": 0.13675254382949303,
+    "scale_gpm": 0.32166709295714746,
+    "training_value_count": 48960,
+    "dataset_sha256": "2348641bc654c5bfc4fe55a04ad7078bb603ff97e227d158f3e6bd2cf9b272ae",
+    "training_sha256": "738ce5c5426e8199344b58c88e5a981519fa2742ee339df7929e5d6ec87f4ca0"
+  },
+  "base_export_sha256": "214eeccd22b5879bc731df3bdbc1c23b1464328af63a763f8d71132cad348a47",
+  "weights_sha256": "32599c6a6b6d8b7564f6b139d955a0a613046e100b78eb8925df1acd2a532d2f",
+  "source_sha256": {
+    "hybrid_train.py": "3ab062a055f300da0125fbdf73f163249f6aa750e329367dd3c85b4edc48c2dc",
+    "train.py": "756c46963715ea32082cb11eb10894e9e76173ee3599839d05d644e4809d3547",
+    "model.py": "a10a597c5c5fb63ffe9033e88ddfbef6196c67e12814d2390c3cb5ecf1beabd1",
+    "hybrid_data.py": "5ef562c85dd41d542285362c18b12684791728b67bdb5380bfc3480b813a3be6",
+    "data.py": "9ad39df149e17248da6761693ac7bdfd6e41bf50ebd08ed2338f55ea2f9bee1a",
+    "ampds2_hybrid.py": "54cec933fe30f8c6d8eddbb1c592a04206e97db342792c811628a58b7e26b560"
+  },
+  "environment": {
+    "python": "3.14.2",
+    "torch": "2.14.1",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "device": "cpu",
+    "threads": 1
+  },
+  "selection": "minimum unmodified-validation MSE; earliest epoch breaks ties",
+  "validation_injections_scored": false,
+  "test_evaluated": false,
+  "reproducibility": "two 20-epoch runs produced identical model tensors and loss history",
+  "reproduction": "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_train --dataset ml/data/external/ampds2/hybrid-v1.json --output ml/artifacts/ampds2-lstm-v1 --epochs 20"
+}
