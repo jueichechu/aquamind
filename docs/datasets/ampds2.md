@@ -177,3 +177,31 @@ The [generated ablation report](../../evals/baselines/ampds2-background-validati
 The earlier slot-standardized score reproduces its previous result. Removing slot scaling worsens sensitivity under the same false-alarm constraints. The measured-flow rule also performs poorly, so this comparison does not support replacing the model with this particular flow rule. It does not establish that the LSTM beats every possible model-free method. Both GPM scores require relatively high thresholds (0.3236 and 0.4321 GPM respectively) to meet the demand-confounder alarm constraint, suppressing subtle injections. The fixed four-hour lower-quartile operator still admits enough demand-confounder scores to limit sensitivity.
 
 These alternatives do not improve the current candidate and should not be promoted to the served detector. The next development step is to investigate persistence robustness to the two-hour demand confounder, with any new rule specified before its validation run. Preserve the current patterns and withheld test period. Full paired score evidence stays in the ignored local report; no held-out metric, new checkpoint, or production deployment is produced by this experiment. Tests cover physical units, burst rejection, within-day boundaries, invalid inputs, held-out access prevention, and independence of the measured-flow baseline from normalization/model parameters.
+
+## Strict persistence protocol
+
+Define `strict-persistence-v1` before its validation run: replace the fourth-smallest residual in each 16-interval stretch with its minimum, then take the maximum stretch score and clamp at zero. Retain the trained LSTM, training-only per-slot residual centers/scales, fixed four-hour duration, original injection grid, and separate 5% validation reference/confounder alarm caps. This requires excess evidence at every interval of a qualifying stretch, reducing the chance that two-hour demand plus unrelated background fills the lower quartile. A single low interval can suppress a real event, so this is a tradeoff to measure, not a guaranteed improvement.
+
+Compare strict standardized-LSTM residuals with the earlier lower-quartile residual candidate, and also apply strict persistence directly to measured GPM as an explicitly model-free control. Do not tune more durations, quantiles, or pattern strengths in this experiment. Report reference alarms and sensitivity by rate/duration, maintain separate attribution for the control, and keep test outcomes unopened. Detector promotion requires acceptable reference-alarm behavior and pattern sensitivity, not aggregate synthetic-injection F1 alone.
+
+Reproduce the strict comparison:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_persistence --dataset ml/data/external/ampds2/hybrid-v1.json --checkpoint ml/artifacts/ampds2-lstm-v1 --output evals/reports/ampds2-persistence-validation-reproduced-v1.json
+```
+
+The [generated strict-persistence report](../../evals/baselines/ampds2-persistence-validation-v1.json) records:
+
+| Validation measure | Earlier lower-quartile residual | Strict LSTM residual | Strict measured-flow control |
+| --- | ---: | ---: | ---: |
+| Precision | 0.9921 | 0.9935 | 0.9896 |
+| Recall | 0.3889 | 0.8218 | 0.5154 |
+| F1 | 0.5588 | 0.8995 | 0.6778 |
+| Unmodified-reference alarms | 0/108 | 2/108 | 2/108 |
+| Demand-confounder alarms | 4/108 | 5/108 | 5/108 |
+
+The strict residual threshold is 0.0851231068 in training-standardized residual units. Requiring all 16 intervals lowers the selected threshold while still satisfying both development alarm caps. The earlier candidate reproduces its previous results exactly. Strict residual scoring detects 1,065 of 1,296 injected variants and outperforms this measured-flow control under the same criterion. That comparison supports a contribution from the LSTM residual/calibration path in this constructed validation task, but cannot establish superiority over all possible rules or models.
+
+Weak short patterns remain: four-hour sensitivity is 13.0% at 0.01 GPM and 25.9% at 0.03 GPM. Corresponding twelve-hour sensitivity is 77.8% and 97.2%; full-day sensitivity is 100% for all tested rates. The generated report retains the complete rate/duration breakdown. Aggregate F1 remains dependent on the designed pattern prevalence and correlated variants.
+
+This candidate is ready to freeze for a held-out experiment, not to claim real-world household leak performance. The next increment should version the checkpoint, training-only normalization/calibration, strict score, threshold, and source hashes before any test scoring. Score the withheld period once without refitting or threshold adjustment, and report the actual outcome even if performance falls. If further development follows inspected test results, obtain a fresh confirmation period/dataset. Tests for this increment cover exact four-hour persistence, interrupted events, short demand, no cross-day wrapping, invalid tensors, validation alarm caps, and inaccessible held-out data.
