@@ -46,6 +46,14 @@ def validate_dataset(dataset, model, normalizer) -> dict:
         torch.set_num_threads(previous_threads)
     labels = [w.is_continuous_injection for w in windows]
     threshold = select_threshold(scores, labels)
+    return summarize_validation(windows, scores, threshold)
+
+
+def summarize_validation(windows, scores: list[float], threshold: float) -> dict:
+    """Shared diagnostic report for a preselected threshold and aligned scores."""
+    if len(windows) != len(scores) or not windows:
+        raise ValueError('Expected aligned nonempty windows and scores')
+    labels = [w.is_continuous_injection for w in windows]
     predictions = [value >= threshold for value in scores]
     references = {w.base_day_id: score for w, score in zip(windows, scores) if w.variant_kind == 'unmodified'}
     kind_reports = {}

@@ -126,3 +126,29 @@ The [generated validation baseline](../../evals/baselines/ampds2-validation-v1.j
 The report includes sensitivity for every rate/duration, nominal confusion counts, reference/confounder alarm rates, and per-variant score changes from the same base day's unmodified reference. Full per-variant evidence is saved locally under ignored `evals/reports/`. Paired deltas are diagnostic metadata only; the standalone score does not assume access to a household's counterfactual unmodified day. No confidence intervals or held-out results are claimed.
 
 This result does not establish real household leak-detection performance. Keep the held-out test period unopened while diagnosing scoring/calibration on training and validation data. The current threshold is recorded for reproducibility, but no production detector has been frozen from it. Any change to scoring, threshold objective, or pattern protocol must be documented before test evaluation; a useful detector must demonstrate acceptable reference and confounder alarm behavior alongside aggregate injection-detection metrics.
+
+## Sustained residual scoring experiment
+
+Scoring protocol `sustained-residual-v1` is defined before running its validation comparison. Center each UTC slot's residual using its median over unmodified training days; divide by that slot's population standard deviation with a fixed 0.01 floor in normalized-flow units. Within each day, score every 16-interval (four-hour) stretch by its fourth-smallest standardized residual (nearest-rank lower quartile), then take the largest stretch score, clamped at zero. There is no wrap across day boundaries. This aims to retain persistent excess flow while reducing sensitivity to isolated demand bursts. It uses LSTM reconstruction residuals and does not access injection timing or a counterfactual base day during inference.
+
+The threshold objective changes from unconstrained maximum F1: maximize validation F1 subject to alarm rates at most 5% **separately** on unmodified references and demand confounders, with higher thresholds breaking ties. Five percent is a declared development cap, not an established acceptable household alert rate. Include the above-maximum threshold so rejecting every variant remains feasible. Apply the same objective to daily MSE to distinguish the scoring effect from the constraint effect. Keep the earlier unconstrained MSE baseline. Fit all calibration parameters from training only; use validation for threshold development; do not score test data in this experiment. Low-flow injections may remain difficult and must be reported by rate and duration.
+
+Reproduce the validation-only comparison:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_sustained --dataset ml/data/external/ampds2/hybrid-v1.json --checkpoint ml/artifacts/ampds2-lstm-v1 --output evals/reports/ampds2-sustained-validation-reproduced-v1.json
+```
+
+The [generated comparison](../../evals/baselines/ampds2-sustained-validation-v1.json) records:
+
+| Validation measure | Sustained residual | MSE with same alarm constraints |
+| --- | ---: | ---: |
+| Precision | 0.9921 | 0.6429 |
+| Recall | 0.3889 | 0.0069 |
+| F1 | 0.5588 | 0.0137 |
+| Unmodified-reference alarms | 0/108 | 0/108 |
+| Demand-confounder alarms | 4/108 | 5/108 |
+
+The sustained score improves discrimination under the same alarm constraints, but misses 792 of 1,296 injected patterns. It detects none of the 0.01 or 0.03 GPM injections. At 0.1 GPM, sensitivity is 20.4% for four hours, 91.7% for twelve hours, and 100% for a full day. This is a development result with important low-flow limitations, not an achieved leak-detection target. Its lower F1 than the original flag-everything result reflects a changed threshold objective and fewer nominal false alarms, not a directly comparable unconstrained optimization result.
+
+The implementation records all 96 training-derived centers/scales, source hashes, both thresholds, confusion counts, per-pattern sensitivity, and paired validation evidence. The fixed scale floor is applied as a Python float after population standard deviation, avoiding a float32 rounding error below the declared 0.01 minimum. Repeated scoring after that repair produced identical real validation scores and metrics. Tests cover zero-variance calibration, serialized parameters, short demand spikes, no cross-midnight wrapping, separate group alarm limits, an all-negative fallback, and a test partition that raises if accessed. No held-out score or production artifact is produced.
