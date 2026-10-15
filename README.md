@@ -338,4 +338,8 @@ The repository is a pnpm workspace. Python data preparation, the LSTM autoencode
 
 ## External data foundation
 
-The real-data foundation includes a checksum-pinned AMPds2 water-file inspector and unlabeled, chronologically split 15-minute windows, plus a training-only descriptive profile and deterministic hybrid-pattern generation, immutable hybrid loading, and training-only normalization under a documented experiment protocol. See [source, license, limitations and reproduction](docs/datasets/ampds2.md). A separate hybrid LSTM training adapter fits unmodified real baseline days without inventing leak labels. The served detector and existing classification/latency metrics still use synthetic data. The initial hybrid MSE validation baseline flags all variants. A subsequent sustained-residual score improves discrimination under explicit alarm limits but misses low-flow injections; held-out hybrid evaluation and bill-first inputs remain outstanding.
+The AMPds2 workflow includes checksum verification, chronological 15-minute windows, a training-only profile, controlled pattern generation, immutable loading, and training-only normalization. A separate LSTM training adapter fits unmodified real baseline days with unknown physical leak labels. See [provenance, experiments, limitations, and reproduction](docs/datasets/ampds2.md).
+
+The initial hybrid MSE validation baseline flags every variant. Sustained residual scoring reduces reference alarms but misses low-flow injections. A subsequent ablation found that removing slot scaling or applying the same persistence operator directly to measured flow performs worse. Held-out hybrid evaluation remains outstanding.
+
+The served detector and existing classification/latency benchmarks still use synthetic data. Bill-first inputs are planned under the expanded product scope and are not implemented yet.

@@ -152,3 +152,28 @@ The [generated comparison](../../evals/baselines/ampds2-sustained-validation-v1.
 The sustained score improves discrimination under the same alarm constraints, but misses 792 of 1,296 injected patterns. It detects none of the 0.01 or 0.03 GPM injections. At 0.1 GPM, sensitivity is 20.4% for four hours, 91.7% for twelve hours, and 100% for a full day. This is a development result with important low-flow limitations, not an achieved leak-detection target. Its lower F1 than the original flag-everything result reflects a changed threshold objective and fewer nominal false alarms, not a directly comparable unconstrained optimization result.
 
 The implementation records all 96 training-derived centers/scales, source hashes, both thresholds, confusion counts, per-pattern sensitivity, and paired validation evidence. The fixed scale floor is applied as a Python float after population standard deviation, avoiding a float32 rounding error below the declared 0.01 minimum. Repeated scoring after that repair produced identical real validation scores and metrics. Tests cover zero-variance calibration, serialized parameters, short demand spikes, no cross-midnight wrapping, separate group alarm limits, an all-negative fallback, and a test partition that raises if accessed. No held-out score or production artifact is produced.
+
+## Background-flow ablation protocol
+
+Before further validation scoring, define a fixed ablation to separate reconstruction effects from residual standardization. Keep the four-hour/fourth-smallest persistence operator and the same separate 5% reference/confounder alarm caps. Compare: (1) the existing slot-standardized sustained residual score; (2) residuals centered by training-slot median, converted back into GPM without dividing by slot standard deviation; and (3) the same persistence operator applied directly to measured GPM. The third candidate is explicitly a model-free physical baseline. It must not be credited as PyTorch/LSTM performance.
+
+Use identical validation variants, threshold objective, and diagnostics for all three. Do not alter pattern strengths/durations, inspect test scores, or tune additional window lengths/quantiles during this ablation. The comparison can reveal whether slot variance masks small offsets or whether reconstruction harms/preserves the useful background-flow signal. It cannot establish real leak truth or prove the LSTM adds value merely because a rule performs well. Counterfactual base-day score changes remain offline diagnostics only.
+
+Run the ablation:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_floor --dataset ml/data/external/ampds2/hybrid-v1.json --checkpoint ml/artifacts/ampds2-lstm-v1 --output evals/reports/ampds2-background-validation-reproduced-v1.json
+```
+
+The [generated ablation report](../../evals/baselines/ampds2-background-validation-v1.json) finds:
+
+| Validation measure | Slot-standardized LSTM residual | Centered LSTM residual, GPM | Measured-flow rule, GPM |
+| --- | ---: | ---: | ---: |
+| Recall | 0.3889 | 0.0340 | 0.0123 |
+| F1 | 0.5588 | 0.0654 | 0.0243 |
+| Unmodified-reference alarms | 0/108 | 0/108 | 0/108 |
+| Demand-confounder alarms | 4/108 | 5/108 | 5/108 |
+
+The earlier slot-standardized score reproduces its previous result. Removing slot scaling worsens sensitivity under the same false-alarm constraints. The measured-flow rule also performs poorly, so this comparison does not support replacing the model with this particular flow rule. It does not establish that the LSTM beats every possible model-free method. Both GPM scores require relatively high thresholds (0.3236 and 0.4321 GPM respectively) to meet the demand-confounder alarm constraint, suppressing subtle injections. The fixed four-hour lower-quartile operator still admits enough demand-confounder scores to limit sensitivity.
+
+These alternatives do not improve the current candidate and should not be promoted to the served detector. The next development step is to investigate persistence robustness to the two-hour demand confounder, with any new rule specified before its validation run. Preserve the current patterns and withheld test period. Full paired score evidence stays in the ignored local report; no held-out metric, new checkpoint, or production deployment is produced by this experiment. Tests cover physical units, burst rejection, within-day boundaries, invalid inputs, held-out access prevention, and independence of the measured-flow baseline from normalization/model parameters.
