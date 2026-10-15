@@ -1,0 +1,40 @@
+{
+  "schema": "aquamind-hybrid-freeze-record-v1",
+  "model_version": "hybrid-detector-c805bc1fffe10b80",
+  "detector_manifest_sha256": "c805bc1fffe10b80a464ef9ca819f90fe93d2e52ec55604fbbc1c8ef56933f0b",
+  "weights_sha256": "32599c6a6b6d8b7564f6b139d955a0a613046e100b78eb8925df1acd2a532d2f",
+  "dataset_sha256": "2348641bc654c5bfc4fe55a04ad7078bb603ff97e227d158f3e6bd2cf9b272ae",
+  "validation_report_sha256": "47e4a3afb7ef156c08f53faa9f33b4ab45cce2bf97ee366a7c6502dff0d44f27",
+  "score": "strict-persistence-v1",
+  "threshold": 0.08512310683727264,
+  "comparison": ">=",
+  "normalizer": {
+    "dataset_sha256": "2348641bc654c5bfc4fe55a04ad7078bb603ff97e227d158f3e6bd2cf9b272ae",
+    "mean_gpm": 0.13675254382949303,
+    "scale_gpm": 0.32166709295714746,
+    "training_sha256": "738ce5c5426e8199344b58c88e5a981519fa2742ee339df7929e5d6ec87f4ca0",
+    "training_value_count": 48960
+  },
+  "development_base_days": 618,
+  "development_last_timestamp": "2013-12-11T00:00:00+00:00",
+  "source_sha256": {
+    "calibration.py": "ebfb9e6b8be7542cb3473468ee4eef50afeacc3ee7d4141294277cd9fbe8eebb",
+    "data.py": "9ad39df149e17248da6761693ac7bdfd6e41bf50ebd08ed2338f55ea2f9bee1a",
+    "hybrid_data.py": "5ef562c85dd41d542285362c18b12684791728b67bdb5380bfc3480b813a3be6",
+    "hybrid_detector.py": "4d20b6d63a724d8fbdf9a87e427b9b1737c8be1536e3c7c7e6cba9957699892d",
+    "hybrid_persistence.py": "e2cfc8b74100a1af2562812b6fa792d79f3f297e0e5ce978e4d99136a3d66d70",
+    "model.py": "a10a597c5c5fb63ffe9033e88ddfbef6196c67e12814d2390c3cb5ecf1beabd1"
+  },
+  "validation_reload_check": {
+    "windows": 1512,
+    "scores_and_flags_identical": true,
+    "refitted": false
+  },
+  "test_evaluated": false,
+  "runtime": {
+    "torch": "2.14.1",
+    "device": "cpu",
+    "threads": 1
+  },
+  "reproduction": "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_detector --dataset ml/data/external/ampds2/hybrid-v1.json --checkpoint ml/artifacts/ampds2-lstm-v1 --validation evals/baselines/ampds2-persistence-validation-v1.json --output ml/artifacts/ampds2-detector-v1"
+}

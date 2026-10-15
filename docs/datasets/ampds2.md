@@ -205,3 +205,17 @@ The strict residual threshold is 0.0851231068 in training-standardized residual 
 Weak short patterns remain: four-hour sensitivity is 13.0% at 0.01 GPM and 25.9% at 0.03 GPM. Corresponding twelve-hour sensitivity is 77.8% and 97.2%; full-day sensitivity is 100% for all tested rates. The generated report retains the complete rate/duration breakdown. Aggregate F1 remains dependent on the designed pattern prevalence and correlated variants.
 
 This candidate is ready to freeze for a held-out experiment, not to claim real-world household leak performance. The next increment should version the checkpoint, training-only normalization/calibration, strict score, threshold, and source hashes before any test scoring. Score the withheld period once without refitting or threshold adjustment, and report the actual outcome even if performance falls. If further development follows inspected test results, obtain a fresh confirmation period/dataset. Tests for this increment cover exact four-hour persistence, interrupted events, short demand, no cross-day wrapping, invalid tensors, validation alarm caps, and inaccessible held-out data.
+
+## Frozen strict-persistence artifact
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_detector --dataset ml/data/external/ampds2/hybrid-v1.json --checkpoint ml/artifacts/ampds2-lstm-v1 --validation evals/baselines/ampds2-persistence-validation-v1.json --output ml/artifacts/ampds2-detector-v1
+```
+
+The freeze command consumes the committed validation summary without selecting another threshold or scoring test windows. It verifies weights, dataset/normalization provenance, selected epoch, validation-source hashes, the training-only residual fit, and the declared alarm constraints. It copies the weights and writes a deterministic `detector.json` completion manifest. Existing directories are never overwritten.
+
+The manifest locks the model dimensions, weights, global normalization, 96 residual centers/scales, strict four-hour scoring contract, threshold, comparison, development base days, last development date, validation-report hash, and runtime source hashes. Only training and validation base-day identities enter the development list. The [generated freeze record](../../evals/baselines/ampds2-detector-freeze-v1.json) pins the full manifest SHA-256 and model version before held-out scoring.
+
+`FrozenHybridDetector` loads weights and saved parameters without fitting or using dataset labels. It rejects changed weights, unsupported scoring contracts, invalid thresholds, and runtime-source mismatches. Updating those source files requires an explicitly new artifact/version. Predictions contain `score`, `is_continuous_pattern`, and `model_version`; the flag reflects the controlled-pattern target, not a verified plumbing diagnosis or probability. For reproducible CPU comparisons, callers use one PyTorch thread. This artifact is local and is not yet promoted into the HTTP/MCP service.
+
+All 1,512 frozen validation scores and flags exactly match the saved validation experiment, with fitting disabled during reload/inference. Tests also verify label/provenance independence, refusal to overwrite, and corrupted/stale artifact rejection. No held-out prediction has been calculated in this increment. Next, evaluate the pinned detector on the withheld period without refitting or threshold changes, report reference/confounder alarm rates and pattern sensitivity alongside aggregate metrics, retaining the hybrid-data qualification.
