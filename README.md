@@ -343,3 +343,18 @@ The AMPds2 workflow includes checksum verification, chronological 15-minute wind
 The initial hybrid MSE validation baseline flags every variant. Subsequent sustained-residual experiments improve discrimination; strict four-hour persistence reaches validation F1 0.8995 while meeting the declared reference alarm caps. Short low-flow patterns remain difficult. The strict-persistence detector is frozen and versioned. Its chronological hybrid holdout achieved F1 0.8988, but unmodified/demand-confounder alarm rates rose to 6.4%/11.0%; it remains experimental.
 
 The served detector and existing classification/latency benchmarks still use synthetic data. Bill-first inputs are planned under the expanded product scope and are not implemented yet.
+
+
+## Agent MCP adapter
+
+`aquamind_ml.agent_tools.McpAgentTools` is the first agent integration layer. The host supplies a connected official MCP `Client` and an explicit subset of the eight known AquaMind tool names. The default tool list is empty. Discovery reads the real server's tool descriptions and schemas, with at most four pages and a timeout; it never exposes host approval/decision methods. MCP scopes remain authoritative even when a name is allowed by the adapter.
+
+`await bridge.discover()` returns function definitions suitable for a future Responses API request. They preserve the MCP JSON schemas and explicitly use `strict: false`; the existing MCP/Pydantic server performs final validation. This follows the [official OpenAI function-calling contract](https://developers.openai.com/api/docs/guides/function-calling). There is no promise of model-side strict schema enforcement in this adapter.
+
+`await bridge.execute(call_id, tool_name, arguments_json)` returns a `ToolOutcome`; `response_output()` serializes a correlated `function_call_output` record. Execution is serialized and bounded to eight calls by default (host-configurable up to 16), ten seconds per tool (up to 30), 32 KiB of arguments and 64 KiB of structured output. Invalid JSON, duplicate keys, NaN/Infinity, extra root arguments and disallowed tools are rejected. Failed attempts consume budget. Repeated call IDs cannot execute twice, including concurrent requests.
+
+Read success, tool errors, unconfirmed transport outcomes, and pending approvals remain distinct. `set_conservation_goal` must return `approval_required`; it cannot be treated as an executed goal. Timeout/connection failures receive no automatic retry because an outcome may be uncertain. Hosts must stop or surface a pending approval rather than claiming a goal was applied. Cancellation/timeout does not guarantee the underlying server work stopped.
+
+The bounded metadata trace contains only call ID, recognized tool name, status and elapsed time. It does not log tool arguments/results, session credentials, provider errors or hidden reasoning. Tool results stay in the returned in-memory outcome for the future agent host. Tests negotiate real MCP sessions, including stdio subprocess discovery/execution, and cover scopes, approval safety, duplicate execution, malformed arguments, budgets, and timeout handling.
+
+This adapter does not call an LLM, produce conservation explanations, continue after human approval, or connect the browser to an agent yet. These are development tests, not an end-to-end agent evaluation. The next increment is the bounded live-model conversation/tool loop, followed by authenticated session/browser integration. OpenAI credentials are needed for its live verification; database and hosting setup are not needed for the local adapter.
