@@ -340,6 +340,6 @@ The repository is a pnpm workspace. Python data preparation, the LSTM autoencode
 
 The AMPds2 workflow includes checksum verification, chronological 15-minute windows, a training-only profile, controlled pattern generation, immutable loading, and training-only normalization. A separate LSTM training adapter fits unmodified real baseline days with unknown physical leak labels. See [provenance, experiments, limitations, and reproduction](docs/datasets/ampds2.md).
 
-The initial hybrid MSE validation baseline flags every variant. Subsequent sustained-residual experiments improve discrimination; strict four-hour persistence reaches validation F1 0.8995 while meeting the declared reference alarm caps. Short low-flow patterns remain difficult. This is development evidence. The strict-persistence detector is frozen and versioned; held-out hybrid evaluation remains outstanding.
+The initial hybrid MSE validation baseline flags every variant. Subsequent sustained-residual experiments improve discrimination; strict four-hour persistence reaches validation F1 0.8995 while meeting the declared reference alarm caps. Short low-flow patterns remain difficult. The strict-persistence detector is frozen and versioned. Its chronological hybrid holdout achieved F1 0.8988, but unmodified/demand-confounder alarm rates rose to 6.4%/11.0%; it remains experimental.
 
 The served detector and existing classification/latency benchmarks still use synthetic data. Bill-first inputs are planned under the expanded product scope and are not implemented yet.

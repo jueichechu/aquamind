@@ -1,0 +1,172 @@
+{
+  "schema": "aquamind-hybrid-heldout-v1",
+  "source": "real AMPds2 consumption with controlled synthetic patterns",
+  "target": "controlled continuous-injection detection; real physical leak labels unknown",
+  "pattern_protocol": "ampds2-hybrid-v1",
+  "scoring_protocol": "strict-persistence-v1",
+  "model_version": "hybrid-detector-c805bc1fffe10b80",
+  "dataset_sha256": "2348641bc654c5bfc4fe55a04ad7078bb603ff97e227d158f3e6bd2cf9b272ae",
+  "detector_manifest_sha256": "c805bc1fffe10b80a464ef9ca819f90fe93d2e52ec55604fbbc1c8ef56933f0b",
+  "freeze_record_sha256": "f3d6fb7872c257140360d65db5c3b2f6da97e1fab7a01182e607b95cfe9ae75a",
+  "weights_sha256": "32599c6a6b6d8b7564f6b139d955a0a613046e100b78eb8925df1acd2a532d2f",
+  "refitted": false,
+  "threshold_changed": false,
+  "test_evaluated": true,
+  "environment": {
+    "python": "3.14.2",
+    "torch": "2.14.1",
+    "device": "cpu",
+    "threads": 1
+  },
+  "source_sha256": {
+    "hybrid_confirm.py": "08e12f1a3017c8f0ac19d4733abb327cbd6436ea725fb76da43d0126e98fe932",
+    "hybrid_validate.py": "eb17f88e1d356804a93171999a3b0724d05bd933163f64c34c2c961e481ceac4",
+    "evaluate.py": "bb1552fdd93ae5071f67dcb84b6a5552fe01defd2fd5f714d9026a6414f2e4bb"
+  },
+  "limitations": [
+    "One household and one temporal holdout; no unseen-household generalization",
+    "Real baseline leak labels unknown; positive patterns are injected",
+    "Designed class composition is not real leak prevalence",
+    "Bootstrap intervals reflect within-period variation, not household diversity or all temporal dependence",
+    "Short low-flow, interrupted, and cross-midnight patterns remain limitations",
+    "This period is now inspected and cannot be fresh confirmation for further tuning"
+  ],
+  "threshold": 0.08512310683727264,
+  "comparison": ">=",
+  "always_positive_reference": {
+    "count": 1526,
+    "tp": 1308,
+    "fp": 218,
+    "fn": 0,
+    "tn": 0,
+    "precision": 0.8571428571428571,
+    "recall": 1.0,
+    "f1": 0.9230769230769231
+  },
+  "by_variant_kind": {
+    "unmodified": {
+      "count": 109,
+      "alarms": 7,
+      "alarm_rate": 0.06422018348623854
+    },
+    "continuous_injection": {
+      "count": 1308,
+      "alarms": 1083,
+      "alarm_rate": 0.8279816513761468
+    },
+    "demand_confounder": {
+      "count": 109,
+      "alarms": 12,
+      "alarm_rate": 0.11009174311926606
+    }
+  },
+  "by_injection_pattern": {
+    "0.01gpm/240min": {
+      "count": 109,
+      "detected": 10,
+      "sensitivity": 0.09174311926605505
+    },
+    "0.01gpm/720min": {
+      "count": 109,
+      "detected": 88,
+      "sensitivity": 0.8073394495412844
+    },
+    "0.01gpm/1440min": {
+      "count": 109,
+      "detected": 109,
+      "sensitivity": 1.0
+    },
+    "0.03gpm/240min": {
+      "count": 109,
+      "detected": 37,
+      "sensitivity": 0.3394495412844037
+    },
+    "0.03gpm/720min": {
+      "count": 109,
+      "detected": 103,
+      "sensitivity": 0.944954128440367
+    },
+    "0.03gpm/1440min": {
+      "count": 109,
+      "detected": 109,
+      "sensitivity": 1.0
+    },
+    "0.1gpm/240min": {
+      "count": 109,
+      "detected": 90,
+      "sensitivity": 0.8256880733944955
+    },
+    "0.1gpm/720min": {
+      "count": 109,
+      "detected": 109,
+      "sensitivity": 1.0
+    },
+    "0.1gpm/1440min": {
+      "count": 109,
+      "detected": 109,
+      "sensitivity": 1.0
+    },
+    "0.3gpm/240min": {
+      "count": 109,
+      "detected": 101,
+      "sensitivity": 0.926605504587156
+    },
+    "0.3gpm/720min": {
+      "count": 109,
+      "detected": 109,
+      "sensitivity": 1.0
+    },
+    "0.3gpm/1440min": {
+      "count": 109,
+      "detected": 109,
+      "sensitivity": 1.0
+    }
+  },
+  "test": {
+    "count": 1526,
+    "tp": 1083,
+    "fp": 19,
+    "fn": 225,
+    "tn": 199,
+    "precision": 0.9827586206896551,
+    "recall": 0.8279816513761468,
+    "f1": 0.8987551867219917,
+    "balanced_accuracy": 0.8704128440366972
+  },
+  "uncertainty": {
+    "method": "seven-day circular moving-block percentile bootstrap over ordered base days",
+    "repetitions": 1000,
+    "seed": 42,
+    "base_days": 109,
+    "block_days": 7,
+    "confidence_level": 0.95,
+    "percentile_method": "nearest rank",
+    "intervals": {
+      "precision": {
+        "lower": 0.9731182795698925,
+        "upper": 0.9916743755781684
+      },
+      "recall": {
+        "lower": 0.8119266055045872,
+        "upper": 0.8448012232415902
+      },
+      "f1": {
+        "lower": 0.8894451397580309,
+        "upper": 0.9085690856908569
+      },
+      "unmodified_alarm_rate": {
+        "lower": 0.027522935779816515,
+        "upper": 0.11009174311926606
+      },
+      "demand_confounder_alarm_rate": {
+        "lower": 0.05504587155963303,
+        "upper": 0.1834862385321101
+      }
+    }
+  },
+  "test_base_days": 109,
+  "first_test_day": "2013-12-13T00:00:00+00:00",
+  "last_test_day": "2014-03-31T00:00:00+00:00",
+  "full_report_sha256": "0ca0a6677e3f00c509535447f3438f9c91c3f8aa1adff1a36be1aba8ab3ae9f1",
+  "reproduction": "PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_confirm --dataset ml/data/external/ampds2/hybrid-v1.json --detector ml/artifacts/ampds2-detector-v1 --output evals/reports/ampds2-heldout-reproduced-v1.json"
+}

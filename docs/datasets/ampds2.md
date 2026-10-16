@@ -219,3 +219,41 @@ The manifest locks the model dimensions, weights, global normalization, 96 resid
 `FrozenHybridDetector` loads weights and saved parameters without fitting or using dataset labels. It rejects changed weights, unsupported scoring contracts, invalid thresholds, and runtime-source mismatches. Updating those source files requires an explicitly new artifact/version. Predictions contain `score`, `is_continuous_pattern`, and `model_version`; the flag reflects the controlled-pattern target, not a verified plumbing diagnosis or probability. For reproducible CPU comparisons, callers use one PyTorch thread. This artifact is local and is not yet promoted into the HTTP/MCP service.
 
 All 1,512 frozen validation scores and flags exactly match the saved validation experiment, with fitting disabled during reload/inference. Tests also verify label/provenance independence, refusal to overwrite, and corrupted/stale artifact rejection. No held-out prediction has been calculated in this increment. Next, evaluate the pinned detector on the withheld period without refitting or threshold changes, report reference/confounder alarm rates and pattern sensitivity alongside aggregate metrics, retaining the hybrid-data qualification.
+
+## Held-out evaluation protocol
+
+Evaluate only the detector matching the committed pre-test manifest hash and dataset hash. Require every test base day to be disjoint from development and at least two UTC days after the last development day, retaining the withheld boundary day. Make no calls to normalization/calibration fitting or threshold selection. Apply the frozen score and threshold to all test variants, with the same pattern/reference breakdown as validation. Record all predictions locally and a compact generated summary in Git.
+
+For uncertainty, use 1,000 circular moving-block bootstrap replicates over chronologically ordered base days, block length seven days, seed 42, with nearest-rank 2.5th/97.5th percentiles. Keep all variants of a sampled day together. This reflects some within-period temporal dependence and cannot quantify generalization to other households, model-selection uncertainty, or all seasonal effects. A zero bootstrap alarm interval does not establish zero population risk. These choices are fixed before inspecting held-out results.
+
+## Held-out result
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.hybrid_confirm --dataset ml/data/external/ampds2/hybrid-v1.json --detector ml/artifacts/ampds2-detector-v1 --output evals/reports/ampds2-heldout-reproduced-v1.json
+```
+
+The [generated held-out summary](../../evals/baselines/ampds2-heldout-v1.json) evaluates the pinned `hybrid-detector-c805bc1fffe10b80` at its unchanged 0.0851231068 threshold. The detector weights and manifest remained byte-identical to the pre-test record. There was no refitting, threshold selection, or model change during evaluation.
+
+The withheld period is December 13, 2013 through March 31, 2014: 109 base days and 1,526 variants. There are 1,308 positive continuous-injection variants, 109 unmodified references, and 109 demand confounders.
+
+| Held-out measure | Result |
+| --- | ---: |
+| Precision | 0.9828 |
+| Recall | 0.8280 |
+| F1 | 0.8988 |
+| Balanced accuracy | 0.8704 |
+| TP / FP / FN / TN | 1,083 / 19 / 225 / 199 |
+| Unmodified-reference alarms | 7/109 (6.42%) |
+| Demand-confounder alarms | 12/109 (11.01%) |
+
+The seven-day moving-block bootstrap gives an F1 interval of approximately 0.8894–0.9086. This conditional interval reflects variation within one household/period and does not establish population or unseen-household performance. At 0.01 GPM, sensitivity is 9.2% for four hours, 80.7% for twelve hours, and 100% for a full day. All pattern results and reference-alarm intervals are retained in the generated summary; per-variant predictions remain in the ignored full report.
+
+**The validation alarm caps did not generalize:** both reference rates exceed 5% on the held-out period. Aggregate injection-detection F1 is encouraging, but alert reliability and short low-flow sensitivity remain inadequate for unrestricted household deployment. Preserve this result without adjusting the frozen threshold to test outcomes. Future ML tuning requires a fresh confirmation dataset/period; this test period is now inspected.
+
+### Interpretation and serving limitations
+
+The PyTorch LSTM autoencoder with residual calibration achieved F1 0.8988 on the chronological AMPds2 holdout with controlled synthetic continuous-flow injections. This is a hybrid-data experiment: physical leak labels are unknown, and the result does not demonstrate field leak validation.
+
+The existing local FastAPI p95 benchmark (15.36 ms) used the separately versioned **synthetic-trained detector**. It does not establish the latency of this hybrid artifact or a production service. Do not combine the hybrid F1 and prior latency into wording implying they were measured on the same served model. Hybrid service promotion and its own latency measurement remain later integration work.
+
+This completes the planned frozen-model/held-out experiment, with limitations explicitly recorded. The next major phase is live agent integration with the existing typed MCP tools and approval boundary. It can proceed while the hybrid detector remains experimental and clearly disclosed. Bill workflows, image/voice, end-to-end agent and tool benchmarks, durable storage, and production deployment still remain. OpenAI credentials are needed when the first live agent requests are ready to verify; database and hosting setup are not required for the local agent adapter.
