@@ -1,6 +1,7 @@
 // Only these demo endpoints are exposed through the same-origin relay.
 const allowed = new Set([
-  "POST v1/sessions", "DELETE v1/session", "GET v1/goals/current", "POST v1/goals/proposals", "POST v1/agent/turn",
+  "POST v1/sessions", "DELETE v1/session", "GET v1/goals/current", "POST v1/goals/proposals",
+  "POST v1/agent/turn", "POST v1/agent/continue",
 ]);
 
 class RequestTooLarge extends Error {}
@@ -41,9 +42,9 @@ async function relay(request: Request, context: { params: Promise<{ path: string
   }
   const base = process.env.AQUAMIND_API_URL;
   if (!base) return failure("Demo backend unavailable", 503);
-  const agent = route === "v1/agent/turn";
+  const agent = route === "v1/agent/turn" || route === "v1/agent/continue";
   try {
-    const body = request.method === "POST" ? await boundedBody(request, agent ? 16384 : 1024) : undefined;
+    const body = request.method === "POST" ? await boundedBody(request, route === "v1/agent/turn" ? 16384 : 1024) : undefined;
     const headers = new Headers({ "Content-Type": "application/json" });
     const auth = request.headers.get("authorization");
     if (auth) headers.set("Authorization", auth);

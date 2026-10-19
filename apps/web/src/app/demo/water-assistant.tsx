@@ -31,6 +31,7 @@ export function WaterAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [gallons, setGallons] = useState("150");
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [continuation, setContinuation] = useState<string | null>(null);
   const [goal, setGoal] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -48,7 +49,7 @@ export function WaterAssistant() {
     setBusy(true); setError("");
     try { await operation(); }
     catch (cause) {
-      if (cause instanceof SessionExpired) { setProposal(null); setGoal(null); setMessages([]); }
+      if (cause instanceof SessionExpired) { setProposal(null); setGoal(null); setMessages([]); setContinuation(null); }
       setError(cause instanceof Error ? cause.message : "The request could not be confirmed.");
     } finally { busyRef.current = false; setBusy(false); }
   }
@@ -58,15 +59,36 @@ export function WaterAssistant() {
     if (result.status === "approved") setGoal(result.arguments.daily_gallons);
   }
 
+  function showReply(reply: AgentReply) {
+    setMessages((previous) => [...previous, { who: "AquaMind" as const,
+      text: reply.status === "answer" ? reply.answer : outcomeText[reply.status], tools: reply.tool_trace }].slice(-16));
+  }
+
+  async function continueDecision(result: Proposal) {
+    const reply = await client.continueAfterDecision(result.approval_id);
+    showReply(reply);
+    setContinuation(null);
+  }
+
+  async function resolveProposal(result: Proposal) {
+    showProposal(result); // Keep the confirmed decision even if the model follow-up fails.
+    if (continuation === result.approval_id && result.status !== "approval_required") {
+      setMessages((previous) => [...previous, { who: "You" as const,
+        text: `Goal review: ${result.status}. ${result.summary}` }].slice(-16));
+      await continueDecision(result);
+    }
+  }
+
   async function send() {
     if (pending || !question.trim()) return;
     const text = question.trim();
     await perform(async () => {
+      setContinuation(null);
       setMessages((previous) => [...previous, { who: "You" as const, text }].slice(-16));
       const reply = await client.ask(text);
       setQuestion("");
-      setMessages((previous) => [...previous, { who: "AquaMind" as const,
-        text: reply.status === "answer" ? reply.answer : outcomeText[reply.status], tools: reply.tool_trace }].slice(-16));
+      showReply(reply);
+      setContinuation(reply.pending_approval?.approval_id ?? null);
       if (reply.pending_approval) showProposal(reply.pending_approval);
     });
   }
@@ -75,7 +97,7 @@ export function WaterAssistant() {
     <p className="text-xs text-cyan-200">AI text assistant · local demo</p>
     <h2 id="assistant-heading" className="mt-2 text-lg font-semibold">Ask AquaMind</h2>
     <p className="mt-2 text-sm leading-6 text-slate-300">Explore demo rates, savings, synthetic weather, or a daily goal. The meter chart is not shared with chat yet.</p>
-    <p className="mt-2 text-xs leading-5 text-slate-400">Each question stands on its own. Include the details you want considered. Questions are sent to OpenAI; avoid personal information.</p>
+    <p className="mt-2 text-xs leading-5 text-slate-400">New questions stand on their own. After you review an AI goal proposal, AquaMind can explain the confirmed result. Questions are sent to OpenAI; avoid personal information.</p>
 
     <div ref={log} role="log" aria-label="Conversation" aria-live="polite" className="mt-4 max-h-[420px] space-y-3 overflow-y-auto overscroll-contain">
       {messages.map((message, index) => <article key={index} className={`rounded-xl p-3 text-sm ${message.who === "You" ? "bg-white/5" : "border border-cyan-300/15 bg-cyan-300/5"}`}>
@@ -105,7 +127,7 @@ export function WaterAssistant() {
       <details className="mt-3">
         <summary className="cursor-pointer rounded text-sm text-cyan-100 focus-visible:outline-2 focus-visible:outline-cyan-300">Enter a goal manually</summary>
         <form className="mt-3 space-y-3" onSubmit={(event) => { event.preventDefault();
-          if (!pending) void perform(async () => showProposal(await client.propose(Number(gallons)))); }}>
+          if (!pending) void perform(async () => { showProposal(await client.propose(Number(gallons))); setContinuation(null); }); }}>
           <label htmlFor="daily-goal" className="block text-sm text-slate-200">Daily target (gallons)</label>
           <input id="daily-goal" type="number" required min="0.01" max="10000" step="0.01" value={gallons}
             onChange={(event) => setGallons(event.target.value)} disabled={busy || pending}
@@ -118,13 +140,15 @@ export function WaterAssistant() {
         <p className="mt-2">{proposalText[proposal.status]}</p>
         {pending && <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" className={button} disabled={busy}
-            onClick={() => void perform(async () => showProposal(await client.decide(proposal, "approve")))}>Approve goal</button>
+            onClick={() => void perform(async () => resolveProposal(await client.decide(proposal, "approve")))}>Approve goal</button>
           <button type="button" className={button} disabled={busy}
-            onClick={() => void perform(async () => showProposal(await client.decide(proposal, "reject")))}>Reject</button>
+            onClick={() => void perform(async () => resolveProposal(await client.decide(proposal, "reject")))}>Reject</button>
           <button type="button" className={button} disabled={busy}
-            onClick={() => void perform(async () => showProposal(await client.review(proposal)))}>Refresh proposal</button>
+            onClick={() => void perform(async () => resolveProposal(await client.review(proposal)))}>Refresh proposal</button>
         </div>}
       </div>}
+      {continuation && proposal && !pending && <button type="button" className={`${button} mt-3`} disabled={busy}
+        onClick={() => void perform(async () => continueDecision(proposal))}>Check assistant follow-up</button>}
     </div>
     <p role="status" aria-live="polite" aria-atomic="true" className="mt-3 text-sm text-slate-300">
       {busy ? "Waiting for AquaMind…" : pending ? "Review the pending proposal before sending another question." : proposal ? proposalText[proposal.status] : ""}

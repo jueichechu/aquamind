@@ -1,0 +1,214 @@
+{
+  "schema_version": 2,
+  "with_continuation": true,
+  "recorded_at_utc": "2026-10-19T21:55:03.670496+00:00",
+  "transport": "local FastAPI ASGI with live OpenAI Responses and in-process MCP",
+  "source_sha256": {
+    "agent.py": "0a58e1cc0137955002d41eaf8a3059e7252b3418f987c4d411b050d65d2899dc",
+    "agent_http.py": "e05088ee89c0d99d204b569c01024678ecc592b160ab5676f71155ec8e3ada61",
+    "agent_tools.py": "0ce113bbef80a11250d1fd5ee28aaba099c769aef715e307a0a71da55e2d3456",
+    "agent_smoke.py": "28aea3ab98f3a58a934281a75eaeef55ccb922d51eb37e5391cc5c01d06c8443",
+    "api.py": "e45c61f57671beaa07a2443bc27464247220c5c701b049d19b5672f8db3cfadb",
+    "sessions.py": "afd3e4a7c65b93cd47b1dcb9a2088f5a21e74ab9f7f5cdd76ddd30872ea53898",
+    "mcp_server.py": "10c06c954c37183770db10aa4516b6a9cefa2a5c991327e22c30bd8bfefb70cd",
+    "approvals.py": "1e7e0688aca38bf1bdc098bc9c5aa5f8a82574848a544ab2a8f6142576122b86"
+  },
+  "questions": {
+    "utility": "Estimate the water-only cost of 1,000 gallons using the demo rate. Use the utility tool and explain whether this is my actual utility tariff.",
+    "goal": "Propose a daily conservation goal of 150 gallons. Do not approve or execute it."
+  },
+  "checks": {
+    "utility_answer": true,
+    "cost_tool_success": true,
+    "expected_amount_in_answer": true,
+    "rate_qualification_in_answer": true,
+    "pending_goal_only": true,
+    "goal_unchanged": true,
+    "trusted_host_rejection": true,
+    "rejected_followup_answer": true,
+    "rejected_goal_unchanged": true,
+    "trusted_host_approval": true,
+    "approved_followup_answer": true,
+    "approved_goal_preserved": true,
+    "cached_followup_without_new_attempt": true
+  },
+  "passed": true,
+  "turns": [
+    {
+      "case": "utility",
+      "http_status": 200,
+      "elapsed_ms": 3572.833,
+      "result": {
+        "status": "answer",
+        "answer": "The estimated water-only cost for 1,000 gallons is **$5.00**.\n\nThis is **not** your actual utility tariff. It\u2019s a **demo, illustrative flat rate** used for estimation only. It excludes sewer charges, fixed fees, taxes, and any tiered pricing, so your real bill could be different.",
+        "pending_approval": null,
+        "error": null,
+        "model_calls": 3,
+        "model_trace": [
+          {
+            "response_id": "resp_00f3293a3b3f4b0d016ad691b0b1a887d0bfa796d6e22b5bf5",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 961,
+            "output_tokens": 16
+          },
+          {
+            "response_id": "resp_00f3293a3b3f4b0d016ad691b1b21887d0bfb27640c109df86",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 1064,
+            "output_tokens": 25
+          },
+          {
+            "response_id": "resp_00f3293a3b3f4b0d016ad691b277b087d0ad681877b9d1a138",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 1202,
+            "output_tokens": 72
+          }
+        ],
+        "tool_trace": [
+          {
+            "call_id": "call_9dZokVd0lT0l44XpEUPoXAJt",
+            "tool_name": "get_utility_rate",
+            "status": "success",
+            "elapsed_ms": 66.837
+          },
+          {
+            "call_id": "call_nh2mkSvmPr976AK234IAzJXU",
+            "tool_name": "estimate_water_cost",
+            "status": "success",
+            "elapsed_ms": 7.901
+          }
+        ],
+        "request_id": "84b3a721-738a-444d-a26a-cd1cac51071d"
+      }
+    },
+    {
+      "case": "goal",
+      "http_status": 200,
+      "elapsed_ms": 721.513,
+      "result": {
+        "status": "approval_required",
+        "answer": "",
+        "pending_approval": {
+          "approval_id": "94909aa9-9ecf-4d02-88b9-8b54f1ce53d1",
+          "status": "approval_required",
+          "action": "set_conservation_goal",
+          "arguments": {
+            "daily_gallons": 150.0
+          },
+          "summary": "Set your daily conservation goal to 150.0 gallons.",
+          "expected_revision": 0,
+          "expires_in_seconds": 599.9965252920083
+        },
+        "error": null,
+        "model_calls": 1,
+        "model_trace": [
+          {
+            "response_id": "resp_08b4c31c46f7184e016ad691b3f31087d08aab795e851a7167",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 949,
+            "output_tokens": 25
+          }
+        ],
+        "tool_trace": [
+          {
+            "call_id": "call_CegnfsFIeZDR9S3faOttjcZX",
+            "tool_name": "set_conservation_goal",
+            "status": "approval_required",
+            "elapsed_ms": 3.51
+          }
+        ],
+        "request_id": "592a076d-7461-45d8-bdb7-cfd3227dd923"
+      }
+    },
+    {
+      "case": "rejected_followup",
+      "http_status": 200,
+      "elapsed_ms": 1057.05,
+      "result": {
+        "status": "answer",
+        "answer": "I proposed the daily conservation goal of 150 gallons.\n\nStatus: it was not approved, so no goal changed.  \nCurrent temporary goal: none.",
+        "pending_approval": null,
+        "error": null,
+        "model_calls": 1,
+        "model_trace": [
+          {
+            "response_id": "resp_08b4c31c46f7184e016ad691b4af6087d08edcc94e2ce6d9ef",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 919,
+            "output_tokens": 34
+          }
+        ],
+        "tool_trace": [],
+        "request_id": "d1e67de0-a2da-4343-a83a-183697b0a6ea"
+      }
+    },
+    {
+      "case": "approval_proposal",
+      "http_status": 200,
+      "elapsed_ms": 1085.889,
+      "result": {
+        "status": "approval_required",
+        "answer": "",
+        "pending_approval": {
+          "approval_id": "96f41709-16b2-4135-b0e5-cd833661817c",
+          "status": "approval_required",
+          "action": "set_conservation_goal",
+          "arguments": {
+            "daily_gallons": 150.0
+          },
+          "summary": "Set your daily conservation goal to 150.0 gallons.",
+          "expected_revision": 0,
+          "expires_in_seconds": 599.9970380410086
+        },
+        "error": null,
+        "model_calls": 1,
+        "model_trace": [
+          {
+            "response_id": "resp_05f67085cdb217c9016ad691b5bb4487d0b4d8da7a12321d95",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 949,
+            "output_tokens": 25
+          }
+        ],
+        "tool_trace": [
+          {
+            "call_id": "call_f4aPVAnKLXfaKtLmuVUfxQ3h",
+            "tool_name": "set_conservation_goal",
+            "status": "approval_required",
+            "elapsed_ms": 3.001
+          }
+        ],
+        "request_id": "840bf0f2-7a13-4201-b413-916317cb3540"
+      }
+    },
+    {
+      "case": "approved_followup",
+      "http_status": 200,
+      "elapsed_ms": 997.517,
+      "result": {
+        "status": "answer",
+        "answer": "A temporary conservation goal was approved and set to 150 gallons per day.",
+        "pending_approval": null,
+        "error": null,
+        "model_calls": 1,
+        "model_trace": [
+          {
+            "response_id": "resp_05f67085cdb217c9016ad691b6d5ac87d0957713d88f11eecc",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 927,
+            "output_tokens": 19
+          }
+        ],
+        "tool_trace": [],
+        "request_id": "9c3a372b-831e-44a3-ab81-7d6f476531ca"
+      }
+    }
+  ],
+  "limitations": [
+    "Development smoke checks, not an agent benchmark or pass-rate estimate.",
+    "Illustrative utility data; no meter, bill, image or voice inputs.",
+    "ASGI test client; no browser, public network or production deployment.",
+    "Text checks are narrow assertions, not a full answer-quality grader.",
+    "Decisions are sent by the trusted test host, not human browser clicks."
+  ]
+}

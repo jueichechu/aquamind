@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 from weakref import WeakKeyDictionary
 
@@ -13,7 +15,7 @@ from .sessions import DemoSessions, require_session
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
-    from .agent import AgentConfig, AgentResult
+    from .agent import AgentConfig, AgentPause, AgentResult
 
 
 class AgentTurnRequest(BaseModel):
@@ -39,6 +41,19 @@ class AgentTurnResponse(BaseModel):
     request_id: str
 
 
+class AgentContinueRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    approval_id: str = Field(pattern=r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+
+
+@dataclass
+class _Continuation:
+    approval_id: str
+    pause: AgentPause | None
+    attempted: bool = False
+    result: AgentResult | None = None
+
+
 class AgentHost:
     """One event loop/process; fixed local-demo limits, never an approval authority."""
 
@@ -46,19 +61,12 @@ class AgentHost:
         self.client, self.config = client, config
         self._active: set[GoalApprovals] = set()
         self._counts: WeakKeyDictionary[GoalApprovals, int] = WeakKeyDictionary()
+        self._continuations: WeakKeyDictionary[GoalApprovals, _Continuation] = WeakKeyDictionary()
         self._total = 0
 
-    async def run(self, text: str, store: GoalApprovals) -> AgentResult:
-        # Lazy imports keep inference-only installations independent of the agent SDK.
-        from mcp import Client
-        from .agent import run_agent
-        from .agent_tools import McpAgentTools
-        from .mcp_server import create_server
-
-        def check_active():
-            _ = store.goal  # Uses the store's locked expiry/revocation check.
-
-        check_active()
+    @asynccontextmanager
+    async def _slot(self, store: GoalApprovals):
+        _ = store.goal  # Uses the store's locked expiry/revocation check.
         # No awaits between admission checks and reservation on the host's event loop.
         if store in self._active:
             raise HTTPException(409, 'An agent turn is already running for this session')
@@ -70,48 +78,119 @@ class AgentHost:
         self._counts[store] = self._counts.get(store, 0) + 1
         self._total += 1
         try:
+            yield
+        except HTTPException:
+            raise
+        except Exception:
+            _ = store.goal  # Map revocation/expiry during provider or transport work to 401.
+            raise HTTPException(503, 'Agent unavailable') from None
+        finally:
+            self._active.discard(store)
+
+    async def run(self, text: str, store: GoalApprovals) -> AgentResult:
+        # Lazy imports keep inference-only installations independent of the agent SDK.
+        from mcp import Client
+        from .agent import run_agent
+        from .agent_tools import McpAgentTools
+        from .mcp_server import create_server
+
+        def check_active():
+            _ = store.goal
+
+        check_active()
+        previous = self._continuations.get(store)
+        if previous is not None and store.review(previous.approval_id).status == 'approval_required':
+            raise HTTPException(409, 'Resolve the pending goal before starting another question')
+        async with self._slot(store):
+            self._continuations.pop(store, None)
+            pauses = []
             scopes = frozenset({'weather:read', 'utility:read', 'goals:write'})
             allowed = frozenset({'get_weather_context', 'get_utility_rate', 'estimate_water_cost',
                                  'estimate_conservation_savings', 'set_conservation_goal'})
             async with Client(create_server(None, scopes, goal_approvals=store)) as mcp:
                 outcome = await run_agent(text, self.client, McpAgentTools(mcp, allowed), self.config,
-                                          check_active=check_active)
+                                          check_active=check_active, on_pause=pauses.append)
             check_active()
+            if outcome.status == 'approval_required' and pauses:
+                self._continuations[store] = _Continuation(outcome.pending_approval['approval_id'], pauses[0])
             return outcome
-        except HTTPException:
-            raise
-        except Exception:
-            check_active()  # Expired/revoked sessions remain 401, including during MCP setup.
-            raise HTTPException(503, 'Agent unavailable') from None
-        finally:
-            self._active.discard(store)
+
+    async def continue_after_decision(self, approval_id: str, store: GoalApprovals) -> AgentResult:
+        from mcp import Client
+        from .agent import continue_agent
+        from .agent_tools import McpAgentTools
+        from .mcp_server import create_server
+
+        def check_active():
+            _ = store.goal
+
+        check_active()
+        entry = self._continuations.get(store)
+        if entry is None or entry.approval_id != approval_id:
+            raise HTTPException(404, 'Agent continuation not found')
+        if store in self._active:
+            raise HTTPException(409, 'An agent turn is already running for this session')
+        if entry.attempted:
+            if entry.result is None:
+                raise HTTPException(503, 'Continuation outcome unconfirmed; start a new question')
+            return entry.result
+        decision = store.review(approval_id)
+        if decision.status == 'approval_required':
+            raise HTTPException(409, 'A trusted decision is required before continuing')
+        async with self._slot(store):
+            entry.attempted = True  # Consume before awaiting; interruption must never trigger a second paid attempt.
+            try:
+                allowed = frozenset({'get_weather_context', 'get_utility_rate', 'estimate_water_cost',
+                                     'estimate_conservation_savings'})
+                async with Client(create_server(None, frozenset({'weather:read', 'utility:read'}))) as mcp:
+                    entry.result = await continue_agent(entry.pause, decision, store.goal, self.client,
+                        McpAgentTools(mcp, allowed), self.config, check_active=check_active)
+                check_active()
+                return entry.result
+            finally:
+                entry.pause = None  # Drop original prompts and encrypted protocol items after the one attempt.
 
 
 def agent_router(sessions: DemoSessions) -> APIRouter:
     router = APIRouter()
 
-    @router.post('/v1/agent/turn', response_model=AgentTurnResponse)
-    async def turn(request: Request):
-        store = require_session(sessions, request)
-        host = request.app.state.agent_host
-        if host is None:
-            raise HTTPException(503, 'Agent unavailable')
+    async def body_for(request: Request, schema, limit):
         if request.headers.get('content-type', '').split(';')[0].strip().lower() != 'application/json':
             raise HTTPException(415, 'Expected application/json')
         raw = bytearray()
         async for chunk in request.stream():
-            if len(raw) + len(chunk) > 16384:
+            if len(raw) + len(chunk) > limit:
                 raise HTTPException(413, 'Request too large')
             raw.extend(chunk)
         try:
-            body = AgentTurnRequest.model_validate_json(bytes(raw))
+            return schema.model_validate_json(bytes(raw))
         except ValidationError:
             raise HTTPException(422, 'Invalid agent request') from None
+
+    def host_for(request):
+        host = request.app.state.agent_host
+        if host is None:
+            raise HTTPException(503, 'Agent unavailable')
+        return host
+
+    @router.post('/v1/agent/turn', response_model=AgentTurnResponse)
+    async def turn(request: Request):
+        store = require_session(sessions, request)
+        host = host_for(request)
+        body = await body_for(request, AgentTurnRequest, 16384)
         outcome = await host.run(body.text, store)
         # Re-read a pending proposal from this session's authoritative store.
         public = outcome.public_dict()
         if outcome.pending_approval is not None:
             public['pending_approval'] = store.review(outcome.pending_approval['approval_id'])
         return AgentTurnResponse(**public, request_id=request.state.request_id)
+
+    @router.post('/v1/agent/continue', response_model=AgentTurnResponse)
+    async def continue_turn(request: Request):
+        store = require_session(sessions, request)
+        host = host_for(request)
+        body = await body_for(request, AgentContinueRequest, 1024)
+        outcome = await host.continue_after_decision(body.approval_id, store)
+        return AgentTurnResponse(**outcome.public_dict(), request_id=request.state.request_id)
 
     return router

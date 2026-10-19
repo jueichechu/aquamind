@@ -111,4 +111,46 @@ describe("shared in-memory demo client", () => {
       expect(fetcher).toHaveBeenCalledTimes(2);
     }
   });
+
+  it("continues with only the proposal ID after a separately confirmed decision", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(session()).mockResolvedValueOnce(Response.json({
+      ...reply, status: "approval_required", answer: "", pending_approval: proposal,
+    })).mockResolvedValueOnce(Response.json({ ...proposal, status: "approved" }))
+      .mockResolvedValueOnce(Response.json({ ...reply, answer: "Your temporary goal is 150 gallons/day." }));
+    vi.stubGlobal("fetch", fetcher);
+    const client = new DemoClient();
+    await client.ask("Propose 150 gallons/day.");
+    const decision = await client.decide(proposal, "approve");
+    expect(decision.status).toBe("approved");
+    expect((await client.continueAfterDecision(id)).answer).toContain("150");
+    expect(fetcher.mock.calls[3][0]).toBe("/api/aquamind/v1/agent/continue");
+    expect(JSON.parse(fetcher.mock.calls[3][1].body)).toEqual({ approval_id: id });
+    expect(fetcher.mock.calls[3][1].headers.Authorization).toBe(`Bearer ${token}`);
+    expect(fetcher.mock.calls.filter(([path]) => path.endsWith("/decision"))).toHaveLength(1);
+  });
+
+  it("does not repeat a decision when an unconfirmed follow-up is explicitly checked", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(session()).mockResolvedValueOnce(Response.json(proposal))
+      .mockResolvedValueOnce(Response.json({ ...proposal, status: "approved" }))
+      .mockRejectedValueOnce(new Error("private connection detail"))
+      .mockResolvedValueOnce(Response.json(reply));
+    vi.stubGlobal("fetch", fetcher);
+    const client = new DemoClient();
+    await client.propose(150);
+    const confirmed = await client.decide(proposal, "approve");
+    await expect(client.continueAfterDecision(id)).rejects.toThrow("could not be confirmed");
+    expect(confirmed.status).toBe("approved");
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    await client.continueAfterDecision(id);
+    expect(fetcher.mock.calls[4][0]).toBe("/api/aquamind/v1/agent/continue");
+    expect(fetcher.mock.calls.filter(([path]) => path.endsWith("/decision"))).toHaveLength(1);
+  });
+
+  it("rejects a new pending proposal in a read-only continuation", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(session()).mockResolvedValueOnce(Response.json({
+      ...reply, status: "approval_required", answer: "", pending_approval: proposal,
+    }));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(new DemoClient().continueAfterDecision(id)).rejects.toThrow("invalid response");
+  });
 });

@@ -59,7 +59,7 @@ export class DemoClient {
         method: body ? "POST" : "GET", credentials: "omit",
         headers: { "Content-Type": "application/json", ...(this.#token ? { Authorization: `Bearer ${this.#token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined, cache: "no-store",
-        signal: AbortSignal.timeout(path === "agent/turn" ? 150_000 : 15_000),
+        signal: AbortSignal.timeout(path === "agent/turn" || path === "agent/continue" ? 150_000 : 15_000),
       });
     } catch { throw new Error("The request could not be confirmed. It will not be retried automatically. Goals need your separate approval."); }
     if (response.status === 401) { this.#token = null; throw new SessionExpired(); }
@@ -90,6 +90,14 @@ export class DemoClient {
   propose(daily_gallons: number) {
     if (!Number.isFinite(daily_gallons) || daily_gallons <= 0 || daily_gallons > 10000) return Promise.reject(new Error("Enter a daily goal between 0 and 10,000 gallons."));
     return this.perform(async () => parseProposal(await this.call("goals/proposals", { daily_gallons })));
+  }
+  continueAfterDecision(approval_id: string) {
+    if (!/^[0-9a-f-]{36}$/.test(approval_id)) return Promise.reject(invalid());
+    return this.perform(async () => {
+      const reply = parseAgentReply(await this.call("agent/continue", { approval_id }));
+      if (reply.pending_approval !== null) throw invalid();
+      return reply;
+    });
   }
   decide(proposal: Proposal, decision: "approve" | "reject") {
     return this.perform(async () => {

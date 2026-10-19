@@ -57,4 +57,20 @@ describe("approval relay", () => {
     expect(result.headers.get("cache-control")).toBe("no-store");
     expect(fetcher).not.toHaveBeenCalled();
   });
+  it("allows POST continuation with a model timeout while keeping its body limit small", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ status: "answer" }));
+    vi.stubGlobal("fetch", fetcher);
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const body = '{"approval_id":"12345678-abcd-1234-abcd-123456789abc"}';
+    const result = await POST(new Request("http://localhost/api", { method: "POST", body }), context("v1/agent/continue"));
+    expect(result.status).toBe(200);
+    expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8000/v1/agent/continue");
+    expect(fetcher.mock.calls[0][1].body).toBe(body);
+    expect(timeout).toHaveBeenCalledWith(135_000);
+    timeout.mockRestore();
+    expect((await POST(new Request("http://localhost/api", { method: "POST", body: "x".repeat(1025) }), context("v1/agent/continue"))).status).toBe(413);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect((await GET(new Request("http://localhost/api"), context("v1/agent/continue"))).status).toBe(404);
+  });
 });
