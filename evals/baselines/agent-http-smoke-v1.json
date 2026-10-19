@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-19T02:33:56.068480+00:00",
+  "transport": "local FastAPI ASGI with live OpenAI Responses and in-process MCP",
+  "source_sha256": {
+    "agent.py": "e9d26cf29679d2ced7dacc6a3e67038c25e0cb7fcdce67180a64a7772035d745",
+    "agent_http.py": "10bf2f6d0490c3606487611c03bfe40bc75736b25f5769958b54a8c4e060efa9",
+    "agent_tools.py": "0ce113bbef80a11250d1fd5ee28aaba099c769aef715e307a0a71da55e2d3456",
+    "agent_smoke.py": "b685117751b4378636262f1cbd44a91e6445ab8ff1ce48d500f65e0f9e53c521",
+    "api.py": "e45c61f57671beaa07a2443bc27464247220c5c701b049d19b5672f8db3cfadb",
+    "sessions.py": "afd3e4a7c65b93cd47b1dcb9a2088f5a21e74ab9f7f5cdd76ddd30872ea53898",
+    "mcp_server.py": "10c06c954c37183770db10aa4516b6a9cefa2a5c991327e22c30bd8bfefb70cd",
+    "approvals.py": "1e7e0688aca38bf1bdc098bc9c5aa5f8a82574848a544ab2a8f6142576122b86"
+  },
+  "questions": {
+    "utility": "Estimate the water-only cost of 1,000 gallons using the demo rate. Use the utility tool and explain whether this is my actual utility tariff.",
+    "goal": "Propose a daily conservation goal of 150 gallons. Do not approve or execute it."
+  },
+  "checks": {
+    "utility_answer": true,
+    "cost_tool_success": true,
+    "expected_amount_in_answer": true,
+    "rate_qualification_in_answer": true,
+    "pending_goal_only": true,
+    "goal_unchanged": true,
+    "trusted_host_rejection": true
+  },
+  "passed": true,
+  "turns": [
+    {
+      "case": "utility",
+      "http_status": 200,
+      "elapsed_ms": 3702.838,
+      "result": {
+        "status": "answer",
+        "answer": "Using the demo flat rate, 1,000 gallons is estimated to cost **$5.00** for water only.\n\nThis is **not necessarily your actual utility tariff**. The tool explicitly labels the rate as an **illustrative assumption**, not a real bill rate. It also excludes:\n- sewer charges\n- fixed fees\n- taxes\n- tiered pricing\n\nSo this is a simple water-only estimate, not a full utility bill calculation.",
+        "pending_approval": null,
+        "error": null,
+        "model_calls": 3,
+        "model_trace": [
+          {
+            "response_id": "resp_0b49ae748df2376e016ad5818ffeb887d0b5af744fd059bdb7",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 875,
+            "output_tokens": 16
+          },
+          {
+            "response_id": "resp_0b49ae748df2376e016ad58190c8f487d0909131a77c030eb2",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 978,
+            "output_tokens": 25
+          },
+          {
+            "response_id": "resp_0b49ae748df2376e016ad5819223ec87d087e3d57f7bd7bd44",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 1116,
+            "output_tokens": 95
+          }
+        ],
+        "tool_trace": [
+          {
+            "call_id": "call_H1E5gdmQkUldNm12hXhJzm6w",
+            "tool_name": "get_utility_rate",
+            "status": "success",
+            "elapsed_ms": 74.288
+          },
+          {
+            "call_id": "call_IzRX0gWwRxjbtuZoj153y4FQ",
+            "tool_name": "estimate_water_cost",
+            "status": "success",
+            "elapsed_ms": 4.723
+          }
+        ],
+        "request_id": "b6f051e7-b092-4562-b4b4-0d3147648640"
+      }
+    },
+    {
+      "case": "goal",
+      "http_status": 200,
+      "elapsed_ms": 1033.876,
+      "result": {
+        "status": "approval_required",
+        "answer": "",
+        "pending_approval": {
+          "approval_id": "051a7e5c-76b0-4c3c-a9b2-ef82465a7bd6",
+          "status": "approval_required",
+          "action": "set_conservation_goal",
+          "arguments": {
+            "daily_gallons": 150.0
+          },
+          "summary": "Set your daily conservation goal to 150.0 gallons.",
+          "expected_revision": 0,
+          "expires_in_seconds": 599.9949740830052
+        },
+        "error": null,
+        "model_calls": 1,
+        "model_trace": [
+          {
+            "response_id": "resp_00ad62aec36791f5016ad58193306c87d09e918167537cbb28",
+            "model": "gpt-5.4-mini-2026-03-17",
+            "input_tokens": 863,
+            "output_tokens": 25
+          }
+        ],
+        "tool_trace": [
+          {
+            "call_id": "call_YOv67veX6ULBo9plRpeQYsU8",
+            "tool_name": "set_conservation_goal",
+            "status": "approval_required",
+            "elapsed_ms": 4.981
+          }
+        ],
+        "request_id": "70bd4b24-4b7b-4a66-86d8-ed7e514fcf23"
+      }
+    }
+  ],
+  "limitations": [
+    "Two development smoke cases, not an agent benchmark or pass-rate estimate.",
+    "Illustrative utility data; no meter, bill, image or voice inputs.",
+    "ASGI test client; no browser, public network or production deployment.",
+    "Text checks are narrow assertions, not a full answer-quality grader.",
+    "Rejection is sent by the trusted test host, not a human browser click."
+  ]
+}

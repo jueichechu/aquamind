@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import asdict, dataclass
 import json
 import math
+from typing import Callable
 
 from openai import APITimeoutError, AsyncOpenAI, RateLimitError
 
@@ -59,7 +60,8 @@ class AgentResult:
         return asdict(self)
 
 
-async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config: AgentConfig) -> AgentResult:
+async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config: AgentConfig, *,
+                    check_active: Callable[[], None] | None = None) -> AgentResult:
     """One text turn. Keep protocol/reasoning items in memory, outside public output."""
     if not isinstance(text, str) or not text.strip() or len(text.encode()) > 8192:
         raise ValueError('Expected 1–8192 bytes of user text')
@@ -74,6 +76,8 @@ async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config
             definitions = await tools.discover()
             history = [{'role': 'user', 'content': text}]
             for _ in range(config.max_model_calls):
+                if check_active is not None:
+                    check_active()
                 if len(json.dumps(history, allow_nan=False).encode()) > 524288:
                     return result('limit_reached', error='context_budget_exhausted')
                 calls += 1
@@ -102,6 +106,8 @@ async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config
                         return result('refused', error='model_refusal')
                     return result('unavailable', error='empty_model_response')
                 history.extend(output)  # Includes protocol reasoning items; never expose them in traces.
+                if check_active is not None:
+                    check_active()
                 tool_call = function_calls[0]
                 if not all(isinstance(tool_call.get(key), str) for key in ('call_id', 'name', 'arguments')):
                     return result('unavailable', error='invalid_tool_call')

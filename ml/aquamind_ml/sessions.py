@@ -69,21 +69,26 @@ class GoalState(BaseModel):
     goal: GoalRequest | None
 
 
+def session_token(request: Request) -> str:
+    authorization = request.headers.get("authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token or len(token) > 128:
+        raise HTTPException(401, "Session required")
+    return token
+
+
+def require_session(sessions: DemoSessions, request: Request) -> GoalApprovals:
+    try:
+        return sessions.approvals(session_token(request))
+    except LookupError:
+        raise HTTPException(401, "Session unavailable") from None
+
+
 def approval_router(sessions: DemoSessions) -> APIRouter:
     router = APIRouter()
 
-    def token_for(request: Request) -> str:
-        authorization = request.headers.get("authorization", "")
-        scheme, _, token = authorization.partition(" ")
-        if scheme.lower() != "bearer" or not token or len(token) > 128:
-            raise HTTPException(401, "Session required")
-        return token
-
     def store_for(request: Request) -> GoalApprovals:
-        try:
-            return sessions.approvals(token_for(request))
-        except LookupError:
-            raise HTTPException(401, "Session unavailable") from None
+        return require_session(sessions, request)
 
     @router.post("/v1/sessions", response_model=SessionResponse, status_code=201)
     def create_session():
@@ -95,7 +100,7 @@ def approval_router(sessions: DemoSessions) -> APIRouter:
     @router.delete("/v1/session", status_code=204)
     def revoke_session(request: Request):
         store_for(request)
-        sessions.revoke(token_for(request))
+        sessions.revoke(session_token(request))
 
     @router.get("/v1/goals/current", response_model=GoalState)
     def current_goal(request: Request):

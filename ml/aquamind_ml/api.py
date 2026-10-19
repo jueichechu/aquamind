@@ -1,6 +1,6 @@
 """Local FastAPI serving for the frozen daily-window leak detector."""
 
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import datetime, timedelta
 import json
 import logging
@@ -60,7 +60,8 @@ class PredictionResponse(BaseModel):
     unit: Literal["daily_window"] = "daily_window"
 
 
-def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | None = None) -> FastAPI:
+def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | None = None,
+               agent_host=None) -> FastAPI:
     lock = Lock()
 
     @asynccontextmanager
@@ -75,14 +76,35 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
                     app.state.detector = FrozenDetector(Path(configured))
                 except Exception as error:
                     logger.error(json.dumps({"event": "model_load_failed", "error_type": type(error).__name__}))
-            yield
+            async with AsyncExitStack() as stack:
+                app.state.agent_host = agent_host
+                if agent_host is None and os.environ.get('AQUAMIND_AGENT_ENABLED') == '1':
+                    try:
+                        from openai import AsyncOpenAI
+                        from .agent import AgentConfig
+                        from .agent_http import AgentHost
+                        key = os.environ.get('OPENAI_API_KEY', '').strip()
+                        if not key:
+                            raise ValueError('OpenAI key missing')
+                        config = AgentConfig(model=os.environ.get('OPENAI_MODEL', '').strip())
+                        provider = await stack.enter_async_context(AsyncOpenAI(
+                            api_key=key,
+                            base_url='https://api.openai.com/v1', max_retries=0, timeout=30))
+                        app.state.agent_host = AgentHost(provider, config)
+                    except Exception as error:
+                        logger.error(json.dumps({'event': 'agent_configuration_failed',
+                                                 'error_type': type(error).__name__}))
+                yield
         finally:
+            app.state.agent_host = None
             app.state.detector = None
             torch.set_num_threads(previous_threads)
 
     app = FastAPI(title="AquaMind inference", version="0.1.0", lifespan=lifespan)
     app.state.sessions = sessions if sessions is not None else DemoSessions()
     app.include_router(approval_router(app.state.sessions))
+    from .agent_http import agent_router
+    app.include_router(agent_router(app.state.sessions))
 
     @app.middleware("http")
     async def trace(request: Request, call_next):

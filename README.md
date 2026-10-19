@@ -381,4 +381,30 @@ PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.agent_cli 'Estimate the water-o
 
 The CLI exposes only four read tools for synthetic weather and illustrative utility calculations, with `weather:read` and `utility:read` scopes. It has no meter, anomaly or goal tool enabled. Its response and metadata print locally; no conversation is persisted. Provider requests go to the official API endpoint with automatic retries disabled. The application key will later belong in the Python backend's production secret configuration, never in browser code.
 
-Automated checks use the real SDK with a simulated HTTP transport and real in-process MCP sessions. They verify protocol replay, actual utility calculations, approval stopping, call limits, provider errors/timeouts and incomplete/refused responses. They do not establish live model behavior, answer quality, multimodal capabilities, agent benchmark scores or deployment readiness. Live verification currently awaits OpenAI configuration; database and hosting credentials are not needed for this increment.
+Automated checks use the real SDK with a simulated HTTP transport and real in-process MCP sessions. They verify protocol replay, actual utility calculations, approval stopping, call limits, provider errors/timeouts and incomplete/refused responses. They do not establish live model behavior, answer quality, multimodal capabilities, agent benchmark scores or deployment readiness. OpenAI configuration is now available for explicit live smoke checks; database and hosting credentials are not needed for this increment.
+
+## Session-bound agent API
+
+`POST /v1/agent/turn` accepts only `{"text":"your water question"}` and requires the bearer credential from `POST /v1/sessions`. The model, tool names, scopes, approval store and budgets are chosen by the host, never by request fields. A turn can use synthetic weather, illustrative utility calculations and `set_conservation_goal`; meter and anomaly tools are not enabled in this host yet. The session credential is never included in the model input or tool arguments.
+
+The endpoint returns `status`, `answer`, `pending_approval`, `error`, `model_calls`, bounded model/tool metadata and `request_id`. Turn outcomes, including provider unavailability or incomplete responses, use this structured body with HTTP 200. Missing/expired/revoked sessions return 401; an unavailable/disabled host returns 503. Malformed text/extra fields return 422, non-JSON content returns 415, and raw request bodies over 16 KiB return 413. Text itself remains limited to 8 KiB of UTF-8. Request logs contain no prompts, bearer credentials or answers.
+
+A goal tool shares the exact session's existing approval store. The endpoint returns its stored pending proposal and suppresses model text that might claim execution. Only the separate trusted decision endpoint can approve/reject it; a different session cannot review or decide. Expiry/revocation is checked before each model request and tool call, and before releasing the result. Revocation cannot undo a provider request already in flight. Turns are independent: prior conversation and human decision continuation are not replayed yet.
+
+For this opt-in local host, limits are two concurrent turns per process, one per session, eight attempted turns per session lifetime, and 100 attempted turns per process lifetime. Failed attempts consume budget; admitted turns retain the existing model/tool call and time limits. Concurrent requests for one session receive 409; global concurrency and exhausted budgets receive 429. There is no automatic HTTP retry. Counters are process-local, and anonymous users can create another session; these are bounded development controls, not production abuse prevention or distributed rate limiting. Use one worker and bind to loopback while developing.
+
+The agent is disabled by default even if an API key is present. Install `ml/requirements-agent.txt`, configure the ignored root `.env.local`, then explicitly enable it for a local server:
+
+```sh
+AQUAMIND_AGENT_ENABLED=1 PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_ml.api:app --env-file .env.local --host 127.0.0.1 --port 8000 --workers 1
+```
+
+Missing/invalid configuration leaves inference health available and the agent host unavailable. The provider client is created/closed with app lifespan, and the endpoint is pinned to the official OpenAI API. The inference-only installation does not import the optional OpenAI SDK when the agent is disabled. The Next.js relay and browser chat do not expose this endpoint yet.
+
+Run the explicitly paid smoke check to exercise session creation, a live-model utility answer, a live-model pending goal, trusted-host rejection and session cleanup through FastAPI's local ASGI test client:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.agent_smoke --output evals/reports/agent-http-smoke.json
+```
+
+The record contains known demo questions, safe public outcomes, model/token/tool metadata, timings, source hashes and narrow check results. It excludes the API key and session credential. The initial run is saved in `evals/baselines/agent-http-smoke-v1.json`. These are two development smoke cases, not an end-to-end agent evaluation; the check does not establish browser behavior, production latency, multimodal reasoning or physical leak detection. Automated API checks additionally cover cross-session approval denial, malformed input, disabled/misconfigured hosts, concurrent requests, budget exhaustion and expiry/revocation during a provider request.
