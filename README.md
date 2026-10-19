@@ -115,7 +115,7 @@ Create an isolated environment and run all Python tests from the repository root
 
 ```sh
 python3 -m venv ml/.venv
-ml/.venv/bin/python -m pip install -r ml/requirements-mcp.txt
+ml/.venv/bin/python -m pip install -r ml/requirements-agent.txt
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -v
 ```
 
@@ -357,4 +357,28 @@ Read success, tool errors, unconfirmed transport outcomes, and pending approvals
 
 The bounded metadata trace contains only call ID, recognized tool name, status and elapsed time. It does not log tool arguments/results, session credentials, provider errors or hidden reasoning. Tool results stay in the returned in-memory outcome for the future agent host. Tests negotiate real MCP sessions, including stdio subprocess discovery/execution, and cover scopes, approval safety, duplicate execution, malformed arguments, budgets, and timeout handling.
 
-This adapter does not call an LLM, produce conservation explanations, continue after human approval, or connect the browser to an agent yet. These are development tests, not an end-to-end agent evaluation. The next increment is the bounded live-model conversation/tool loop, followed by authenticated session/browser integration. OpenAI credentials are needed for its live verification; database and hosting setup are not needed for the local adapter.
+These are development tests, not an end-to-end agent evaluation. The adapter supplies the following model loop; authenticated session/browser integration and continuation after human approval remain outstanding.
+
+## Bounded text agent
+
+`aquamind_ml.agent.run_agent` connects the official OpenAI Responses SDK to the MCP adapter for one text turn. The host supplies a model, connected client, explicit tool allowlist and scoped MCP server. It allows at most six model requests by default (configurable up to eight), 2,048 output tokens per request, 30 seconds per request and 120 seconds total. Input is limited to 8 KiB; accumulated history and each response have additional size limits. Every request overrides SDK retries to zero, including when the supplied client has its default retry policy. Tool budgets and validation still apply independently.
+
+Function calls and correlated results are replayed in memory until an answer, pending approval, refusal, limit or dependency failure ends the turn. Unexpected parallel tool calls are rejected before execution. A goal proposal immediately returns its actual pending record to the trusted host, with no model-generated claim of approval or execution. Unconfirmed tool/provider timeouts stop the turn without retry. Human decision delivery and a subsequent agent turn are not implemented yet.
+
+Requests use `store=False` and replay encrypted reasoning protocol items in memory, following the [Responses migration guide](https://developers.openai.com/api/docs/guides/migrate-to-responses). These items, prompts, arguments and raw provider errors are excluded from the public trace. Model trace metadata includes response ID, model and token counts; tool traces retain only execution metadata. `store=False` does not assert zero provider retention. The runtime policy requires evidence-grounded water guidance and disclosure of synthetic data and illustrative rates; policy text alone is not an evaluated reasoning-quality guarantee.
+
+Install `ml/requirements-agent.txt`. Configure `OPENAI_API_KEY` and `OPENAI_MODEL` in the ignored repository-root `.env.local`, keeping the secret out of chat and `.env.example`. The model must support Responses function calling. Check presence without printing values or making an external request:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.agent_cli --check-config
+```
+
+After configuration, run a live local smoke request:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.agent_cli 'Estimate the water-only cost of 1,000 gallons using the demo rate.'
+```
+
+The CLI exposes only four read tools for synthetic weather and illustrative utility calculations, with `weather:read` and `utility:read` scopes. It has no meter, anomaly or goal tool enabled. Its response and metadata print locally; no conversation is persisted. Provider requests go to the official API endpoint with automatic retries disabled. The application key will later belong in the Python backend's production secret configuration, never in browser code.
+
+Automated checks use the real SDK with a simulated HTTP transport and real in-process MCP sessions. They verify protocol replay, actual utility calculations, approval stopping, call limits, provider errors/timeouts and incomplete/refused responses. They do not establish live model behavior, answer quality, multimodal capabilities, agent benchmark scores or deployment readiness. Live verification currently awaits OpenAI configuration; database and hosting credentials are not needed for this increment.
