@@ -32,4 +32,29 @@ describe("approval relay", () => {
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain("internal details");
   });
+  it("relays only POST agent turns with a larger bounded body and model timeout", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ status: "answer" }));
+    vi.stubGlobal("fetch", fetcher);
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const body = JSON.stringify({ text: "q".repeat(2000) });
+    const response = await POST(new Request("http://localhost/api", { method: "POST", body,
+      headers: { authorization: "Bearer test-session", cookie: "private=value" } }), context("v1/agent/turn"));
+    expect(response.status).toBe(200);
+    expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8000/v1/agent/turn");
+    expect(fetcher.mock.calls[0][1].body).toBe(body);
+    expect(fetcher.mock.calls[0][1].headers.has("cookie")).toBe(false);
+    expect(timeout).toHaveBeenCalledWith(135_000);
+    timeout.mockRestore();
+    expect((await GET(new Request("http://localhost/api"), context("v1/agent/turn"))).status).toBe(404);
+  });
+  it("stops oversized streamed agent bodies before calling the backend", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const result = await POST(new Request("http://localhost/api", { method: "POST", body: "x".repeat(16385) }), context("v1/agent/turn"));
+    expect(result.status).toBe(413);
+    expect(result.headers.get("cache-control")).toBe("no-store");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });

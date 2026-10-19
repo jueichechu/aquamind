@@ -11,7 +11,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open `http://localhost:3000` for the landing page or `http://localhost:3000/demo` for the interactive dashboard. Stop the development server with `Ctrl+C` in its terminal. The current demo needs no API keys, database, or external service credentials.
+Open `http://localhost:3000` for the landing page or `http://localhost:3000/demo` for the interactive dashboard. Stop the development server with `Ctrl+C` in its terminal. The synthetic dashboard needs no credentials. The optional live text assistant requires the Python backend and OpenAI configuration described below; no database is needed yet.
 
 ## Current demo
 
@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The side panel provides a manual conservation-goal approval demo; no live assistant is connected. A PyTorch autoencoder, training commands, local FastAPI inference, and read-only MCP anomaly/meter/utility/weather tools are implemented separately; LLMs, image analysis, and voice interaction are not implemented yet. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The side panel connects a live text assistant to synthetic-weather, illustrative-utility, savings and goal-proposal MCP tools when the backend is configured. Agent and manual proposals use the same session and require a separate explicit approval. The chart and PyTorch inference are not connected to chat yet. A PyTorch autoencoder, training commands and local FastAPI inference are implemented separately; bill uploads, image analysis and voice interaction remain unimplemented. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -274,7 +274,7 @@ An embedded trusted host supplies one `GoalApprovals` instance to `create_server
 
 Approval atomically sets the session's goal. Rejection and expiry do not change it. Retries return the original outcome without executing again. If another goal was approved since a proposal was created, the stale proposal returns `conflict` and requires a new proposal and approval. Each session retains at most 100 proposal/outcome records; reaching capacity rejects further proposals. State is in memory and disappears on restart.
 
-This is the tested backend approval boundary, **not a completed human-approval product flow**. The standalone stdio server can propose but has no approval UI or decision transport. Persistent goals/audit storage and agent continuation with the decision result remain to be implemented. No database or API credentials are needed for this local implementation.
+This is the tested backend approval boundary. The browser flow below adds a session-bound review and decision UI; the standalone stdio server still has no decision transport. Persistent goals/audit storage and agent continuation with the decision result remain to be implemented. No database or API credentials are needed for the approval store itself.
 
 ### Session-bound approval API
 
@@ -290,22 +290,24 @@ All except creation require `Authorization: Bearer <session_token>`. Responses u
 
 The trusted host obtains the session store via `app.state.sessions.approvals(token)` and injects it into `create_server(..., goal_approvals=store)`. There is no HTTP endpoint that lets the agent grant itself consent. The decision endpoint is for the human UI; it must never be registered as an agent tool. Bearer possession authenticates the demo session, not a real-world identity or proof of a physical click. Approval stores enforce their own session deadline and revocation state: cached MCP connections cannot propose goals, read goals/proposals, or execute decisions after the owning session ends. Revocation clears the session’s stored goals and proposals. Proposal expiry is capped by the session’s remaining lifetime. A decision racing with revocation is serialized by the store lock; requests that reach the store after revocation receive 401. Read-only synthetic MCP tools retain their independent startup scopes.
 
-The API retains at most 100 sessions, evicts expired sessions on creation, and returns 503 at capacity. State is process-local: use one worker for this local prototype. Production rate limiting, shared storage, and agent/session lifecycle integration remain outstanding. Tests run an actual MCP proposal followed by HTTP review/approval and cover cross-session denial, rejection, malformed decisions, expiry, revocation, and capacity recovery.
+The API retains at most 100 sessions, evicts expired sessions on creation, and returns 503 at capacity. State is process-local: use one worker for this local prototype. Production rate limiting, shared storage and production lifecycle hardening remain outstanding. Tests run an actual MCP proposal followed by HTTP review/approval and cover cross-session denial, rejection, malformed decisions, expiry, revocation, and capacity recovery.
 
-### Browser approval demo
+### Browser assistant and approval
 
-The `/demo` side panel lets a visitor enter a daily target, review the server's exact proposal, and explicitly Approve or Reject. This is a manual demonstration, not an LLM recommendation. The new `POST /v1/goals/proposals` endpoint creates only a pending proposal; it cannot apply a goal or accept an approval flag.
+The `/demo` side panel accepts water questions and displays live model answers with expandable tool-execution metadata. Chat can calculate illustrative water costs/savings, obtain synthetic weather context, or propose a daily goal. The meter chart is not sent to the assistant. Each question is an independent turn; the last 16 messages are retained only in the mounted panel, and previous messages or decisions are not replayed to the model yet. Questions go to OpenAI, with a visible reminder to avoid personal information. Model text is escaped as text, without HTML execution, embedded remote media or automatic link rendering.
 
-Start the single-worker backend and frontend from the repository root in separate terminals:
+Agent and manual goal proposals share one ephemeral bearer session. The manual form remains available without a model connection. A pending proposal disables new questions and proposals until it is approved, rejected, or refreshed into a terminal state. The review card shows the server's exact summary and provides explicit Approve, Reject and Refresh controls. Approval alone updates the displayed goal from the server-confirmed result. An uncertain decision leaves the pending proposal available for an explicit idempotent retry. Model text and tool proposals cannot trigger these decision requests. No household equipment is controlled.
+
+Install `ml/requirements-agent.txt`, configure `OPENAI_API_KEY` and `OPENAI_MODEL` in the ignored root `.env.local`, then start the single-worker backend and frontend from the repository root in separate terminals:
 
 ```sh
-PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_ml.api:app --host 127.0.0.1 --port 8000
-AQUAMIND_API_URL=http://127.0.0.1:8000 pnpm dev
+AQUAMIND_AGENT_ENABLED=1 PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_ml.api:app --env-file .env.local --host 127.0.0.1 --port 8000 --workers 1
+AQUAMIND_API_URL=http://127.0.0.1:8000 pnpm --filter web dev --hostname 127.0.0.1
 ```
 
-`AQUAMIND_API_URL` is a server-only backend address, not an API key. The Next.js relay exposes only the session, goal-proposal, goal-read, and approval endpoints. Session credentials remain in browser memory and are sent in authorization headers; they are not stored in URLs or local storage. Reloading starts fresh. Pending decisions stay available for safe retry after a connection failure; the UI reports an approved goal only after server confirmation. Missing backend configuration returns unavailable rather than simulating success.
+`AQUAMIND_API_URL` is a server-only backend address, not an API key. The Next.js relay exposes only the session, agent-turn, goal-proposal, goal-read and approval endpoints. It forwards JSON and the bearer credential, omits browser cookies and limits streamed bodies to 16 KiB for agent turns or 1 KiB for other requests. Agent relay/browser deadlines are 135/150 seconds, allowing the backend's bounded turn to finish; other relay requests retain a ten-second deadline. All responses are non-cacheable. The OpenAI key is loaded only by Python, never sent to the browser.
 
-This path uses the same approval store as MCP but manual proposals enter through HTTP. Live agent-to-browser proposal delivery remains future work. The UI and storage are session-local and not ready for multi-worker production deployment.
+Session credentials remain in memory and authorization headers, never URLs, cookies or browser storage. Reloading starts fresh. A 401 clears the expired session and its displayed proposals/goals; a new user action can create another session. Concurrent actions are blocked, and paid questions are never retried automatically. Missing dependencies, invalid responses, busy/budget outcomes and unconfirmed requests are surfaced without fabricated answers. These are local, session-only flows, not multi-worker production deployment or an end-to-end agent evaluation. Meter-context integration, conversation/approval-result continuation and durable state remain outstanding.
 
 ## Checks
 
@@ -318,7 +320,9 @@ pnpm typecheck
 pnpm build
 ```
 
-Tests use Vitest and cover time spacing, reproducibility, non-negative volumes, fixture attribution, scenario patterns, summary calculations, and scenario metadata isolation.
+Tests use Vitest and cover time spacing, reproducibility, non-negative volumes, fixture attribution, scenario patterns, summary calculations, and scenario metadata isolation. Relay/client checks also cover shared in-memory sessions, explicit approval requests, uncertain-decision retries, expiry, concurrent requests, response validation and bounded bodies. These unit checks are separate from the planned agent scenario benchmark.
+
+The browser flow was manually checked in Chrome against the built frontend and live local Python/OpenAI/MCP backend: utility answer/tool metadata, agent proposal rejection and approval, a manual rejection preserving the approved goal, and reload clearing local state. Desktop and a 397-pixel responsive viewport were inspected. These are development checks, not a production latency measurement or an end-to-end pass-rate estimate.
 
 The build uses Next.js's default Turbopack bundler. If a restricted environment blocks Turbopack worker ports, the alternative production build is:
 
@@ -349,13 +353,13 @@ The served detector and existing classification/latency benchmarks still use syn
 
 `aquamind_ml.agent_tools.McpAgentTools` is the first agent integration layer. The host supplies a connected official MCP `Client` and an explicit subset of the eight known AquaMind tool names. The default tool list is empty. Discovery reads the real server's tool descriptions and schemas, with at most four pages and a timeout; it never exposes host approval/decision methods. MCP scopes remain authoritative even when a name is allowed by the adapter.
 
-`await bridge.discover()` returns function definitions suitable for a future Responses API request. They preserve the MCP JSON schemas and explicitly use `strict: false`; the existing MCP/Pydantic server performs final validation. This follows the [official OpenAI function-calling contract](https://developers.openai.com/api/docs/guides/function-calling). There is no promise of model-side strict schema enforcement in this adapter.
+`await bridge.discover()` returns function definitions suitable for a Responses API request. They preserve the MCP JSON schemas and explicitly use `strict: false`; the existing MCP/Pydantic server performs final validation. This follows the [official OpenAI function-calling contract](https://developers.openai.com/api/docs/guides/function-calling). There is no promise of model-side strict schema enforcement in this adapter.
 
 `await bridge.execute(call_id, tool_name, arguments_json)` returns a `ToolOutcome`; `response_output()` serializes a correlated `function_call_output` record. Execution is serialized and bounded to eight calls by default (host-configurable up to 16), ten seconds per tool (up to 30), 32 KiB of arguments and 64 KiB of structured output. Invalid JSON, duplicate keys, NaN/Infinity, extra root arguments and disallowed tools are rejected. Failed attempts consume budget. Repeated call IDs cannot execute twice, including concurrent requests.
 
 Read success, tool errors, unconfirmed transport outcomes, and pending approvals remain distinct. `set_conservation_goal` must return `approval_required`; it cannot be treated as an executed goal. Timeout/connection failures receive no automatic retry because an outcome may be uncertain. Hosts must stop or surface a pending approval rather than claiming a goal was applied. Cancellation/timeout does not guarantee the underlying server work stopped.
 
-The bounded metadata trace contains only call ID, recognized tool name, status and elapsed time. It does not log tool arguments/results, session credentials, provider errors or hidden reasoning. Tool results stay in the returned in-memory outcome for the future agent host. Tests negotiate real MCP sessions, including stdio subprocess discovery/execution, and cover scopes, approval safety, duplicate execution, malformed arguments, budgets, and timeout handling.
+The bounded metadata trace contains only call ID, recognized tool name, status and elapsed time. It does not log tool arguments/results, session credentials, provider errors or hidden reasoning. Tool results stay in the returned in-memory outcome for the agent host. Tests negotiate real MCP sessions, including stdio subprocess discovery/execution, and cover scopes, approval safety, duplicate execution, malformed arguments, budgets, and timeout handling.
 
 These are development tests, not an end-to-end agent evaluation. The adapter supplies the following model loop; authenticated session/browser integration and continuation after human approval remain outstanding.
 
@@ -363,7 +367,7 @@ These are development tests, not an end-to-end agent evaluation. The adapter sup
 
 `aquamind_ml.agent.run_agent` connects the official OpenAI Responses SDK to the MCP adapter for one text turn. The host supplies a model, connected client, explicit tool allowlist and scoped MCP server. It allows at most six model requests by default (configurable up to eight), 2,048 output tokens per request, 30 seconds per request and 120 seconds total. Input is limited to 8 KiB; accumulated history and each response have additional size limits. Every request overrides SDK retries to zero, including when the supplied client has its default retry policy. Tool budgets and validation still apply independently.
 
-Function calls and correlated results are replayed in memory until an answer, pending approval, refusal, limit or dependency failure ends the turn. Unexpected parallel tool calls are rejected before execution. A goal proposal immediately returns its actual pending record to the trusted host, with no model-generated claim of approval or execution. Unconfirmed tool/provider timeouts stop the turn without retry. Human decision delivery and a subsequent agent turn are not implemented yet.
+Function calls and correlated results are replayed in memory until an answer, pending approval, refusal, limit or dependency failure ends the turn. Unexpected parallel tool calls are rejected before execution. A goal proposal immediately returns its actual pending record to the trusted host, with no model-generated claim of approval or execution. Unconfirmed tool/provider timeouts stop the turn without retry. Automatically continuing the model turn after a trusted UI decision is not implemented yet.
 
 Requests use `store=False` and replay encrypted reasoning protocol items in memory, following the [Responses migration guide](https://developers.openai.com/api/docs/guides/migrate-to-responses). These items, prompts, arguments and raw provider errors are excluded from the public trace. Model trace metadata includes response ID, model and token counts; tool traces retain only execution metadata. `store=False` does not assert zero provider retention. The runtime policy requires evidence-grounded water guidance and disclosure of synthetic data and illustrative rates; policy text alone is not an evaluated reasoning-quality guarantee.
 
@@ -399,7 +403,7 @@ The agent is disabled by default even if an API key is present. Install `ml/requ
 AQUAMIND_AGENT_ENABLED=1 PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_ml.api:app --env-file .env.local --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Missing/invalid configuration leaves inference health available and the agent host unavailable. The provider client is created/closed with app lifespan, and the endpoint is pinned to the official OpenAI API. The inference-only installation does not import the optional OpenAI SDK when the agent is disabled. The Next.js relay and browser chat do not expose this endpoint yet.
+Missing/invalid configuration leaves inference health available and the agent host unavailable. The provider client is created/closed with app lifespan, and the endpoint is pinned to the official OpenAI API. The inference-only installation does not import the optional OpenAI SDK when the agent is disabled. The Next.js relay and `/demo` assistant expose this endpoint using the same session as manual/agent goal approvals.
 
 Run the explicitly paid smoke check to exercise session creation, a live-model utility answer, a live-model pending goal, trusted-host rejection and session cleanup through FastAPI's local ASGI test client:
 

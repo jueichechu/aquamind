@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GoalApproval } from "./goal-approval";
+import { WaterAssistant } from "./water-assistant";
 import { generateHouseholdDataset } from "@/lib/water";
 import { HouseholdDashboard } from "./household-dashboard";
 
@@ -41,7 +41,7 @@ export default function DemoPage() {
         <div className="grid gap-4 py-4 lg:grid-cols-[240px_minmax(0,1fr)_360px]">
           <HouseholdDashboard initialDataset={generateHouseholdDataset("overnight-leak")} />
 
-          <GoalApproval />
+          <WaterAssistant />
         </div>
       </div>
     </main>
