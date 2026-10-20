@@ -14,6 +14,7 @@
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web exec tsc --noEmit",
     "test": "pnpm --filter web test",
-    "data:export": "pnpm --filter web data:export"
+    "data:export": "pnpm --filter web data:export",
+    "data:demo": "pnpm --filter web data:demo"
   }
 }

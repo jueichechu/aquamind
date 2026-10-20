@@ -12,5 +12,5 @@
     "noEmitOnError": true,
     "types": ["node"]
   },
-  "include": ["scripts/export-dataset.ts"]
+  "include": ["scripts/export-dataset.ts", "scripts/export-demo-meter.ts"]
 }

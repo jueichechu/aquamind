@@ -228,6 +228,21 @@ Both tools return the synthetic-source disclosure, dataset SHA-256, window ident
 
 The dataset is loaded once at startup. Missing windows, absent files, and invalid exports produce tool errors. Callers cannot select filesystem paths. Grant both scopes as `anomaly:read,meter:read` and configure both artifact paths to enable model inference alongside meter reads. These are local synthetic-window tools; household authentication, window discovery, and dashboard/agent integration are not implemented yet. The export's test split remains ML evaluation data, not an independent agent benchmark.
 
+### Dashboard meter snapshot
+
+The committed 16 KB `ml/data/demo/meter-v1.json` is generated directly from the same TypeScript simulator as the dashboard, using seed 42. It contains seven days of interval gallons for each of the four scenarios, with no fixture identities, excess-volume labels or anomaly ground truth. It is separate from the ML experiment export; no experiment splits or frozen detector artifacts are changed.
+
+`DemoMeterStore` validates and loads this snapshot once. Its summary gives the final UTC day's gallons, mean/peak interval-average GPM, and comparison with the preceding six-day baseline. Series adds 96 GPM values derived from interval gallons divided by 15; the simulator's separately rounded GPM field is not used, so volumes match the chart's underlying gallons. Dashboard cards round totals to one decimal place. Returned source, seed, timestamps and SHA-256 identify the synthetic snapshot; these readings are not real observations or a leak diagnosis.
+
+Regenerate or check the snapshot from the repository root after simulator changes:
+
+```sh
+pnpm data:demo
+pnpm data:demo --check
+```
+
+The TypeScript check compares all four snapshot scenarios and rounded daily/baseline totals with the dashboard generator. Python checks cover strict snapshot validation, units/provenance, copy isolation and an undefined percentage when the baseline is zero.
+
 ### Utility estimates
 
 Three read-only tools require `utility:read`: `get_utility_rate`, `estimate_water_cost`, and `estimate_conservation_savings`. Enable them with `AQUAMIND_MCP_SCOPES=utility:read` (or add that scope to the comma-separated list). They need no model artifact, dataset, or API key.

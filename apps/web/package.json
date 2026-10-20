@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "data:export": "tsc -p tsconfig.export.json && node out/dataset/scripts/export-dataset.js"
+    "data:export": "tsc -p tsconfig.export.json && node out/dataset/scripts/export-dataset.js",
+    "data:demo": "tsc -p tsconfig.export.json && node out/dataset/scripts/export-demo-meter.js"
   },
   "dependencies": {
     "next": "16.3.5",
