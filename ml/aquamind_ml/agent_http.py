@@ -12,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from .approvals import GoalApprovals, GoalProposal
 from .sessions import DemoSessions, require_session
+from .demo_meter import DEFAULT_DEMO_METER_PATH, DemoMeterStore
+from .weather import ScenarioId
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
@@ -21,6 +23,7 @@ if TYPE_CHECKING:
 class AgentTurnRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     text: str = Field(min_length=1, max_length=8192)
+    scenario_id: ScenarioId | None = None
 
     @field_validator('text')
     @classmethod
@@ -50,6 +53,7 @@ class AgentContinueRequest(BaseModel):
 class _Continuation:
     approval_id: str
     pause: AgentPause | None
+    scenario_id: ScenarioId | None = None
     attempted: bool = False
     result: AgentResult | None = None
 
@@ -57,12 +61,34 @@ class _Continuation:
 class AgentHost:
     """One event loop/process; fixed local-demo limits, never an approval authority."""
 
-    def __init__(self, client: AsyncOpenAI, config: AgentConfig):
+    def __init__(self, client: AsyncOpenAI, config: AgentConfig, *,
+                 demo_meter_path=DEFAULT_DEMO_METER_PATH):
         self.client, self.config = client, config
         self._active: set[GoalApprovals] = set()
         self._counts: WeakKeyDictionary[GoalApprovals, int] = WeakKeyDictionary()
         self._continuations: WeakKeyDictionary[GoalApprovals, _Continuation] = WeakKeyDictionary()
         self._total = 0
+        try:
+            self._demo_meter = DemoMeterStore(demo_meter_path)
+        except Exception:
+            # Unselected turns remain usable; selected meter requests fail before provider work.
+            self._demo_meter = None
+
+    def _server(self, store, scenario_id, *, allow_goals):
+        from .mcp_server import create_server
+        scopes = {'weather:read', 'utility:read'}
+        allowed = {'get_weather_context', 'get_utility_rate', 'estimate_water_cost',
+                   'estimate_conservation_savings'}
+        if allow_goals:
+            scopes.add('goals:write')
+            allowed.add('set_conservation_goal')
+        if scenario_id is not None:
+            if self._demo_meter is None:
+                raise HTTPException(503, 'Demo meter unavailable')
+            scopes.add('meter:read')
+            allowed.update({'get_meter_summary', 'get_meter_series'})
+        return create_server(None, frozenset(scopes), goal_approvals=store,
+                             demo_meter=self._demo_meter, demo_scenario=scenario_id), frozenset(allowed)
 
     @asynccontextmanager
     async def _slot(self, store: GoalApprovals):
@@ -87,12 +113,12 @@ class AgentHost:
         finally:
             self._active.discard(store)
 
-    async def run(self, text: str, store: GoalApprovals) -> AgentResult:
+    async def run(self, text: str, store: GoalApprovals, *,
+                  scenario_id: ScenarioId | None = None) -> AgentResult:
         # Lazy imports keep inference-only installations independent of the agent SDK.
         from mcp import Client
         from .agent import run_agent
         from .agent_tools import McpAgentTools
-        from .mcp_server import create_server
 
         def check_active():
             _ = store.goal
@@ -104,22 +130,20 @@ class AgentHost:
         async with self._slot(store):
             self._continuations.pop(store, None)
             pauses = []
-            scopes = frozenset({'weather:read', 'utility:read', 'goals:write'})
-            allowed = frozenset({'get_weather_context', 'get_utility_rate', 'estimate_water_cost',
-                                 'estimate_conservation_savings', 'set_conservation_goal'})
-            async with Client(create_server(None, scopes, goal_approvals=store)) as mcp:
+            server, allowed = self._server(store, scenario_id, allow_goals=True)
+            async with Client(server) as mcp:
                 outcome = await run_agent(text, self.client, McpAgentTools(mcp, allowed), self.config,
                                           check_active=check_active, on_pause=pauses.append)
             check_active()
             if outcome.status == 'approval_required' and pauses:
-                self._continuations[store] = _Continuation(outcome.pending_approval['approval_id'], pauses[0])
+                self._continuations[store] = _Continuation(
+                    outcome.pending_approval['approval_id'], pauses[0], scenario_id)
             return outcome
 
     async def continue_after_decision(self, approval_id: str, store: GoalApprovals) -> AgentResult:
         from mcp import Client
         from .agent import continue_agent
         from .agent_tools import McpAgentTools
-        from .mcp_server import create_server
 
         def check_active():
             _ = store.goal
@@ -140,9 +164,8 @@ class AgentHost:
         async with self._slot(store):
             entry.attempted = True  # Consume before awaiting; interruption must never trigger a second paid attempt.
             try:
-                allowed = frozenset({'get_weather_context', 'get_utility_rate', 'estimate_water_cost',
-                                     'estimate_conservation_savings'})
-                async with Client(create_server(None, frozenset({'weather:read', 'utility:read'}))) as mcp:
+                server, allowed = self._server(store, entry.scenario_id, allow_goals=False)
+                async with Client(server) as mcp:
                     entry.result = await continue_agent(entry.pause, decision, store.goal, self.client,
                         McpAgentTools(mcp, allowed), self.config, check_active=check_active)
                 check_active()
@@ -178,7 +201,7 @@ def agent_router(sessions: DemoSessions) -> APIRouter:
         store = require_session(sessions, request)
         host = host_for(request)
         body = await body_for(request, AgentTurnRequest, 16384)
-        outcome = await host.run(body.text, store)
+        outcome = await host.run(body.text, store, scenario_id=body.scenario_id)
         # Re-read a pending proposal from this session's authoritative store.
         public = outcome.public_dict()
         if outcome.pending_approval is not None:

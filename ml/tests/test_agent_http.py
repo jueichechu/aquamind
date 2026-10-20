@@ -2,6 +2,7 @@ import asyncio
 from contextlib import AsyncExitStack
 import json
 import os
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ from aquamind_ml.agent import AgentConfig
 from aquamind_ml.agent_http import AgentHost
 from aquamind_ml.api import create_app
 from aquamind_ml.sessions import DemoSessions
+from aquamind_ml.demo_meter import DemoMeterStore, SCENARIOS
 from test_agent import call, message, response
 
 
@@ -95,6 +97,93 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(decided.json()['status'], 'rejected' if decision == 'reject' else 'approved')
         self.assertEqual(self.sessions.approvals(token).goal.daily_gallons, 150)
         self.assertEqual(len(self.requests), 2)
+
+    async def test_selected_scenarios_supply_matching_summary_series_and_weather(self):
+        meter = DemoMeterStore()
+        for scenario in sorted(SCENARIOS):
+            _, headers = await self.session()
+            before = len(self.requests)
+            names = ['get_meter_summary', 'get_meter_series', 'get_weather_context']
+            self.reply = lambda index: response([call('meter_' + str(index), names[index - before - 1], '{}')]) \
+                if index - before <= 3 else response([message('Synthetic meter evidence retrieved.')])
+            result = await self.http.post('/v1/agent/turn', headers=headers,
+                json={'text': 'Explain the selected synthetic day.', 'scenario_id': scenario})
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.json()['status'], 'answer')
+            self.assertEqual([item['status'] for item in result.json()['tool_trace']], ['success'] * 3)
+            requests = self.requests[before:]
+            for name in names:
+                definition = next(tool for tool in requests[0]['tools'] if tool['name'] == name)
+                self.assertEqual(definition['parameters'].get('properties', {}), {})
+            self.assertNotIn('detect_water_anomaly', [tool['name'] for tool in requests[0]['tools']])
+            for index, name in enumerate(names):
+                evidence = json.loads(requests[index + 1]['input'][-1]['output'])['result']
+                self.assertEqual(evidence['source'], 'synthetic')
+                self.assertEqual(evidence['scenario_id'], scenario)
+                if name == 'get_meter_summary':
+                    self.assertEqual(evidence, meter.summary(scenario).model_dump())
+                elif name == 'get_meter_series':
+                    self.assertEqual(evidence, meter.series(scenario).model_dump())
+                for label in ('hasLeak', 'isAnomaly', 'fixtures', 'excessGallons'):
+                    self.assertNotIn(label, evidence)
+
+    async def test_meter_selection_requires_valid_request_and_cannot_be_overridden_by_model(self):
+        _, headers = await self.session()
+        for extra in ({'scenario_id': 'unknown'}, {'scenario_id': True}, {'scenario_id': {}},
+                      {'scenario_id': 'normal', 'seed': 7}, {'meter_path': '/private/meter.json'},
+                      {'flow_rates_gpm': [999] * 96}):
+            result = await self.http.post('/v1/agent/turn', headers=headers,
+                json={'text': 'Water use?', **extra})
+            self.assertEqual(result.status_code, 422)
+        self.assertEqual(self.requests, [])
+        for selected in (False, True):
+            before = len(self.requests)
+            args = '{"request":{"scenario_id":"normal","seed":0}}' if selected else '{}'
+            self.reply = lambda index: response([call('meter_call', 'get_meter_summary', args)]) \
+                if index == before + 1 else response([message('Meter read denied.')])
+            payload = {'text': 'Water use?'}
+            if selected:
+                payload['scenario_id'] = 'overnight-leak'
+            result = await self.http.post('/v1/agent/turn', headers=headers, json=payload)
+            self.assertEqual(result.json()['tool_trace'][0]['status'], 'error')
+            error = json.loads(self.requests[-1]['input'][-1]['output'])
+            self.assertEqual(error['error'], 'invalid_arguments' if selected else 'tool_not_allowed')
+
+    async def test_missing_demo_snapshot_fails_selected_turn_without_provider_work(self):
+        self.app.state.agent_host = AgentHost(self.provider, AgentConfig(model='test-model'),
+            demo_meter_path=Path('/nonexistent/aquamind-demo-meter.json'))
+        _, headers = await self.session()
+        result = await self.http.post('/v1/agent/turn', headers=headers,
+            json={'text': 'Water use?', 'scenario_id': 'normal'})
+        self.assertEqual(result.status_code, 503)
+        self.assertNotIn('/nonexistent', result.text)
+        self.assertEqual(self.requests, [])
+        self.assertEqual((await self.turn(headers)).status_code, 200)
+
+    async def test_continuation_keeps_selected_context_and_new_questions_choose_independently(self):
+        token, headers = await self.session()
+        self.reply = lambda index: response([call('goal_call', 'set_conservation_goal',
+            '{"request":{"daily_gallons":150}}')])
+        original = await self.http.post('/v1/agent/turn', headers=headers,
+            json={'text': 'Propose a daily goal.', 'scenario_id': 'running-toilet'})
+        pending = original.json()['pending_approval']
+        self.sessions.approvals(token).decide(pending['approval_id'], 'approve')
+        self.reply = lambda index: response([call('followup_meter', 'get_meter_summary', '{}')]) \
+            if index == 2 else response([message('Approved. Synthetic usage explained.')])
+        result = await self.continue_goal(headers, pending['approval_id'])
+        self.assertEqual(result.json()['status'], 'answer')
+        evidence = json.loads(self.requests[-1]['input'][-1]['output'])['result']
+        self.assertEqual(evidence['scenario_id'], 'running-toilet')
+        self.assertNotIn('set_conservation_goal', [tool['name'] for tool in self.requests[-1]['tools']])
+        self.assertEqual(self.sessions.approvals(token).goal.daily_gallons, 150)
+        self.reply = lambda index: response([call('new_meter', 'get_meter_summary', '{}')]) \
+            if index == 4 else response([message('New independent context.')])
+        fresh = await self.http.post('/v1/agent/turn', headers=headers,
+            json={'text': 'Explain usage.', 'scenario_id': 'normal'})
+        self.assertEqual(fresh.json()['status'], 'answer')
+        evidence = json.loads(self.requests[-1]['input'][-1]['output'])['result']
+        self.assertEqual(evidence['scenario_id'], 'normal')
+        self.assertEqual((await self.continue_goal(headers, pending['approval_id'])).status_code, 404)
 
     async def test_invalid_bodies_and_disabled_host_never_call_provider(self):
         _, headers = await self.session()
