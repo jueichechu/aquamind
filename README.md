@@ -226,7 +226,7 @@ Supply a window identity from the export, for example the first normal training 
 
 Both tools return the synthetic-source disclosure, dataset SHA-256, window identity, exclusive end time, reading count, total gallons, mean GPM, and peak fifteen-minute average GPM. Series also returns the 96 readings in chronological order. Gallons are calculated as the sum of average GPM × 15 minutes. Simulator anomaly/leak labels are omitted; a usage summary is not a model diagnosis. UTC timestamp spellings normalize to the same instant.
 
-The dataset is loaded once at startup. Missing windows, absent files, and invalid exports produce tool errors. Callers cannot select filesystem paths. Grant both scopes as `anomaly:read,meter:read` and configure both artifact paths to enable model inference alongside meter reads. These are local synthetic-window tools; household authentication, window discovery, and dashboard/agent integration are not implemented yet. The export's test split remains ML evaluation data, not an independent agent benchmark.
+The dataset is loaded once at startup. Missing windows, absent files, and invalid exports produce tool errors. Callers cannot select filesystem paths. Grant both scopes as `anomaly:read,meter:read` and configure both artifact paths to enable model inference alongside meter reads. These are local synthetic-window tools; household authentication and window discovery remain outstanding. In-process hosts can also bind the dashboard snapshot described below; agent/browser wiring remains outstanding. The export's test split remains ML evaluation data, not an independent agent benchmark.
 
 ### Dashboard meter snapshot
 
@@ -242,6 +242,8 @@ pnpm data:demo --check
 ```
 
 The TypeScript check compares all four snapshot scenarios and rounded daily/baseline totals with the dashboard generator. Python checks cover strict snapshot validation, units/provenance, copy isolation and an undefined percentage when the baseline is zero.
+
+In-process hosts may pass `demo_meter=DemoMeterStore()` and a validated `demo_scenario` to `create_server`, rather than an experiment dataset path. In this mode, `get_meter_summary`, `get_meter_series`, and `get_weather_context` take no model-supplied arguments and read the same host-selected scenario. The meter reads still require `meter:read`, and weather requires `weather:read`. Invalid or ambiguous bindings are rejected. MCP checks cover these bindings, read-only annotations and scope denial. This mode does not grant anomaly inference or goal approval.
 
 ### Utility estimates
 

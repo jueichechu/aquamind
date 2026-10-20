@@ -17,7 +17,9 @@ from .data import MeterWindow
 from .detector import FrozenDetector
 from .approvals import ApprovalSessionUnavailable, GoalApprovals, GoalProposal, GoalRequest
 from .meter import MeterQuery, MeterSeries, MeterStore, MeterSummary
+from .demo_meter import DemoMeterStore, DemoMeterSummary, DemoMeterSeries
 from .weather import DEFAULT_WEATHER_PATH, WeatherContext, WeatherQuery, WeatherStore
+from .weather import ScenarioId
 from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate,
                       UtilityRate, estimate_cost, estimate_savings)
 
@@ -25,7 +27,13 @@ from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate
 def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset(),
                   meter_path: Path | None = None,
                   weather_path: Path = DEFAULT_WEATHER_PATH,
-                  goal_approvals: GoalApprovals | None = None) -> MCPServer:
+                  goal_approvals: GoalApprovals | None = None, *,
+                  demo_meter: DemoMeterStore | None = None,
+                  demo_scenario: ScenarioId | None = None) -> MCPServer:
+    if demo_scenario is not None:
+        demo_scenario = WeatherQuery(scenario_id=demo_scenario).scenario_id
+        if demo_meter is None or meter_path is not None:
+            raise ValueError('Demo meter requires one host-selected snapshot')
     # Copy policy into this server; it cannot be changed through an MCP request.
     granted_scopes = frozenset(scopes)
     if granted_scopes - {"anomaly:read", "meter:read", "utility:read", "weather:read", "goals:write"}:
@@ -65,9 +73,7 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
         except Exception:
             logging.getLogger(__name__).error("AquaMind MCP weather context unavailable")
 
-    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
-                                           idempotentHint=True, openWorldHint=False))
-    def get_weather_context(request: WeatherQuery) -> WeatherContext:
+    def weather_context(request: WeatherQuery) -> WeatherContext:
         """Read synthetic rainfall and temperature for the selected demo scenario.
 
         Requires weather:read. Static scenario context, not live weather, a forecast,
@@ -79,6 +85,16 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
         if weather is None:
             raise ToolError("Weather context unavailable")
         return weather.context(request)
+
+    read_only = ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                idempotentHint=True, openWorldHint=False)
+    if demo_scenario is not None:
+        @server.tool(annotations=read_only)
+        def get_weather_context() -> WeatherContext:
+            """Read synthetic weather for the host-selected demo scenario, not live weather."""
+            return weather_context(WeatherQuery(scenario_id=demo_scenario))
+    else:
+        server.tool(name='get_weather_context', annotations=read_only)(weather_context)
 
     def require_utility_scope():
         if "utility:read" not in granted_scopes:
@@ -131,9 +147,7 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
             raise ToolError("Meter data unavailable")
         return meter
 
-    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
-                                           idempotentHint=True, openWorldHint=False))
-    def get_meter_series(request: MeterQuery) -> MeterSeries:
+    def meter_series(request: MeterQuery) -> MeterSeries:
         """Read 96 synthetic fifteen-minute average GPM values for an exported window.
 
         Requires meter:read. Select by generator seed, scenario ID and UTC start.
@@ -146,9 +160,7 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
         except LookupError:
             raise ToolError("Meter window not found") from None
 
-    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
-                                           idempotentHint=True, openWorldHint=False))
-    def get_meter_summary(request: MeterQuery) -> MeterSummary:
+    def meter_summary(request: MeterQuery) -> MeterSummary:
         """Summarize one exported synthetic day: gallons, mean and peak interval GPM.
 
         Requires meter:read. This describes measured usage, not a leak diagnosis.
@@ -159,6 +171,34 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
             return store.summary(request)
         except LookupError:
             raise ToolError("Meter window not found") from None
+
+    if demo_scenario is not None:
+        def require_demo_meter():
+            if 'meter:read' not in granted_scopes:
+                raise ToolError('Permission denied: meter:read required')
+
+        @server.tool(annotations=read_only)
+        def get_meter_summary() -> DemoMeterSummary:
+            """Read the selected synthetic demo's final day and preceding six-day baseline.
+
+            Requires meter:read. Gallons and fifteen-minute average flow describe usage,
+            not a leak diagnosis. Selection is fixed by the host for this turn.
+            """
+            require_demo_meter()
+            return demo_meter.summary(demo_scenario)
+
+        @server.tool(annotations=read_only)
+        def get_meter_series() -> DemoMeterSeries:
+            """Read 96 fifteen-minute average GPM values for the selected synthetic demo day.
+
+            Requires meter:read. Starts at start_timestamp, ends before
+            end_timestamp_exclusive. No fixture identities or simulator anomaly labels.
+            """
+            require_demo_meter()
+            return demo_meter.series(demo_scenario)
+    else:
+        server.tool(name='get_meter_series', annotations=read_only)(meter_series)
+        server.tool(name='get_meter_summary', annotations=read_only)(meter_summary)
 
     @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
                                            idempotentHint=True, openWorldHint=False))
