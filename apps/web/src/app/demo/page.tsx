@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { WaterAssistant } from "./water-assistant";
 import { generateHouseholdDataset } from "@/lib/water";
-import { HouseholdDashboard } from "./household-dashboard";
+import { DemoWorkspace } from "./demo-workspace";
 
 export default function DemoPage() {
   return (
@@ -38,11 +37,7 @@ export default function DemoPage() {
           </div>
         </header>
 
-        <div className="grid gap-4 py-4 lg:grid-cols-[240px_minmax(0,1fr)_360px]">
-          <HouseholdDashboard initialDataset={generateHouseholdDataset("overnight-leak")} />
-
-          <WaterAssistant />
-        </div>
+        <DemoWorkspace initialDataset={generateHouseholdDataset("overnight-leak")} />
       </div>
     </main>
   );

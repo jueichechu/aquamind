@@ -37,7 +37,7 @@ describe("approval relay", () => {
     const fetcher = vi.fn().mockResolvedValue(Response.json({ status: "answer" }));
     vi.stubGlobal("fetch", fetcher);
     const timeout = vi.spyOn(AbortSignal, "timeout");
-    const body = JSON.stringify({ text: "q".repeat(2000) });
+    const body = JSON.stringify({ text: "q".repeat(2000), scenario_id: "irrigation-after-rain" });
     const response = await POST(new Request("http://localhost/api", { method: "POST", body,
       headers: { authorization: "Bearer test-session", cookie: "private=value" } }), context("v1/agent/turn"));
     expect(response.status).toBe(200);

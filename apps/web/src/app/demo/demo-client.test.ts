@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DemoClient, parseAgentReply, SessionExpired, type Proposal } from "./demo-client";
+import type { ScenarioId } from "../../lib/water/types";
 
 const token = "a".repeat(43);
 const id = "12345678-abcd-1234-abcd-123456789abc";
@@ -11,6 +12,45 @@ const session = () => Response.json({ session_token: token });
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("shared in-memory demo client", () => {
+  it("sends only the question and selected scenario for each independent turn", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(session())
+      .mockImplementation(() => Promise.resolve(Response.json(reply)));
+    vi.stubGlobal("fetch", fetcher);
+    const client = new DemoClient();
+    for (const scenario of ["normal", "overnight-leak", "running-toilet", "irrigation-after-rain"] as const) {
+      await client.ask("Compare this day with its baseline.", scenario);
+      expect(JSON.parse(fetcher.mock.calls.at(-1)![1].body)).toEqual({
+        text: "Compare this day with its baseline.", scenario_id: scenario,
+      });
+    }
+    expect(fetcher.mock.calls.filter(([path]) => path.endsWith("/sessions"))).toHaveLength(1);
+  });
+
+  it("captures scenario selection before session creation finishes", async () => {
+    let release!: (response: Response) => void;
+    const fetcher = vi.fn().mockReturnValueOnce(new Promise<Response>((resolve) => { release = resolve; }))
+      .mockResolvedValueOnce(Response.json(reply)).mockResolvedValueOnce(Response.json(reply));
+    vi.stubGlobal("fetch", fetcher);
+    const client = new DemoClient();
+    let selected: ScenarioId = "overnight-leak";
+    const first = client.ask("Explain usage.", selected);
+    selected = "normal";
+    release(session());
+    await first;
+    expect(JSON.parse(fetcher.mock.calls[1][1].body).scenario_id).toBe("overnight-leak");
+    await client.ask("Explain usage.", selected);
+    expect(JSON.parse(fetcher.mock.calls[2][1].body).scenario_id).toBe("normal");
+  });
+
+  it("rejects unknown or inherited scenario names before any network request", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    for (const scenario of ["unknown", "__proto__", "constructor", "", null, {}, ["normal"]]) {
+      await expect(new DemoClient().ask("Water use?", scenario as ScenarioId)).rejects.toThrow("supported demo scenario");
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("uses one session for chat, manual goals, review and explicit decisions", async () => {
     const fetcher = vi.fn().mockResolvedValueOnce(session()).mockResolvedValueOnce(Response.json(reply))
       .mockResolvedValueOnce(Response.json(proposal)).mockResolvedValueOnce(Response.json(proposal))
@@ -119,7 +159,8 @@ describe("shared in-memory demo client", () => {
       .mockResolvedValueOnce(Response.json({ ...reply, answer: "Your temporary goal is 150 gallons/day." }));
     vi.stubGlobal("fetch", fetcher);
     const client = new DemoClient();
-    await client.ask("Propose 150 gallons/day.");
+    await client.ask("Propose 150 gallons/day.", "running-toilet");
+    expect(JSON.parse(fetcher.mock.calls[1][1].body).scenario_id).toBe("running-toilet");
     const decision = await client.decide(proposal, "approve");
     expect(decision.status).toBe("approved");
     expect((await client.continueAfterDecision(id)).answer).toContain("150");

@@ -1,3 +1,6 @@
+import { SCENARIOS } from "../../lib/water/scenarios";
+import type { ScenarioId } from "../../lib/water/types";
+
 export type Proposal = {
   approval_id: string;
   status: "approval_required" | "approved" | "rejected" | "expired" | "conflict";
@@ -83,9 +86,14 @@ export class DemoClient {
     } finally { this.#busy = false; }
   }
 
-  ask(text: string) {
+  ask(text: string, scenarioId?: ScenarioId) {
     if (!text.trim() || new TextEncoder().encode(text).length > 8192) return Promise.reject(new Error("Enter a question of up to 8 KiB."));
-    return this.perform(async () => parseAgentReply(await this.call("agent/turn", { text })));
+    if (scenarioId !== undefined && (typeof scenarioId !== "string" || !Object.hasOwn(SCENARIOS, scenarioId))) {
+      return Promise.reject(new Error("Select a supported demo scenario."));
+    }
+    return this.perform(async () => parseAgentReply(await this.call("agent/turn", {
+      text, ...(scenarioId === undefined ? {} : { scenario_id: scenarioId }),
+    })));
   }
   propose(daily_gallons: number) {
     if (!Number.isFinite(daily_gallons) || daily_gallons <= 0 || daily_gallons > 10000) return Promise.reject(new Error("Enter a daily goal between 0 and 10,000 gallons."));

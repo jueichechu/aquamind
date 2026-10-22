@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { SCENARIOS, type ScenarioId } from "@/lib/water";
 import { DemoClient, SessionExpired, type AgentReply, type Proposal, type ToolEvent } from "./demo-client";
 
 const button = "rounded-lg border border-cyan-300/30 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-300/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:opacity-50";
-type Message = { who: "You" | "AquaMind"; text: string; tools?: ToolEvent[] };
+type Message = { who: "You" | "AquaMind"; text: string; scenarioId: ScenarioId; tools?: ToolEvent[] };
+type Continuation = { approvalId: string; scenarioId: ScenarioId };
 const outcomeText: Record<Exclude<AgentReply["status"], "answer">, string> = {
   approval_required: "A goal proposal is ready for review below. No goal has been changed.",
   refused: "I couldn’t answer that request. Try a question about household water use.",
@@ -23,15 +25,17 @@ const toolLabels: Record<string, string> = {
   get_weather_context: "Synthetic weather", get_utility_rate: "Illustrative utility rate",
   estimate_water_cost: "Water-cost calculation", estimate_conservation_savings: "Savings calculation",
   set_conservation_goal: "Goal proposal",
+  get_meter_summary: "Synthetic meter summary", get_meter_series: "Synthetic meter readings",
 };
 
-export function WaterAssistant() {
+export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
   const [client] = useState(() => new DemoClient());
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [gallons, setGallons] = useState("150");
   const [proposal, setProposal] = useState<Proposal | null>(null);
-  const [continuation, setContinuation] = useState<string | null>(null);
+  const [continuation, setContinuation] = useState<Continuation | null>(null);
+  const [proposalScenario, setProposalScenario] = useState<ScenarioId | null>(null);
   const [goal, setGoal] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -49,7 +53,7 @@ export function WaterAssistant() {
     setBusy(true); setError("");
     try { await operation(); }
     catch (cause) {
-      if (cause instanceof SessionExpired) { setProposal(null); setGoal(null); setMessages([]); setContinuation(null); }
+      if (cause instanceof SessionExpired) { setProposal(null); setGoal(null); setMessages([]); setContinuation(null); setProposalScenario(null); }
       setError(cause instanceof Error ? cause.message : "The request could not be confirmed.");
     } finally { busyRef.current = false; setBusy(false); }
   }
@@ -59,49 +63,53 @@ export function WaterAssistant() {
     if (result.status === "approved") setGoal(result.arguments.daily_gallons);
   }
 
-  function showReply(reply: AgentReply) {
+  function showReply(reply: AgentReply, selectedScenario: ScenarioId) {
     setMessages((previous) => [...previous, { who: "AquaMind" as const,
-      text: reply.status === "answer" ? reply.answer : outcomeText[reply.status], tools: reply.tool_trace }].slice(-16));
+      text: reply.status === "answer" ? reply.answer : outcomeText[reply.status],
+      scenarioId: selectedScenario, tools: reply.tool_trace }].slice(-16));
   }
 
-  async function continueDecision(result: Proposal) {
+  async function continueDecision(result: Proposal, selectedScenario: ScenarioId) {
     const reply = await client.continueAfterDecision(result.approval_id);
-    showReply(reply);
+    showReply(reply, selectedScenario);
     setContinuation(null);
   }
 
   async function resolveProposal(result: Proposal) {
     showProposal(result); // Keep the confirmed decision even if the model follow-up fails.
-    if (continuation === result.approval_id && result.status !== "approval_required") {
+    if (continuation?.approvalId === result.approval_id && result.status !== "approval_required") {
       setMessages((previous) => [...previous, { who: "You" as const,
-        text: `Goal review: ${result.status}. ${result.summary}` }].slice(-16));
-      await continueDecision(result);
+        text: `Goal review: ${result.status}. ${result.summary}`, scenarioId: continuation.scenarioId }].slice(-16));
+      await continueDecision(result, continuation.scenarioId);
     }
   }
 
   async function send() {
     if (pending || !question.trim()) return;
     const text = question.trim();
+    const selectedScenario = scenarioId;
     await perform(async () => {
       setContinuation(null);
-      setMessages((previous) => [...previous, { who: "You" as const, text }].slice(-16));
-      const reply = await client.ask(text);
+      setMessages((previous) => [...previous, { who: "You" as const, text, scenarioId: selectedScenario }].slice(-16));
+      const reply = await client.ask(text, selectedScenario);
       setQuestion("");
-      showReply(reply);
-      setContinuation(reply.pending_approval?.approval_id ?? null);
-      if (reply.pending_approval) showProposal(reply.pending_approval);
+      showReply(reply, selectedScenario);
+      setContinuation(reply.pending_approval ? { approvalId: reply.pending_approval.approval_id, scenarioId: selectedScenario } : null);
+      if (reply.pending_approval) { showProposal(reply.pending_approval); setProposalScenario(selectedScenario); }
     });
   }
 
   return <section aria-labelledby="assistant-heading" className="min-w-0 self-start rounded-2xl border border-white/10 bg-[#0a1521] p-5">
     <p className="text-xs text-cyan-200">AI text assistant · local demo</p>
     <h2 id="assistant-heading" className="mt-2 text-lg font-semibold">Ask AquaMind</h2>
-    <p className="mt-2 text-sm leading-6 text-slate-300">Explore demo rates, savings, synthetic weather, or a daily goal. The meter chart is not shared with chat yet.</p>
-    <p className="mt-2 text-xs leading-5 text-slate-400">New questions stand on their own. After you review an AI goal proposal, AquaMind can explain the confirmed result. Questions are sent to OpenAI; avoid personal information.</p>
+    <p className="mt-2 text-sm leading-6 text-slate-300">Explore the selected synthetic meter readings and weather, demo rates, savings, or a daily goal. Meter evidence describes usage; it is not a model diagnosis.</p>
+    <p className="mt-3 rounded-lg border border-cyan-300/15 bg-cyan-300/5 p-3 text-sm text-cyan-100">Selected scenario: {SCENARIOS[scenarioId].title}</p>
+    <p className="mt-2 text-xs leading-5 text-slate-400">New questions stand on their own and use the scenario selected when sent. Earlier replies and goal follow-ups keep their original scenario. Questions and requested synthetic evidence go to OpenAI; avoid personal information.</p>
 
     <div ref={log} role="log" aria-label="Conversation" aria-live="polite" className="mt-4 max-h-[420px] space-y-3 overflow-y-auto overscroll-contain">
       {messages.map((message, index) => <article key={index} className={`rounded-xl p-3 text-sm ${message.who === "You" ? "bg-white/5" : "border border-cyan-300/15 bg-cyan-300/5"}`}>
         <p className="text-xs font-semibold text-cyan-100">{message.who}</p>
+        <p className="mt-1 text-xs text-slate-400">Scenario: {SCENARIOS[message.scenarioId].title}</p>
         <p className="mt-2 whitespace-pre-wrap break-words leading-6 text-slate-200">{message.text}</p>
         {!!message.tools?.length && <details className="mt-3 text-xs text-slate-300">
           <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-cyan-300">Tools used</summary>
@@ -114,7 +122,7 @@ export function WaterAssistant() {
     <form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <label htmlFor="water-question" className="block text-sm text-slate-200">Your water question</label>
       <textarea id="water-question" required rows={3} maxLength={2000} value={question}
-        placeholder="What would 1,000 gallons cost at the demo rate?" disabled={busy || pending}
+        placeholder="How does this day compare with the six-day baseline?" disabled={busy || pending}
         onChange={(event) => setQuestion(event.target.value)}
         className="w-full resize-y rounded-lg border border-white/20 bg-[#07111b] px-3 py-2 text-sm text-white placeholder:text-slate-500 focus-visible:outline-2 focus-visible:outline-cyan-300" />
       <button className={button} disabled={busy || pending || !question.trim()}>Send question</button>
@@ -127,7 +135,7 @@ export function WaterAssistant() {
       <details className="mt-3">
         <summary className="cursor-pointer rounded text-sm text-cyan-100 focus-visible:outline-2 focus-visible:outline-cyan-300">Enter a goal manually</summary>
         <form className="mt-3 space-y-3" onSubmit={(event) => { event.preventDefault();
-          if (!pending) void perform(async () => { showProposal(await client.propose(Number(gallons))); setContinuation(null); }); }}>
+          if (!pending) void perform(async () => { showProposal(await client.propose(Number(gallons))); setContinuation(null); setProposalScenario(null); }); }}>
           <label htmlFor="daily-goal" className="block text-sm text-slate-200">Daily target (gallons)</label>
           <input id="daily-goal" type="number" required min="0.01" max="10000" step="0.01" value={gallons}
             onChange={(event) => setGallons(event.target.value)} disabled={busy || pending}
@@ -136,6 +144,7 @@ export function WaterAssistant() {
         </form>
       </details>
       {proposal && <div aria-labelledby="goal-heading" className="mt-4 rounded-xl border border-cyan-300/20 p-3 text-sm text-slate-200">
+        {proposalScenario && <p className="mb-2 text-xs text-slate-400">Proposed with: {SCENARIOS[proposalScenario].title}</p>}
         <p className="font-medium">{proposal.summary}</p>
         <p className="mt-2">{proposalText[proposal.status]}</p>
         {pending && <div className="mt-3 flex flex-wrap gap-2">
@@ -148,7 +157,7 @@ export function WaterAssistant() {
         </div>}
       </div>}
       {continuation && proposal && !pending && <button type="button" className={`${button} mt-3`} disabled={busy}
-        onClick={() => void perform(async () => continueDecision(proposal))}>Check assistant follow-up</button>}
+        onClick={() => void perform(async () => continueDecision(proposal, continuation.scenarioId))}>Check assistant follow-up</button>}
     </div>
     <p role="status" aria-live="polite" aria-atomic="true" className="mt-3 text-sm text-slate-300">
       {busy ? "Waiting for AquaMind…" : pending ? "Review the pending proposal before sending another question." : proposal ? proposalText[proposal.status] : ""}

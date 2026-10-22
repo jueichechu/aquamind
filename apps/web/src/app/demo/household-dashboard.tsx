@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { generateHouseholdDataset, SCENARIOS } from "@/lib/water";
-import type { HouseholdDataset, MeterReading } from "@/lib/water";
+import { SCENARIOS } from "@/lib/water";
+import type { HouseholdDataset, MeterReading, ScenarioId } from "@/lib/water";
 
-export function HouseholdDashboard({ initialDataset }: { initialDataset: HouseholdDataset }) {
-  const [dataset, setDataset] = useState(initialDataset);
+export function HouseholdDashboard({ dataset, onScenarioChange }: {
+  dataset: HouseholdDataset;
+  onScenarioChange: (scenarioId: ScenarioId) => void;
+}) {
   const { scenario, summary, readings } = dataset;
   const today = readings.slice(-96);
 
@@ -21,7 +22,7 @@ export function HouseholdDashboard({ initialDataset }: { initialDataset: Househo
             <button
               key={option.id}
               type="button"
-              onClick={() => setDataset(generateHouseholdDataset(option.id))}
+              onClick={() => onScenarioChange(option.id)}
               aria-pressed={option.id === scenario.id}
               className={`w-full cursor-pointer rounded-xl border p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${
                 option.id === scenario.id
