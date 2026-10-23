@@ -42,6 +42,41 @@ Summary calculations use the final simulated day as “today” and the precedin
 
 These are transparent simulation assumptions, not a scientifically validated household model or an evaluated leak detector.
 
+## Manual bill normalization
+
+`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills. This is a domain-layer foundation; there is no bill HTTP endpoint, form, upload/OCR, agent tool or persistence yet. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
+
+Example from a Python process started with `PYTHONPATH=ml`:
+
+```python
+from aquamind_ml.bills import ManualBill, normalize_bill
+
+bill = ManualBill.model_validate_json('''{
+  "period_start": "2026-06-01",
+  "period_end_exclusive": "2026-07-01",
+  "usage": "8.5",
+  "usage_unit": "ccf",
+  "water_charge": "45.12",
+  "currency": "USD"
+}''')
+result = normalize_bill(bill)
+print(result.model_dump_json(indent=2))
+```
+
+The result preserves the entry and reports billing days, total US gallons and US gallons/day as six-decimal strings. Calendar subtraction handles leap years without timezone assumptions; periods must cover 1–366 days. Usage must be non-negative and at most 1,000,000 normalized US gallons, with up to six input decimal places. Decimal arithmetic uses a local 40-digit context and half-up output rounding; daily volume is calculated before rounding the total.
+
+Optional `water_charge` and `sewer_charge` accept non-negative amounts up to 1,000,000 with at most two decimal places. Charges require an explicit `currency: "USD"`; currency conversion, credits and other currencies are not supported. Missing charges stay unknown. A water/sewer subtotal is returned only when both line items are supplied, including explicit zero amounts; it is not a verified invoice total or a utility tariff. The illustrative demo rate is never applied to these entries.
+
+Results disclose `source: "manual_entry"`, `evidence_level: "bill_only"`, and limited confidence for diagnostic conclusions. Values are unverified. One bill does not establish a usage trend, precise leak timing or a fixture diagnosis, and no leak score, tariff or savings prediction is produced. No account number, address, original document or free-text bill content is collected by this contract.
+
+Conversions use the [NIST Handbook 44 unit definitions](https://www.nist.gov/system/files/documents/2024/01/14/NIST%20HB%2044%202024%20Appendix%20C%20General%20Tables%20of%20Units%20of%20Measurement.pdf): 1 US liquid gallon = 231 cubic inches = 3.785411784 liters, and 1 cubic foot = 1728 cubic inches. [EPA defines CCF as 100 cubic feet](https://www.epa.gov/watersense/understanding-your-water-bill); the implementation uses the exact ratio `172800 / 231` gallons per CCF rather than rounding the factor to 748. The supported unit labels do not imply that a utility's bill itself has this precision.
+
+Run the bill-domain checks without credentials or a listening server:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bills.py -v
+```
+
 ## Preparing meter sequences
 
 `createMeterWindows(dataset.readings)` produces seven non-overlapping 96-reading windows by default. Optional `windowSize` and `stride` arguments allow shorter or overlapping sequences. Incomplete tails are dropped, and missing, duplicate, or out-of-order intervals and invalid flow rates are rejected. Window timestamps identify the first and last included readings.
