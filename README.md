@@ -24,7 +24,7 @@ The four scenario buttons update the usage summary, chart, anomaly state, explan
 
 The chart shows the final day's 96 readings. Amber bars mark simulator-defined anomalous intervals; the expandable table provides interval volumes and excess usage.
 
-All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The side panel connects a live text assistant to synthetic-weather, illustrative-utility, savings and goal-proposal MCP tools when the backend is configured. Agent and manual proposals use the same session and require a separate explicit approval. The chart and PyTorch inference are not connected to chat yet. A PyTorch autoencoder, training commands and local FastAPI inference are implemented separately; bill uploads, image analysis and voice interaction remain unimplemented. The landing-page preview is illustrative and is separate from the generated demo dashboard.
+All meter readings and weather context are **synthetic**. Dashboard anomaly flags are injected by the simulator, not predicted by a trained model. The side panel connects a live text assistant to selected meter/weather, illustrative-utility, savings and goal-proposal MCP tools when the backend is configured. With a frozen detector configured, chat can also request an experimental PyTorch anomaly check on the selected day. This is separate from the chart's simulator labels and does not prove a physical leak. Agent and manual proposals use the same session and require a separate explicit approval. Bill uploads, image analysis and voice interaction remain unimplemented. The landing-page preview is illustrative and is separate from the generated demo dashboard.
 
 ## Water-data model
 
@@ -243,7 +243,9 @@ pnpm data:demo --check
 
 The TypeScript check compares all four snapshot scenarios and rounded daily/baseline totals with the dashboard generator. Python checks cover strict snapshot validation, units/provenance, copy isolation and an undefined percentage when the baseline is zero.
 
-In-process hosts may pass `demo_meter=DemoMeterStore()` and a validated `demo_scenario` to `create_server`, rather than an experiment dataset path. In this mode, `get_meter_summary`, `get_meter_series`, and `get_weather_context` take no model-supplied arguments and read the same host-selected scenario. The meter reads still require `meter:read`, and weather requires `weather:read`. Invalid or ambiguous bindings are rejected. MCP checks cover these bindings, read-only annotations and scope denial. This mode does not grant anomaly inference or goal approval.
+In-process hosts may pass `demo_meter=DemoMeterStore()` and a validated `demo_scenario` to `create_server`, rather than an experiment dataset path. In this mode, `get_meter_summary`, `get_meter_series`, and `get_weather_context` take no model-supplied arguments and read the same host-selected scenario. The meter reads still require `meter:read`, and weather requires `weather:read`. Invalid or ambiguous bindings are rejected. MCP checks cover these bindings, read-only annotations and scope denial. Bindings alone do not grant anomaly inference or goal approval.
+
+With both `meter:read` and `anomaly:read`, the selected-demo `detect_water_anomaly` tool also takes no arguments. It feeds only the snapshot's final-day GPM values and neutral window metadata into the frozen model; the model cannot choose readings, a threshold, a path or a different scenario. Results add synthetic-source disclosure, snapshot SHA-256 and UTC boundaries to the existing score, threshold, model version and training-data disclosure. The legacy `is_leak` field is a daily threshold flag, not proof of a physical leak or a fixture diagnosis. Scores are not probabilities, and an unflagged day does not rule out a leak. The model is trained on synthetic data and is not field-validated. Direct frozen-model and MCP predictions are compared for all four demo scenarios; this is integration coverage, not a new accuracy evaluation.
 
 ### Utility estimates
 
@@ -326,9 +328,11 @@ AQUAMIND_AGENT_ENABLED=1 PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_m
 AQUAMIND_API_URL=http://127.0.0.1:8000 pnpm --filter web dev --hostname 127.0.0.1
 ```
 
+To enable model checks in chat, also set `AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1` on the backend command after creating the frozen artifact described above. FastAPI loads the model once and shares the same instance and inference lock with the agent's MCP tools, including approval follow-ups. No fitting, calibration, threshold changes or per-turn model reloads occur. An absent or invalid artifact leaves meter/weather/utility/goal chat usable without advertising the anomaly tool; an inference failure returns a tool error without fabricated scores. New API credentials are not required. Stop both local servers after testing.
+
 `AQUAMIND_API_URL` is a server-only backend address, not an API key. The Next.js relay exposes only the session, agent-turn/continuation, goal-proposal, goal-read and approval endpoints. It forwards JSON and the bearer credential, omits browser cookies and limits streamed bodies to 16 KiB for new agent turns or 1 KiB for other requests. Both agent routes use 135/150-second relay/browser deadlines, allowing the backend's bounded stage to finish; other relay requests retain a ten-second deadline. All responses are non-cacheable. The OpenAI key is loaded only by Python, never sent to the browser.
 
-Session credentials remain in memory and authorization headers, never URLs, cookies or browser storage. Reloading starts fresh. A 401 clears the expired session and its displayed proposals/goals; a new user action can create another session. Concurrent actions are blocked, and paid questions are never retried automatically. Missing dependencies, invalid responses, busy/budget outcomes and unconfirmed requests are surfaced without fabricated answers. These are local, session-only flows, not multi-worker production deployment or an end-to-end agent evaluation. Agent anomaly inference, general conversation history and durable state remain outstanding.
+Session credentials remain in memory and authorization headers, never URLs, cookies or browser storage. Reloading starts fresh. A 401 clears the expired session and its displayed proposals/goals; a new user action can create another session. Concurrent actions are blocked, and paid questions are never retried automatically. Missing dependencies, invalid responses, busy/budget outcomes and unconfirmed requests are surfaced without fabricated answers. These are local, session-only flows, not multi-worker production deployment or an end-to-end agent evaluation. General conversation history, durable state and multimodal inputs remain outstanding.
 
 ## Checks
 
@@ -412,7 +416,7 @@ Automated checks use the real SDK with a simulated HTTP transport and real in-pr
 
 ## Session-bound agent API
 
-`POST /v1/agent/turn` accepts `{"text":"your water question"}` with an optional `scenario_id`, and requires the bearer credential from `POST /v1/sessions`. The model, tool names, scopes, approval store and budgets are chosen by the host, never by request fields. A turn can use synthetic weather, illustrative utility calculations and `set_conservation_goal`. Selecting a demo scenario additionally enables scoped meter reads using the dashboard snapshot above; anomaly inference is not enabled in this host yet. The session credential is never included in the model input or tool arguments.
+`POST /v1/agent/turn` accepts `{"text":"your water question"}` with an optional `scenario_id`, and requires the bearer credential from `POST /v1/sessions`. The model, tool names, scopes, approval store and budgets are chosen by the host, never by request fields. A turn can use synthetic weather, illustrative utility calculations and `set_conservation_goal`. Selecting a demo scenario additionally enables scoped meter reads using the dashboard snapshot above, plus the bound anomaly tool when a frozen model is loaded. Unselected turns never receive anomaly access. The session credential is never included in the model input or tool arguments.
 
 For example, `{"text":"How does this day compare with the baseline?","scenario_id":"overnight-leak"}` selects the dashboard's fixed seed-42 household. The only supported selections are `normal`, `overnight-leak`, `running-toilet`, and `irrigation-after-rain`. In this mode, `get_meter_summary`, `get_meter_series`, and `get_weather_context` take no model-supplied arguments: the host binds all three to the same scenario for the entire turn and any approval continuation. A new question can choose a different scenario. Omitted/null selection retains the previous utility/weather/goal-only behavior. The browser client now sends its selected scenario for every question, and continuation requests still contain only the proposal ID.
 
@@ -453,3 +457,11 @@ PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.agent_smoke --with-continuation
 ```
 
 `evals/baselines/agent-continuation-smoke-v1.json` records the verified continuation run and source hashes. Decisions in this harness come from the trusted test host, not human browser clicks. These narrow checks are not a new agent benchmark or a measured scenario pass rate. API tests separately cover forged decisions, read-only enforcement, all four resolved statuses, shared budgets, cached failures, interrupted requests and context invalidation.
+
+To additionally check live-model calls to both the anomaly tool and meter summary for overnight and normal demo days:
+
+```sh
+AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.agent_smoke --with-anomaly --output evals/reports/agent-anomaly-smoke.json
+```
+
+This explicitly paid smoke run checks model readiness before provider work and cleans up its session, provider client and API lifespan without opening a listening port. Automated checks require successful tool execution and a final answer; they do not grade full diagnostic quality or establish new ML accuracy, latency or agent pass-rate metrics. Review the saved answers and limitations alongside the deterministic integration tests. `--with-continuation` may also be added within the existing per-session stage budget.

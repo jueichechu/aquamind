@@ -26,6 +26,7 @@ const toolLabels: Record<string, string> = {
   estimate_water_cost: "Water-cost calculation", estimate_conservation_savings: "Savings calculation",
   set_conservation_goal: "Goal proposal",
   get_meter_summary: "Synthetic meter summary", get_meter_series: "Synthetic meter readings",
+  detect_water_anomaly: "Experimental anomaly check",
 };
 
 export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
@@ -102,7 +103,7 @@ export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
   return <section aria-labelledby="assistant-heading" className="min-w-0 self-start rounded-2xl border border-white/10 bg-[#0a1521] p-5">
     <p className="text-xs text-cyan-200">AI text assistant · local demo</p>
     <h2 id="assistant-heading" className="mt-2 text-lg font-semibold">Ask AquaMind</h2>
-    <p className="mt-2 text-sm leading-6 text-slate-300">Explore the selected synthetic meter readings and weather, demo rates, savings, or a daily goal. Meter evidence describes usage; it is not a model diagnosis.</p>
+    <p className="mt-2 text-sm leading-6 text-slate-300">Explore the selected synthetic meter readings and weather, demo rates, savings, or a daily goal. Model findings are experimental and do not prove a physical leak.</p>
     <p className="mt-3 rounded-lg border border-cyan-300/15 bg-cyan-300/5 p-3 text-sm text-cyan-100">Selected scenario: {SCENARIOS[scenarioId].title}</p>
     <p className="mt-2 text-xs leading-5 text-slate-400">New questions stand on their own and use the scenario selected when sent. Earlier replies and goal follow-ups keep their original scenario. Questions and requested synthetic evidence go to OpenAI; avoid personal information.</p>
 

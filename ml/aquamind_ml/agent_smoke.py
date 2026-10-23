@@ -17,6 +17,9 @@ from .api import create_app
 UTILITY_QUESTION = ('Estimate the water-only cost of 1,000 gallons using the demo rate. '
                     'Use the utility tool and explain whether this is my actual utility tariff.')
 GOAL_QUESTION = 'Propose a daily conservation goal of 150 gallons. Do not approve or execute it.'
+ANOMALY_QUESTION = ('Use the anomaly tool and meter summary for the selected synthetic day. '
+                    'Explain the daily flag, score and threshold, and compare total gallons with the baseline. '
+                    'Explain the limits of this experimental model; do not diagnose a fixture.')
 
 
 def main():
@@ -24,6 +27,8 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--with-continuation', action='store_true',
                         help='Also check rejected/approved follow-ups; makes additional paid requests')
+    parser.add_argument('--with-anomaly', action='store_true',
+                        help='Also check two selected demo days; requires AQUAMIND_DETECTOR_PATH and makes paid requests')
     args = parser.parse_args()
     load_dotenv(ENV_FILE, override=False)
     if not all(os.environ.get(name, '').strip() for name in ('OPENAI_API_KEY', 'OPENAI_MODEL')):
@@ -31,6 +36,8 @@ def main():
     os.environ['AQUAMIND_AGENT_ENABLED'] = '1'  # Opt in for this smoke process only.
     checks, turns = {}, []
     with TestClient(create_app()) as client:
+        if args.with_anomaly and client.get('/ready').status_code != 200:
+            parser.error('Configure AQUAMIND_DETECTOR_PATH with an available frozen detector before this check')
         token = client.post('/v1/sessions').json()['session_token']
         headers = {'Authorization': 'Bearer ' + token}
 
@@ -80,19 +87,30 @@ def main():
                 cached = client.post('/v1/agent/continue', headers=headers, json={'approval_id': proposed_id}).json()
                 checks['cached_followup_without_new_attempt'] = (cached.get('answer') == approved.get('answer') and
                     cached.get('model_trace') == approved.get('model_trace') and client.app.state.agent_host._total == before)
+            if args.with_anomaly:
+                for scenario in ('overnight-leak', 'normal'):
+                    outcome = agent_request('anomaly_' + scenario, '/v1/agent/turn',
+                                            {'text': ANOMALY_QUESTION, 'scenario_id': scenario})
+                    checks[scenario + '_answer'] = outcome.get('status') == 'answer'
+                    for name in ('detect_water_anomaly', 'get_meter_summary'):
+                        checks[scenario + '_' + name] = any(item['tool_name'] == name and
+                            item['status'] == 'success' for item in outcome.get('tool_trace', []))
         finally:
             client.delete('/v1/session', headers=headers)
     sources = ('agent.py', 'agent_http.py', 'agent_tools.py', 'agent_smoke.py', 'api.py',
-               'sessions.py', 'mcp_server.py', 'approvals.py')
+               'sessions.py', 'mcp_server.py', 'approvals.py', 'demo_meter.py')
     report = {'schema_version': 2, 'with_continuation': args.with_continuation,
+              'with_anomaly': args.with_anomaly,
               'recorded_at_utc': datetime.now(timezone.utc).isoformat(),
               'transport': 'local FastAPI ASGI with live OpenAI Responses and in-process MCP',
               'source_sha256': {name: sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
                                 for name in sources},
-              'questions': {'utility': UTILITY_QUESTION, 'goal': GOAL_QUESTION},
+              'questions': {'utility': UTILITY_QUESTION, 'goal': GOAL_QUESTION,
+                            **({'anomaly': ANOMALY_QUESTION} if args.with_anomaly else {})},
               'checks': checks, 'passed': all(checks.values()), 'turns': turns,
               'limitations': ['Development smoke checks, not an agent benchmark or pass-rate estimate.',
-                              'Illustrative utility data; no meter, bill, image or voice inputs.',
+                              ('Synthetic meter and experimental anomaly checks; no bill, image or voice inputs.'
+                               if args.with_anomaly else 'Illustrative utility data; no meter, bill, image or voice inputs.'),
                               'ASGI test client; no browser, public network or production deployment.',
                               'Text checks are narrow assertions, not a full answer-quality grader.',
                               'Decisions are sent by the trusted test host, not human browser clicks.']}

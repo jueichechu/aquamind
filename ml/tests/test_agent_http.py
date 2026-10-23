@@ -1,10 +1,12 @@
 import asyncio
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 import json
 import os
 from pathlib import Path
+from threading import Lock
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import httpx
 import httpx2
@@ -184,6 +186,88 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
         evidence = json.loads(self.requests[-1]['input'][-1]['output'])['result']
         self.assertEqual(evidence['scenario_id'], 'normal')
         self.assertEqual((await self.continue_goal(headers, pending['approval_id'])).status_code, 404)
+
+    async def test_configured_anomaly_tool_binds_snapshot_and_continuation_without_new_writes(self):
+        detector = SimpleNamespace(manifest={'threshold': 2.0}, predict=Mock(return_value=[{
+            'score': 3.0, 'is_leak': True, 'model_version': 'test-frozen-detector'}]))
+        self.app.state.agent_host = AgentHost(self.provider, AgentConfig(model='test-model'), detector=detector)
+        token, headers = await self.session()
+        self.reply = lambda index: response([call('anomaly', 'detect_water_anomaly', '{}')]) \
+            if index == 1 else response([call('goal', 'set_conservation_goal', '{"request":{"daily_gallons":150}}')])
+        proposed = await self.http.post('/v1/agent/turn', headers=headers,
+            json={'text': 'Check the selected day and propose a goal.', 'scenario_id': 'overnight-leak'})
+        self.assertEqual(proposed.json()['status'], 'approval_required')
+        evidence = json.loads(self.requests[1]['input'][-1]['output'])['result']
+        self.assertEqual(evidence['scenario_id'], 'overnight-leak')
+        self.assertEqual(evidence['model_version'], 'test-frozen-detector')
+        self.assertIn('not proof of a physical leak', evidence['interpretation'])
+        window = detector.predict.call_args.args[0][0]
+        self.assertEqual(list(window.flow_rates_gpm), DemoMeterStore().series('overnight-leak').flow_rates_gpm)
+        self.assertEqual((window.seed, window.scenario_id, window.has_leak, window.has_anomaly),
+                         (0, 'normal', False, False))
+        pending = proposed.json()['pending_approval']
+        store = self.sessions.approvals(token)
+        self.assertIsNone(store.goal)
+        store.decide(pending['approval_id'], 'reject')
+        self.reply = lambda index: response([call('followup_anomaly', 'detect_water_anomaly', '{}')]) \
+            if index == 3 else response([message('Rejected. Experimental anomaly evidence only.')])
+        result = await self.continue_goal(headers, pending['approval_id'])
+        self.assertEqual(result.json()['status'], 'answer')
+        followup = json.loads(self.requests[-1]['input'][-1]['output'])['result']
+        self.assertEqual(followup['scenario_id'], 'overnight-leak')
+        self.assertEqual(detector.predict.call_count, 2)
+        self.assertNotIn('set_conservation_goal', [tool['name'] for tool in self.requests[-1]['tools']])
+        self.assertIsNone(store.goal)
+
+    async def test_anomaly_args_cannot_override_selection_and_absent_selection_cannot_enable_tool(self):
+        detector = SimpleNamespace(predict=Mock())
+        self.app.state.agent_host = AgentHost(self.provider, AgentConfig(model='test-model'), detector=detector)
+        _, headers = await self.session()
+        for selection, args, expected in (({}, '{}', 'tool_not_allowed'),
+                ({'scenario_id': 'normal'}, '{"request":{"flow_rates_gpm":[999]}}', 'invalid_arguments'),
+                ({'scenario_id': 'normal'}, '{"threshold":0,"scopes":["anomaly:read"]}', 'invalid_arguments')):
+            before = len(self.requests)
+            self.reply = lambda index: response([call('override', 'detect_water_anomaly', args)]) \
+                if index == before + 1 else response([message('No prediction confirmed.')])
+            result = await self.http.post('/v1/agent/turn', headers=headers,
+                json={'text': 'Check usage.', **selection})
+            self.assertEqual(result.json()['tool_trace'][0]['status'], 'error')
+            evidence = json.loads(self.requests[-1]['input'][-1]['output'])
+            self.assertEqual(evidence['error'], expected)
+        detector.predict.assert_not_called()
+
+    async def test_model_failure_reaches_agent_as_error_without_a_prediction(self):
+        detector = SimpleNamespace(predict=Mock(side_effect=RuntimeError('private detector detail')))
+        self.app.state.agent_host = AgentHost(self.provider, AgentConfig(model='test-model'), detector=detector)
+        _, headers = await self.session()
+        self.reply = lambda index: response([call('anomaly', 'detect_water_anomaly', '{}')]) \
+            if index == 1 else response([message('The anomaly check failed; no prediction was confirmed.')])
+        result = await self.http.post('/v1/agent/turn', headers=headers,
+            json={'text': 'Check usage.', 'scenario_id': 'normal'})
+        self.assertEqual(result.json()['tool_trace'][0]['status'], 'error')
+        evidence = json.loads(self.requests[-1]['input'][-1]['output'])
+        self.assertEqual(evidence, {'status': 'error', 'error': 'mcp_tool_error'})
+        self.assertNotIn('private detector detail', result.text)
+
+    async def test_app_lifespan_shares_loaded_detector_and_lock_with_agent(self):
+        detector, lock = object(), Lock()
+
+        @asynccontextmanager
+        async def provider_context(**kwargs):
+            yield self.provider
+
+        with patch.dict(os.environ, {'AQUAMIND_AGENT_ENABLED': '1', 'OPENAI_API_KEY': 'test-placeholder',
+                                     'OPENAI_MODEL': 'test-model'}), \
+                patch('aquamind_ml.api.FrozenDetector', return_value=detector) as load, \
+                patch('aquamind_ml.api.Lock', return_value=lock), \
+                patch('openai.AsyncOpenAI', side_effect=provider_context):
+            app = create_app(Path('host-selected-detector'))
+            async with app.router.lifespan_context(app):
+                self.assertIs(app.state.agent_host._detector, app.state.detector)
+                self.assertIs(app.state.agent_host._detector_lock, lock)
+                load.assert_called_once_with(Path('host-selected-detector'))
+        self.assertIsNone(app.state.agent_host)
+        self.assertIsNone(app.state.detector)
 
     async def test_invalid_bodies_and_disabled_host_never_call_provider(self):
         _, headers = await self.session()

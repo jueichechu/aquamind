@@ -90,7 +90,8 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
                         provider = await stack.enter_async_context(AsyncOpenAI(
                             api_key=key,
                             base_url='https://api.openai.com/v1', max_retries=0, timeout=30))
-                        app.state.agent_host = AgentHost(provider, config)
+                        app.state.agent_host = AgentHost(provider, config,
+                            detector=app.state.detector, detector_lock=lock)
                     except Exception as error:
                         logger.error(json.dumps({'event': 'agent_configuration_failed',
                                                  'error_type': type(error).__name__}))

@@ -6,6 +6,7 @@ from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 from datetime import datetime, timedelta
+from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -24,12 +25,29 @@ from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate
                       UtilityRate, estimate_cost, estimate_savings)
 
 
+class DemoAnomalyResponse(PredictionResponse):
+    source: Literal['synthetic'] = 'synthetic'
+    scenario_id: ScenarioId
+    dataset_sha256: str
+    start_timestamp: str
+    end_timestamp_exclusive: str
+    interpretation: Literal[
+        'Experimental daily-window threshold flag, not proof of a physical leak or a fixture diagnosis. '
+        'Score is not a probability; a negative flag does not rule out a leak.'
+    ] = ('Experimental daily-window threshold flag, not proof of a physical leak or a fixture diagnosis. '
+         'Score is not a probability; a negative flag does not rule out a leak.')
+
+
 def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset(),
                   meter_path: Path | None = None,
                   weather_path: Path = DEFAULT_WEATHER_PATH,
                   goal_approvals: GoalApprovals | None = None, *,
                   demo_meter: DemoMeterStore | None = None,
-                  demo_scenario: ScenarioId | None = None) -> MCPServer:
+                  demo_scenario: ScenarioId | None = None,
+                  detector: FrozenDetector | None = None,
+                  detector_lock: Lock | None = None) -> MCPServer:
+    if detector_path is not None and detector is not None:
+        raise ValueError('Choose one host-owned detector')
     if demo_scenario is not None:
         demo_scenario = WeatherQuery(scenario_id=demo_scenario).scenario_id
         if demo_meter is None or meter_path is not None:
@@ -59,13 +77,14 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
         except ValueError:
             raise ToolError("Goal proposal unavailable") from None
 
-    detector = None
+    if 'anomaly:read' not in granted_scopes:
+        detector = None
     if detector_path is not None and "anomaly:read" in granted_scopes:
         try:
             detector = FrozenDetector(detector_path)
         except Exception:
             logging.getLogger(__name__).error("AquaMind MCP detector unavailable")
-    lock = Lock()
+    lock = detector_lock if detector_lock is not None else Lock()
     weather = None
     if "weather:read" in granted_scopes:
         try:
@@ -200,9 +219,7 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
         server.tool(name='get_meter_series', annotations=read_only)(meter_series)
         server.tool(name='get_meter_summary', annotations=read_only)(meter_summary)
 
-    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
-                                           idempotentHint=True, openWorldHint=False))
-    def detect_water_anomaly(request: PredictionRequest) -> PredictionResponse:
+    def anomaly_prediction(request: PredictionRequest) -> PredictionResponse:
         """Classify one midnight-UTC day of 96 fifteen-minute flow readings in GPM.
 
         Requires anomaly:read. Uses a trained LSTM and frozen residual calibration.
@@ -223,6 +240,29 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
                                       request_id=str(uuid4()))
         except Exception:
             raise ToolError("Anomaly inference unavailable") from None
+
+    if demo_scenario is not None:
+        @server.tool(annotations=read_only)
+        def detect_water_anomaly() -> DemoAnomalyResponse:
+            """Score the host-selected synthetic demo day with the frozen LSTM detector.
+
+            Requires anomaly:read and meter:read. Uses the snapshot's 96 GPM values;
+            no caller-supplied readings, scenario, threshold or model path are accepted.
+            is_leak is an experimental threshold flag, not proof of a physical leak.
+            Trained on synthetic data; no real-world validation. Score is not a
+            probability; a negative flag does not rule out a leak. No state changes.
+            """
+            if 'anomaly:read' not in granted_scopes:
+                raise ToolError('Permission denied: anomaly:read required')
+            require_demo_meter()
+            series = demo_meter.series(demo_scenario)
+            prediction = anomaly_prediction(PredictionRequest(
+                start_timestamp=series.start_timestamp, flow_rates_gpm=series.flow_rates_gpm))
+            return DemoAnomalyResponse(**prediction.model_dump(), scenario_id=demo_scenario,
+                dataset_sha256=series.dataset_sha256, start_timestamp=series.start_timestamp,
+                end_timestamp_exclusive=series.end_timestamp_exclusive)
+    else:
+        server.tool(name='detect_water_anomaly', annotations=read_only)(anomaly_prediction)
 
     return server
 

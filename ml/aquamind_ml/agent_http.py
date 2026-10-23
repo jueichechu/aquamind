@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from threading import Lock
 from typing import TYPE_CHECKING, Literal
 from weakref import WeakKeyDictionary
 
@@ -18,6 +19,7 @@ from .weather import ScenarioId
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
     from .agent import AgentConfig, AgentPause, AgentResult
+    from .detector import FrozenDetector
 
 
 class AgentTurnRequest(BaseModel):
@@ -62,8 +64,11 @@ class AgentHost:
     """One event loop/process; fixed local-demo limits, never an approval authority."""
 
     def __init__(self, client: AsyncOpenAI, config: AgentConfig, *,
-                 demo_meter_path=DEFAULT_DEMO_METER_PATH):
+                 demo_meter_path=DEFAULT_DEMO_METER_PATH,
+                 detector: FrozenDetector | None = None, detector_lock: Lock | None = None):
         self.client, self.config = client, config
+        self._detector = detector
+        self._detector_lock = detector_lock if detector_lock is not None else Lock()
         self._active: set[GoalApprovals] = set()
         self._counts: WeakKeyDictionary[GoalApprovals, int] = WeakKeyDictionary()
         self._continuations: WeakKeyDictionary[GoalApprovals, _Continuation] = WeakKeyDictionary()
@@ -87,8 +92,12 @@ class AgentHost:
                 raise HTTPException(503, 'Demo meter unavailable')
             scopes.add('meter:read')
             allowed.update({'get_meter_summary', 'get_meter_series'})
+            if self._detector is not None:
+                scopes.add('anomaly:read')
+                allowed.add('detect_water_anomaly')
         return create_server(None, frozenset(scopes), goal_approvals=store,
-                             demo_meter=self._demo_meter, demo_scenario=scenario_id), frozenset(allowed)
+                             demo_meter=self._demo_meter, demo_scenario=scenario_id,
+                             detector=self._detector, detector_lock=self._detector_lock), frozenset(allowed)
 
     @asynccontextmanager
     async def _slot(self, store: GoalApprovals):
