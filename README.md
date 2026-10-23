@@ -44,7 +44,7 @@ These are transparent simulation assumptions, not a scientifically validated hou
 
 ## Manual bill normalization
 
-`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills. This is a domain-layer foundation; there is no bill HTTP endpoint, form, upload/OCR, agent tool or persistence yet. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
+`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills, now available through a session-gated HTTP endpoint. There is no bill form, upload/OCR, agent tool or persistence yet. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
 
 Example from a Python process started with `PYTHONPATH=ml`:
 
@@ -71,10 +71,17 @@ Results disclose `source: "manual_entry"`, `evidence_level: "bill_only"`, and li
 
 Conversions use the [NIST Handbook 44 unit definitions](https://www.nist.gov/system/files/documents/2024/01/14/NIST%20HB%2044%202024%20Appendix%20C%20General%20Tables%20of%20Units%20of%20Measurement.pdf): 1 US liquid gallon = 231 cubic inches = 3.785411784 liters, and 1 cubic foot = 1728 cubic inches. [EPA defines CCF as 100 cubic feet](https://www.epa.gov/watersense/understanding-your-water-bill); the implementation uses the exact ratio `172800 / 231` gallons per CCF rather than rounding the factor to 748. The supported unit labels do not imply that a utility's bill itself has this precision.
 
-Run the bill-domain checks without credentials or a listening server:
+`POST /v1/bills/normalize` accepts the flat JSON entry shown above with the bearer credential from `POST /v1/sessions`. It returns the normalized result plus a `request_id` matching the backend's `X-Request-ID` header. The request and response schemas are included in OpenAPI. The same-origin web relay exposes this route at `/api/aquamind/v1/bills/normalize`, forwarding the bearer credential without browser cookies.
+
+The endpoint requires `application/json` and limits the actual streamed UTF-8 body to 1 KiB. Duplicate keys, unknown fields, invalid dates, unsupported units and non-finite numbers are rejected. Missing, expired or revoked sessions return 401; oversized bodies return 413, unsupported content types 415, and invalid entries 422 with a generic error that does not echo the submitted values. Session liveness is checked again before returning a bill. Responses use `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`, and no cross-origin access is enabled.
+
+Normalization is stateless: the entered fields return only to the caller, with no bill history, changes to conservation goals, model calls or bill values in application request logs. It works with the agent and detector disabled and needs no new API keys. The frontend entry form and agent access remain separate increments.
+
+Run the bill checks without credentials or a listening server:
 
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bills.py -v
+PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_http.py -v
 ```
 
 ## Preparing meter sequences
@@ -365,7 +372,7 @@ AQUAMIND_API_URL=http://127.0.0.1:8000 pnpm --filter web dev --hostname 127.0.0.
 
 To enable model checks in chat, also set `AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1` on the backend command after creating the frozen artifact described above. FastAPI loads the model once and shares the same instance and inference lock with the agent's MCP tools, including approval follow-ups. No fitting, calibration, threshold changes or per-turn model reloads occur. An absent or invalid artifact leaves meter/weather/utility/goal chat usable without advertising the anomaly tool; an inference failure returns a tool error without fabricated scores. New API credentials are not required. Stop both local servers after testing.
 
-`AQUAMIND_API_URL` is a server-only backend address, not an API key. The Next.js relay exposes only the session, agent-turn/continuation, goal-proposal, goal-read and approval endpoints. It forwards JSON and the bearer credential, omits browser cookies and limits streamed bodies to 16 KiB for new agent turns or 1 KiB for other requests. Both agent routes use 135/150-second relay/browser deadlines, allowing the backend's bounded stage to finish; other relay requests retain a ten-second deadline. All responses are non-cacheable. The OpenAI key is loaded only by Python, never sent to the browser.
+`AQUAMIND_API_URL` is a server-only backend address, not an API key. The Next.js relay exposes only the session, agent-turn/continuation, goal-proposal, goal-read, approval and bill-normalization endpoints. It forwards JSON and the bearer credential, omits browser cookies and limits streamed bodies to 16 KiB for new agent turns or 1 KiB for other requests. Both agent routes use 135/150-second relay/browser deadlines, allowing the backend's bounded stage to finish; other relay requests retain a ten-second deadline. All responses are non-cacheable. The OpenAI key is loaded only by Python, never sent to the browser.
 
 Session credentials remain in memory and authorization headers, never URLs, cookies or browser storage. Reloading starts fresh. A 401 clears the expired session and its displayed proposals/goals; a new user action can create another session. Concurrent actions are blocked, and paid questions are never retried automatically. Missing dependencies, invalid responses, busy/budget outcomes and unconfirmed requests are surfaced without fabricated answers. These are local, session-only flows, not multi-worker production deployment or an end-to-end agent evaluation. General conversation history, durable state and multimodal inputs remain outstanding.
 
@@ -408,7 +415,7 @@ The AMPds2 workflow includes checksum verification, chronological 15-minute wind
 
 The initial hybrid MSE validation baseline flags every variant. Subsequent sustained-residual experiments improve discrimination; strict four-hour persistence reaches validation F1 0.8995 while meeting the declared reference alarm caps. Short low-flow patterns remain difficult. The strict-persistence detector is frozen and versioned. Its chronological hybrid holdout achieved F1 0.8988, but unmodified/demand-confounder alarm rates rose to 6.4%/11.0%; it remains experimental.
 
-The served detector and existing classification/latency benchmarks still use synthetic data. Bill-first inputs are planned under the expanded product scope and are not implemented yet.
+The served detector and existing classification/latency benchmarks still use synthetic data. Manual bill validation and stateless API normalization are available as described above; the bill entry form and agent integration remain outstanding under the expanded product scope.
 
 
 ## Agent MCP adapter

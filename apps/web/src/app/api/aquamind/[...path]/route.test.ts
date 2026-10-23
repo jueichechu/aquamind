@@ -73,4 +73,23 @@ describe("approval relay", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect((await GET(new Request("http://localhost/api"), context("v1/agent/continue"))).status).toBe(404);
   });
+  it("relays bill normalization with session auth, no cookies and the one-KiB limit", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ source: "manual_entry" }));
+    vi.stubGlobal("fetch", fetcher);
+    const body = JSON.stringify({ period_start: "2026-06-01", period_end_exclusive: "2026-07-01",
+      usage: "3000", usage_unit: "us_gallons" });
+    const response = await POST(new Request("http://localhost/api", { method: "POST", body,
+      headers: { authorization: "Bearer test-session", cookie: "private=value" } }), context("v1/bills/normalize"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8000/v1/bills/normalize");
+    expect(fetcher.mock.calls[0][1].body).toBe(body);
+    expect(fetcher.mock.calls[0][1].headers.get("authorization")).toBe("Bearer test-session");
+    expect(fetcher.mock.calls[0][1].headers.has("cookie")).toBe(false);
+    expect((await GET(new Request("http://localhost/api"), context("v1/bills/normalize"))).status).toBe(404);
+    expect((await POST(new Request("http://localhost/api", { method: "POST", body: "x".repeat(1025) }),
+      context("v1/bills/normalize"))).status).toBe(413);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
 });

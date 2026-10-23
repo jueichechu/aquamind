@@ -2,6 +2,7 @@
 const allowed = new Set([
   "POST v1/sessions", "DELETE v1/session", "GET v1/goals/current", "POST v1/goals/proposals",
   "POST v1/agent/turn", "POST v1/agent/continue",
+  "POST v1/bills/normalize",
 ]);
 
 class RequestTooLarge extends Error {}
