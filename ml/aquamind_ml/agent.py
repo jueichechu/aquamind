@@ -86,8 +86,8 @@ async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config
 
 
 async def continue_agent(pause: AgentPause, decision: GoalProposal, current_goal: GoalRequest | None,
-                       client: AsyncOpenAI, tools: McpAgentTools, config: AgentConfig, *,
-                       check_active: Callable[[], None]) -> AgentResult:
+                         client: AsyncOpenAI, tools: McpAgentTools, config: AgentConfig, *,
+                         check_active: Callable[[], None]) -> AgentResult:
     """Trusted host supplies the stored decision; the pending tool is never executed again."""
     if decision.status == 'approval_required' or 'set_conservation_goal' in tools.allowed_tools:
         raise ValueError('Continuation requires a resolved decision and read-only tools')

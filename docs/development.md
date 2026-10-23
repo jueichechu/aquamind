@@ -451,3 +451,5 @@ AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 PYTHONPATH=ml ml/.venv/bin/pytho
 ```
 
 This explicitly paid smoke run checks model readiness before provider work and cleans up its session, provider client and API lifespan without opening a listening port. Automated checks require successful tool execution and a final answer; they do not grade full diagnostic quality or establish new ML accuracy, latency or agent pass-rate metrics. Review the saved answers and limitations alongside the deterministic integration tests. `--with-continuation` may also be added within the existing per-session stage budget.
+
+Recorded smoke reports describe the source hashes at the time of their original runs. Internal naming refactors can change those hashes without changing runtime behavior. Generate a new report when validating current sources; do not edit historical reports to imply a new provider run.
