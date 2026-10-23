@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# Local development instructions and planning
+/AGENTS.md
+/.codex-local/
+
 # Node / Next.js
 node_modules/
 .pnpm-store/
