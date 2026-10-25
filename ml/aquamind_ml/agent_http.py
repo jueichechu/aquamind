@@ -4,17 +4,21 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
+import json
 from threading import Lock
 from typing import TYPE_CHECKING, Literal
 from weakref import WeakKeyDictionary
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .approvals import GoalApprovals, GoalProposal
 from .sessions import DemoSessions, require_session
 from .demo_meter import DEFAULT_DEMO_METER_PATH, DemoMeterStore
 from .weather import ScenarioId
+from .bills import ManualBill, normalize_bill
+from .bill_http import _unique_object, _invalid_constant
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
@@ -44,6 +48,26 @@ class AgentTurnResponse(BaseModel):
     model_trace: list[dict]
     tool_trace: list[dict]
     request_id: str
+
+
+class AgentBillRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    text: str = Field(min_length=1, max_length=8192)
+    bill: ManualBill
+    is_example: bool
+    share_with_ai: bool = Field(json_schema_extra={'const': True})
+
+    @field_validator('text')
+    @classmethod
+    def bounded_text(cls, value):
+        return AgentTurnRequest.bounded_text(value)
+
+    @field_validator('share_with_ai')
+    @classmethod
+    def explicit_sharing(cls, value):
+        if value is not True:
+            raise ValueError('Explicit sharing is required')
+        return value
 
 
 class AgentContinueRequest(BaseModel):
@@ -182,6 +206,29 @@ class AgentHost:
             finally:
                 entry.pause = None  # Drop original prompts and encrypted protocol items after the one attempt.
 
+    async def run_bill(self, text: str, bill: ManualBill, is_example: bool,
+                       store: GoalApprovals) -> AgentResult:
+        from mcp import Client
+        from .agent import run_agent
+        from .agent_tools import McpAgentTools
+        from .mcp_server import create_server
+
+        def check_active():
+            _ = store.goal
+
+        check_active()
+        previous = self._continuations.get(store)
+        if previous is not None and store.review(previous.approval_id).status == 'approval_required':
+            raise HTTPException(409, 'Resolve the pending goal before starting another question')
+        evidence = normalize_bill(bill)  # Never trust client-supplied normalized quantities.
+        async with self._slot(store):
+            self._continuations.pop(store, None)
+            async with Client(create_server(None, frozenset())) as mcp:
+                outcome = await run_agent(text, self.client, McpAgentTools(mcp), self.config,
+                    check_active=check_active, bill_context=evidence, is_example=is_example)
+            check_active()
+            return outcome
+
 
 def agent_router(sessions: DemoSessions) -> APIRouter:
     router = APIRouter()
@@ -195,8 +242,9 @@ def agent_router(sessions: DemoSessions) -> APIRouter:
                 raise HTTPException(413, 'Request too large')
             raw.extend(chunk)
         try:
-            return schema.model_validate_json(bytes(raw))
-        except ValidationError:
+            return schema.model_validate(json.loads(raw.decode('utf-8'), parse_float=Decimal,
+                parse_constant=_invalid_constant, object_pairs_hook=_unique_object))
+        except (ValueError, InvalidOperation, RecursionError):
             raise HTTPException(422, 'Invalid agent request') from None
 
     def host_for(request):
@@ -223,6 +271,20 @@ def agent_router(sessions: DemoSessions) -> APIRouter:
         host = host_for(request)
         body = await body_for(request, AgentContinueRequest, 1024)
         outcome = await host.continue_after_decision(body.approval_id, store)
+        return AgentTurnResponse(**outcome.public_dict(), request_id=request.state.request_id)
+
+    bill_schema = AgentBillRequest.model_json_schema()
+    # Inline the flat bill definition so its JSON pointer remains valid inside OpenAPI.
+    bill_schema['properties']['bill'] = bill_schema.pop('$defs')['ManualBill']
+
+    @router.post('/v1/agent/bill', response_model=AgentTurnResponse,
+        openapi_extra={'requestBody': {'required': True, 'content': {
+            'application/json': {'schema': bill_schema}}}})
+    async def bill_turn(request: Request):
+        store = require_session(sessions, request)
+        host = host_for(request)
+        body = await body_for(request, AgentBillRequest, 16384)
+        outcome = await host.run_bill(body.text, body.bill, body.is_example, store)
         return AgentTurnResponse(**outcome.public_dict(), request_id=request.state.request_id)
 
     return router
