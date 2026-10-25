@@ -20,7 +20,7 @@ These are transparent simulation assumptions, not a scientifically validated hou
 
 ## Manual bill normalization
 
-`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills, now available through a session-gated HTTP endpoint. There is no bill form, upload/OCR, agent tool or persistence yet. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
+`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills, available through a session-gated HTTP endpoint and the `/analyze` form. There is no upload/OCR, agent tool or persistence yet. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
 
 Example from a Python process started with `PYTHONPATH=ml`:
 
@@ -51,7 +51,7 @@ Conversions use the [NIST Handbook 44 unit definitions](https://www.nist.gov/sys
 
 The endpoint requires `application/json` and limits the actual streamed UTF-8 body to 1 KiB. Duplicate keys, unknown fields, invalid dates, unsupported units and non-finite numbers are rejected. Missing, expired or revoked sessions return 401; oversized bodies return 413, unsupported content types 415, and invalid entries 422 with a generic error that does not echo the submitted values. Session liveness is checked again before returning a bill. Responses use `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`, and no cross-origin access is enabled.
 
-Normalization is stateless: the entered fields return only to the caller, with no bill history, changes to conservation goals, model calls or bill values in application request logs. It works with the agent and detector disabled and needs no new API keys. The frontend entry form and agent access remain separate increments.
+Normalization is stateless: the entered fields return only to the caller, with no bill history, changes to conservation goals, model calls or bill values in application request logs. It works with the agent and detector disabled and needs no new API keys. The `/analyze` form uses its own mounted, in-memory session client and stays independent of the synthetic demo. It requires explicit units and exclusive end dates, preserves decimal strings, keeps missing charges distinct from zero, and requires explicit USD for entered charges. Result parsing checks the evidence labels and echoed bill against the submitted entry. Editing a field or clearing the form removes the previous result; invalid entries, expired sessions and unavailable services show bounded errors without echoing backend details or automatically retrying. No browser storage, assistant calls or model configuration is used for bill normalization. The page includes labeled example values that require an explicit calculation. Agent access remains outstanding.
 
 Run the bill checks without credentials or a listening server:
 
@@ -359,7 +359,7 @@ The AMPds2 workflow includes checksum verification, chronological 15-minute wind
 
 The initial hybrid MSE validation baseline flags every variant. Subsequent sustained-residual experiments improve discrimination; strict four-hour persistence reaches validation F1 0.8995 while meeting the declared reference alarm caps. Short low-flow patterns remain difficult. The strict-persistence detector is frozen and versioned. Its chronological hybrid holdout achieved F1 0.8988, but unmodified/demand-confounder alarm rates rose to 6.4%/11.0%; it remains experimental.
 
-The served detector and existing classification/latency benchmarks still use synthetic data. Manual bill validation and stateless API normalization are available as described above; the bill entry form and agent integration remain outstanding.
+The served detector and existing classification/latency benchmarks still use synthetic data. Manual bill validation and stateless API normalization are available as described above; the bill entry form is available at `/analyze`, while agent integration remains outstanding.
 
 
 ## Agent MCP adapter

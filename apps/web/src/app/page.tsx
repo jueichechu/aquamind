@@ -94,12 +94,12 @@ export default function Home() {
                 <ArrowRight />
               </Link>
 
-              <a
-                href="#capabilities"
+              <Link
+                href="/analyze"
                 className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] px-5 py-3.5 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
               >
-                Explore the system
-              </a>
+                Analyze a bill
+              </Link>
             </div>
 
             <div className="mt-10 flex flex-wrap gap-2">

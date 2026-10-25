@@ -6,7 +6,7 @@ export default function DemoPage() {
   return (
     <main className="min-h-screen bg-[#07111b] text-white">
       <div className="mx-auto min-h-screen max-w-[1600px] px-4 py-4 sm:px-6 lg:px-8">
-        <header className="flex h-16 items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 sm:px-5">
+        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3 sm:px-5">
           <Link
             href="/"
             className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
@@ -24,6 +24,9 @@ export default function DemoPage() {
           </Link>
 
           <div className="flex items-center gap-3">
+            <Link href="/analyze" className="rounded-lg px-2 py-2 text-sm text-cyan-200 hover:text-white focus-visible:outline-2 focus-visible:outline-cyan-300">
+              Analyze a bill
+            </Link>
             <span className="hidden rounded-full border border-white/8 px-3 py-1 text-xs text-slate-500 sm:inline-flex">
               Synthetic household
             </span>

@@ -1,5 +1,6 @@
 import { SCENARIOS } from "../../lib/water/scenarios";
 import type { ScenarioId } from "../../lib/water/types";
+import { createBillEntry, parseBillResult, type BillDraft, type ManualBill } from "../../lib/bills";
 
 export type Proposal = {
   approval_id: string;
@@ -16,7 +17,7 @@ export type AgentReply = {
 };
 
 export class SessionExpired extends Error {
-  constructor() { super("Your demo session expired. Send a new question or create a proposal to start again."); }
+  constructor() { super("Your session expired. Submit a new request to start again."); }
 }
 const invalid = () => new Error("The server returned an invalid response. No action is confirmed.");
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
@@ -55,7 +56,8 @@ export class DemoClient {
   #token: string | null = null;
   #busy = false;
 
-  private async call(path: string, body?: object): Promise<unknown> {
+  private async call(path: string, body?: object, forBill = false): Promise<unknown> {
+    const bill = forBill || path === "bills/normalize";
     let response: Response;
     try {
       response = await fetch(`/api/aquamind/v1/${path}`, {
@@ -64,20 +66,23 @@ export class DemoClient {
         body: body ? JSON.stringify(body) : undefined, cache: "no-store",
         signal: AbortSignal.timeout(path === "agent/turn" || path === "agent/continue" ? 150_000 : 15_000),
       });
-    } catch { throw new Error("The request could not be confirmed. It will not be retried automatically. Goals need your separate approval."); }
+    } catch { throw new Error(bill ? "Your bill result could not be confirmed. Check your connection and submit again." :
+      "The request could not be confirmed. It will not be retried automatically. Goals need your separate approval."); }
     if (response.status === 401) { this.#token = null; throw new SessionExpired(); }
     if (response.status === 429) throw new Error("The demo is busy or has reached its request limit. Please try later.");
     if (response.status === 409) throw new Error("A question is already being processed. Please wait before trying again.");
+    if (bill && response.status === 422) throw new Error("Check the billing dates, usage, units and charges. Usage must not exceed 1,000,000 US gallons after conversion.");
+    if (bill && !response.ok) throw new Error("Bill analysis is unavailable. Please try again later.");
     if (!response.ok) throw new Error("The request could not be confirmed. Check the backend connection. Goals need your separate approval.");
     try { return await response.json(); } catch { throw invalid(); }
   }
 
-  private async perform<T>(operation: () => Promise<T>): Promise<T> {
+  private async perform<T>(operation: () => Promise<T>, forBill = false): Promise<T> {
     if (this.#busy) throw new Error("Another request is still running. Please wait.");
     this.#busy = true;
     try {
       if (!this.#token) {
-        const session = await this.call("sessions", {});
+        const session = await this.call("sessions", {}, forBill);
         if (!record(session) || typeof session.session_token !== "string" ||
             !/^[A-Za-z0-9_-]{40,128}$/.test(session.session_token)) throw invalid();
         this.#token = session.session_token;
@@ -94,6 +99,12 @@ export class DemoClient {
     return this.perform(async () => parseAgentReply(await this.call("agent/turn", {
       text, ...(scenarioId === undefined ? {} : { scenario_id: scenarioId }),
     })));
+  }
+  normalizeBill(draft: BillDraft) {
+    let entry: ManualBill;
+    try { entry = createBillEntry(draft); }
+    catch (cause) { return Promise.reject(cause); }
+    return this.perform(async () => parseBillResult(await this.call("bills/normalize", entry), entry), true);
   }
   propose(daily_gallons: number) {
     if (!Number.isFinite(daily_gallons) || daily_gallons <= 0 || daily_gallons > 10000) return Promise.reject(new Error("Enter a daily goal between 0 and 10,000 gallons."));

@@ -2,7 +2,7 @@
 
 AquaMind is a household water-intelligence application built with Next.js, FastAPI, PyTorch and MCP. It combines water-usage evidence with an AI assistant to help users investigate unusual consumption and explore conservation actions.
 
-The current release is a local development application. It includes a synthetic household dashboard, an optional live text assistant, experimental anomaly detection and a manual-bill normalization API.
+The current release is a local development application. It includes a synthetic household dashboard, an optional live text assistant, experimental anomaly detection and manual bill analysis.
 
 ## Features
 
@@ -10,7 +10,7 @@ The current release is a local development application. It includes a synthetic 
 - Text assistant with scoped MCP tools for selected meter data, weather context, illustrative utility costs and anomaly inference.
 - Conservation-goal proposals with explicit approval or rejection before changes take effect.
 - PyTorch LSTM autoencoder training, frozen inference artifacts and a typed FastAPI prediction endpoint.
-- Manual-bill validation and normalization for US gallons, CCF, cubic meters and liters through the API.
+- Manual-bill entry at `/analyze`, with validation and normalization for US gallons, CCF, cubic meters and liters.
 
 ## Requirements
 
@@ -40,6 +40,15 @@ Create a Python environment and install the backend, MCP and agent dependencies:
 python3 -m venv ml/.venv
 ml/.venv/bin/python -m pip install -r ml/requirements-agent.txt
 ```
+
+For bill analysis without AI configuration, start the backend and frontend in separate terminals, then open `/analyze`:
+
+```sh
+AQUAMIND_AGENT_ENABLED=0 PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_ml.api:app --host 127.0.0.1 --port 8000 --workers 1
+AQUAMIND_API_URL=http://127.0.0.1:8000 pnpm --filter web dev --hostname 127.0.0.1
+```
+
+To also enable the text assistant, follow the configuration below.
 
 Create `.env.local` in the repository root, or edit the existing file, with:
 
@@ -127,7 +136,7 @@ docs/               Technical reference and dataset documentation
 
 Demo meter readings and weather are synthetic. Chart highlights come from simulator labels; model predictions are a separate experimental signal. Utility calculations use a disclosed illustrative rate, not a user's actual tariff. Anomaly scores do not prove a physical leak or identify its fixture.
 
-Manual bills are currently supported through a stateless API only. There is no bill-entry form, bill history, PDF/photo extraction, fixture-image analysis or voice interaction. Sessions and approved goals live in process memory; restarting the backend clears them. Use a single worker and loopback binding for local development; this configuration is not a public production deployment.
+The manual bill form sends structured fields to a stateless calculation API; bills are not sent to the assistant or saved as bill history. There is no bill history, PDF/photo extraction, fixture-image analysis or voice interaction. Sessions and approved goals live in process memory; restarting the backend clears them. Use a single worker and loopback binding for local development; this configuration is not a public production deployment.
 
 Assistant questions and requested evidence are sent to OpenAI. Avoid entering personal information into the demo. Application request logs omit prompts, bill values and credentials.
 
