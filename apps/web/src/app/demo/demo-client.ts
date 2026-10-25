@@ -57,20 +57,23 @@ export class DemoClient {
   #busy = false;
 
   private async call(path: string, body?: object, forBill = false): Promise<unknown> {
-    const bill = forBill || path === "bills/normalize";
+    const billQuestion = path === "agent/bill";
+    const bill = forBill || path === "bills/normalize" || billQuestion;
     let response: Response;
     try {
       response = await fetch(`/api/aquamind/v1/${path}`, {
         method: body ? "POST" : "GET", credentials: "omit",
         headers: { "Content-Type": "application/json", ...(this.#token ? { Authorization: `Bearer ${this.#token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined, cache: "no-store",
-        signal: AbortSignal.timeout(path === "agent/turn" || path === "agent/continue" ? 150_000 : 15_000),
+        signal: AbortSignal.timeout(path === "agent/turn" || path === "agent/continue" || billQuestion ? 150_000 : 15_000),
       });
-    } catch { throw new Error(bill ? "Your bill result could not be confirmed. Check your connection and submit again." :
+    } catch { throw new Error(billQuestion ? "Your bill question could not be confirmed. It will not be retried automatically." : bill ? "Your bill result could not be confirmed. Check your connection and submit again." :
       "The request could not be confirmed. It will not be retried automatically. Goals need your separate approval."); }
     if (response.status === 401) { this.#token = null; throw new SessionExpired(); }
     if (response.status === 429) throw new Error("The demo is busy or has reached its request limit. Please try later.");
     if (response.status === 409) throw new Error("A question is already being processed. Please wait before trying again.");
+    if (billQuestion && response.status === 422) throw new Error("Check your question and bill fields, and confirm sharing with OpenAI.");
+    if (billQuestion && !response.ok) throw new Error("The bill assistant is unavailable. Your bill calculation is still available.");
     if (bill && response.status === 422) throw new Error("Check the billing dates, usage, units and charges. Usage must not exceed 1,000,000 US gallons after conversion.");
     if (bill && !response.ok) throw new Error("Bill analysis is unavailable. Please try again later.");
     if (!response.ok) throw new Error("The request could not be confirmed. Check the backend connection. Goals need your separate approval.");
@@ -105,6 +108,21 @@ export class DemoClient {
     try { entry = createBillEntry(draft); }
     catch (cause) { return Promise.reject(cause); }
     return this.perform(async () => parseBillResult(await this.call("bills/normalize", entry), entry), true);
+  }
+  askBill(text: string, bill: ManualBill, isExample: boolean, shareWithAI: boolean) {
+    if (shareWithAI !== true) return Promise.reject(new Error("Confirm sharing this bill and question with OpenAI first."));
+    if (!text.trim() || new TextEncoder().encode(text).length > 8192) return Promise.reject(new Error("Enter a question of up to 8 KiB."));
+    if (typeof isExample !== "boolean") return Promise.reject(invalid());
+    let entry: ManualBill;
+    try { entry = createBillEntry({ ...bill, water_charge: bill.water_charge ?? "",
+      sewer_charge: bill.sewer_charge ?? "", currency: bill.currency ?? "" }); }
+    catch (cause) { return Promise.reject(cause); }
+    return this.perform(async () => {
+      const reply = parseAgentReply(await this.call("agent/bill", { text, bill: entry,
+        is_example: isExample, share_with_ai: true }));
+      if (reply.pending_approval !== null || reply.tool_trace.some((item) => item.status === "success")) throw invalid();
+      return reply;
+    }, true);
   }
   propose(daily_gallons: number) {
     if (!Number.isFinite(daily_gallons) || daily_gallons <= 0 || daily_gallons > 10000) return Promise.reject(new Error("Enter a daily goal between 0 and 10,000 gallons."));
