@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BILL_UNITS, type BillDraft, type BillResult } from "@/lib/bills";
 import { DemoClient } from "../demo/demo-client";
+import { BillAssistant } from "./bill-assistant";
 
 const empty: BillDraft = { period_start: "", period_end_exclusive: "", usage: "", usage_unit: "",
   water_charge: "", sewer_charge: "", currency: "" };
@@ -21,6 +22,7 @@ export function BillEntry() {
   const [isExample, setIsExample] = useState(false);
   const [result, setResult] = useState<{ value: BillResult; example: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [error, setError] = useState("");
   const working = useRef(false);
   const errorBox = useRef<HTMLParagraphElement>(null);
@@ -28,9 +30,11 @@ export function BillEntry() {
   useEffect(() => { if (error) errorBox.current?.focus(); }, [error]);
 
   function edit(key: keyof BillDraft, value: string) {
+    if (working.current) return;
     setDraft((previous) => ({ ...previous, [key]: value }));
     setResult(null); setError("");
   }
+  function assistantBusy(value: boolean) { working.current = value; setAsking(value); }
   function replace(values: BillDraft, exampleEntry: boolean) {
     if (working.current) return;
     setDraft({ ...values }); setIsExample(exampleEntry); setResult(null); setError("");
@@ -47,9 +51,9 @@ export function BillEntry() {
   return <div className="grid items-start gap-5 pb-8 lg:grid-cols-2">
     <section aria-labelledby="bill-entry-heading" className="min-w-0 rounded-2xl border border-white/10 bg-[#0a1521] p-5 sm:p-6">
       <h2 id="bill-entry-heading" className="text-lg font-semibold">Enter your bill</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-300">Only these fields go to AquaMind for this calculation. They are not sent to the AI assistant or saved as bill history. Leave out your name, address and account number.</p>
+      <p className="mt-2 text-sm leading-6 text-slate-300">Only these fields go to AquaMind for this calculation. They go to OpenAI only if you separately choose to ask about the calculated bill. There is no saved bill history. Leave out your name, address and account number.</p>
       <form method="post" autoComplete="off" className="mt-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-        <fieldset disabled={busy} className="min-w-0 space-y-5">
+        <fieldset disabled={busy || asking} className="min-w-0 space-y-5">
           <legend className="sr-only">Billing dates, usage and optional charges</legend>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className={secondary} onClick={() => replace(example, true)}>Use an example bill</button>
@@ -107,12 +111,13 @@ export function BillEntry() {
           </button>
         </fieldset>
       </form>
-      <p role="status" className="mt-3 text-sm text-slate-300">{busy ? "Calculating your bill usage…" : ""}</p>
+      <p role="status" className="mt-3 text-sm text-slate-300">{busy ? "Calculating your bill usage…" : result ?
+        `Bill calculated: ${result.value.billing_days} days, ${gallons(result.value.us_gallons_per_day)} US gallons per day.` : ""}</p>
       {error && <p ref={errorBox} tabIndex={-1} role="alert" className="mt-3 rounded-lg border border-amber-300/25 bg-amber-300/5 p-3 text-sm leading-6 text-amber-200 focus-visible:outline-2 focus-visible:outline-amber-300">{error}</p>}
       <p className="mt-4 text-xs leading-5 text-slate-400">Use Clear bill to remove your entry. Reloading starts a new calculation; there is no saved bill history or automatic submission.</p>
     </section>
 
-    <section aria-labelledby="bill-result-heading" aria-live="polite" aria-atomic="true" className="min-w-0 rounded-2xl border border-white/10 bg-[#0a1521] p-5 sm:p-6">
+    <section aria-labelledby="bill-result-heading" className="min-w-0 rounded-2xl border border-white/10 bg-[#0a1521] p-5 sm:p-6">
       <p className="text-xs font-medium text-cyan-200">Bill only · Limited evidence</p>
       <h2 id="bill-result-heading" className="mt-2 text-lg font-semibold">{result ? "Your bill breakdown" : "What this bill can tell you"}</h2>
       {result ? <>
@@ -139,6 +144,7 @@ export function BillEntry() {
           <li>No leak score, utility tariff or savings prediction is inferred.</li>
         </ul>
       </div>
+      {result && <BillAssistant client={client} bill={result.value.bill} isExample={result.example} onBusyChange={assistantBusy} />}
     </section>
   </div>;
 }

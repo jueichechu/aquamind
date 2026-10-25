@@ -10,7 +10,7 @@ The current release is a local development application. It includes a synthetic 
 - Text assistant with scoped MCP tools for selected meter data, weather context, illustrative utility costs and anomaly inference.
 - Conservation-goal proposals with explicit approval or rejection before changes take effect.
 - PyTorch LSTM autoencoder training, frozen inference artifacts and a typed FastAPI prediction endpoint.
-- Manual-bill entry at `/analyze`, with validation and normalization for US gallons, CCF, cubic meters and liters.
+- Manual-bill entry at `/analyze`, with validation and normalization for US gallons, CCF, cubic meters and liters, plus optional bill-only AI questions after explicit sharing consent.
 
 ## Requirements
 
@@ -77,7 +77,7 @@ AQUAMIND_AGENT_ENABLED=1 PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_m
 AQUAMIND_API_URL=http://127.0.0.1:8000 pnpm --filter web dev --hostname 127.0.0.1
 ```
 
-Visit `/demo` to use the assistant. Live assistant requests incur provider usage. Stop both servers with `Ctrl+C` when finished.
+Visit `/demo` to use the synthetic-meter assistant, or `/analyze` to calculate a bill and optionally ask about it. Bill questions require the sharing checkbox; calculating usage alone does not call OpenAI. Live assistant requests incur provider usage. Stop both servers with `Ctrl+C` when finished.
 
 The backend also runs without OpenAI configuration when `AQUAMIND_AGENT_ENABLED` is unset or `0`; session, goal and bill-normalization endpoints remain available. Anomaly inference additionally requires a frozen model artifact.
 
@@ -103,6 +103,7 @@ With the backend running, open [127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - `POST /v1/sessions`: create an ephemeral demo session.
 - `POST /v1/agent/turn`: submit a session-bound assistant question.
 - `POST /v1/bills/normalize`: validate and normalize one manually entered bill.
+- `POST /v1/agent/bill`: answer one bill-only question with explicit sharing consent.
 
 Goal review, approval decisions and assistant follow-ups are documented in the [development reference](docs/development.md). Session-bound endpoints require the bearer credential returned by session creation.
 
@@ -136,7 +137,7 @@ docs/               Technical reference and dataset documentation
 
 Demo meter readings and weather are synthetic. Chart highlights come from simulator labels; model predictions are a separate experimental signal. Utility calculations use a disclosed illustrative rate, not a user's actual tariff. Anomaly scores do not prove a physical leak or identify its fixture.
 
-The manual bill form sends structured fields to a stateless calculation API; bills are not sent to the assistant or saved as bill history. There is no bill history, PDF/photo extraction, fixture-image analysis or voice interaction. Sessions and approved goals live in process memory; restarting the backend clears them. Use a single worker and loopback binding for local development; this configuration is not a public production deployment.
+The manual bill form sends structured fields to a stateless calculation API. Only an explicitly submitted bill question shares the entered fields, normalized values and question with OpenAI; no bill history is saved. Bill-only questions have no meter, weather, tariff, anomaly or goal tools. There is no bill history, PDF/photo extraction, fixture-image analysis or voice interaction. Sessions and approved goals live in process memory; restarting the backend clears them. Use a single worker and loopback binding for local development; this configuration is not a public production deployment.
 
 Assistant questions and requested evidence are sent to OpenAI. Avoid entering personal information into the demo. Application request logs omit prompts, bill values and credentials.
 
