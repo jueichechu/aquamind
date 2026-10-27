@@ -229,9 +229,22 @@ class AgentHost:
             check_active()
             return outcome
 
+    async def import_bill(self, body, store: GoalApprovals):
+        from .bill_import import extract_report
+
+        _ = store.goal
+        previous = self._continuations.get(store)
+        if previous is not None and store.review(previous.approval_id).status == 'approval_required':
+            raise HTTPException(409, 'Resolve the pending goal before importing a report')
+        async with self._slot(store):
+            result = await extract_report(self.client, self.config, body)
+            _ = store.goal  # Never release extracted fields after revocation/expiry.
+            return result
+
 
 def agent_router(sessions: DemoSessions) -> APIRouter:
     router = APIRouter()
+    from .bill_import import BillImportRequest, BillImportResponse, IMPORT_BODY_LIMIT
 
     async def body_for(request: Request, schema, limit):
         if request.headers.get('content-type', '').split(';')[0].strip().lower() != 'application/json':
@@ -252,6 +265,17 @@ def agent_router(sessions: DemoSessions) -> APIRouter:
         if host is None:
             raise HTTPException(503, 'Agent unavailable')
         return host
+
+    @router.post('/v1/bills/import', response_model=BillImportResponse,
+        openapi_extra={'requestBody': {'required': True, 'content': {
+            'application/json': {'schema': BillImportRequest.model_json_schema()}}}})
+    async def import_bill(request: Request):
+        store = require_session(sessions, request)
+        host = host_for(request)
+        body = await body_for(request, BillImportRequest, IMPORT_BODY_LIMIT)
+        body.checked_data()
+        result = await host.import_bill(body, store)
+        return BillImportResponse(**result.model_dump(), request_id=request.state.request_id)
 
     @router.post('/v1/agent/turn', response_model=AgentTurnResponse)
     async def turn(request: Request):
