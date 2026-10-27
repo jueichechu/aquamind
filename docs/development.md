@@ -60,6 +60,54 @@ PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bills
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_http.py -v
 ```
 
+## Comparing manually entered bills in Python
+
+`BillComparisonRequest` and `compare_bills` in `ml/aquamind_ml/bills.py` compare
+2–12 supplied bills. This calculation is currently a Python interface; the HTTP
+API and `/analyze` still accept one bill at a time.
+
+```python
+from aquamind_ml.bills import BillComparisonRequest, compare_bills
+
+request = BillComparisonRequest.model_validate({"bills": [
+    {"period_start": "2026-02-01", "period_end_exclusive": "2026-03-01",
+     "usage": "2800", "usage_unit": "us_gallons"},
+    {"period_start": "2026-03-01", "period_end_exclusive": "2026-04-01",
+     "usage": "3100", "usage_unit": "us_gallons"},
+]})
+result = compare_bills(request)
+assert result.latest_percent_change == "0.00"  # Both periods average 100 gallons/day.
+```
+
+The contract sorts entries by start date without changing the caller's collection.
+Duplicate, corrected-but-overlapping and other overlapping periods are rejected;
+adjacent exclusive-end periods are valid. Gaps are allowed and reported as
+`gap_days`; no consumption is assumed for missing days. All entries must describe
+the same household and meter, an assumption the application cannot verify.
+
+The latest period is compared with **all supplied earlier periods**, excluding the
+latest from its own baseline. The baseline is the sum of earlier converted volumes
+divided by their total billing days, not an unweighted mean of bill averages or an
+average over the entire calendar span. The result includes chronologically ordered
+normalized entries, covered days, gap days and the baseline bill/day counts.
+Mixed supported units retain their original entries. Unknown charges and explicit
+zeros stay distinct; no cost trend, tariff or savings calculation is inferred.
+
+Calculations use unrounded converted volumes in an isolated 40-digit decimal
+context. Baseline and absolute daily change are rounded half-up to six decimal
+places; percentage change is rounded to two. Percentage is `null` when the exact
+baseline is zero, including zero-to-zero comparisons. A very small positive
+baseline can display as zero while still producing a defined percentage. These
+are comparisons of unverified aggregate averages, not a seasonal model, a judgment
+that usage is unusually high or evidence of a particular leak or fixture.
+The calculation has no model calls, persistence or changes to session goals.
+
+Run the comparison checks without credentials or a listening server:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_comparison.py -v
+```
+
 ## Preparing meter sequences
 
 `createMeterWindows(dataset.readings)` produces seven non-overlapping 96-reading windows by default. Optional `windowSize` and `stride` arguments allow shorter or overlapping sequences. Incomplete tails are dropped, and missing, duplicate, or out-of-order intervals and invalid flow rates are rejected. Window timestamps identify the first and last included readings.

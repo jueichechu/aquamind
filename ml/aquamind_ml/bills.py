@@ -110,3 +110,70 @@ def normalize_bill(bill: ManualBill) -> NormalizedBill:
             total_us_gallons=str(gallons.quantize(Decimal('0.000001'))),
             us_gallons_per_day=str((gallons / days).quantize(Decimal('0.000001'))),
             water_and_sewer_subtotal=subtotal)
+
+
+class BillComparisonRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True, frozen=True)
+    bills: tuple[ManualBill, ...] = Field(min_length=2, max_length=12)
+
+    @field_validator('bills', mode='before')
+    @classmethod
+    def json_array(cls, value):
+        return tuple(value) if type(value) is list else value
+
+    @field_validator('bills')
+    @classmethod
+    def ordered_non_overlapping(cls, value):
+        ordered = tuple(sorted(value, key=lambda bill: bill.period_start))
+        for previous, current in zip(ordered, ordered[1:]):
+            if previous.period_end_exclusive > current.period_start:
+                raise ValueError('Billing periods must not overlap or repeat')
+        return ordered
+
+
+class BillComparison(BaseModel):
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    source: Literal['manual_entry'] = 'manual_entry'
+    evidence_level: Literal['historical_bills'] = 'historical_bills'
+    confidence: Literal['limited'] = 'limited'
+    bills: tuple[NormalizedBill, ...]
+    covered_days: int
+    gap_days: int
+    baseline_bill_count: int
+    baseline_billing_days: int
+    baseline_us_gallons_per_day: str
+    latest_us_gallons_per_day_change: str
+    latest_percent_change: str | None
+    limitations: tuple[str, ...] = (
+        'Entries are unverified and assumed to describe the same household and meter.',
+        'The baseline includes only earlier supplied billing periods, not missing days.',
+        'Differences in daily averages do not establish seasonality, occupancy changes or a leak diagnosis.',
+        'No tariff, cost-change calculation or savings prediction is inferred; missing charges remain unknown.',
+    )
+
+
+def compare_bills(request: BillComparisonRequest) -> BillComparison:
+    """Compare the latest period with a day-weighted baseline of all supplied earlier bills."""
+    earlier, latest = request.bills[:-1], request.bills[-1]
+    baseline_days = sum((bill.period_end_exclusive - bill.period_start).days for bill in earlier)
+    latest_days = (latest.period_end_exclusive - latest.period_start).days
+    covered_days = baseline_days + latest_days
+    span_days = (latest.period_end_exclusive - earlier[0].period_start).days
+    with localcontext() as context:
+        context.prec = 40
+        context.rounding = ROUND_HALF_UP
+        baseline = sum((_us_gallons(bill.usage, bill.usage_unit) for bill in earlier), Decimal(0)) / baseline_days
+        current = _us_gallons(latest.usage, latest.usage_unit) / latest_days
+        change = current - baseline
+
+        def rounded(value, places):
+            result = value.quantize(Decimal(places))
+            return str(result.copy_abs() if result.is_zero() else result)
+
+        return BillComparison(
+            bills=tuple(normalize_bill(bill) for bill in request.bills),
+            covered_days=covered_days, gap_days=span_days - covered_days,
+            baseline_bill_count=len(earlier), baseline_billing_days=baseline_days,
+            baseline_us_gallons_per_day=rounded(baseline, '0.000001'),
+            latest_us_gallons_per_day_change=rounded(change, '0.000001'),
+            latest_percent_change=rounded(change / baseline * 100, '0.01') if baseline else None)
