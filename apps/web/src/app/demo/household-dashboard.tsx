@@ -12,7 +12,21 @@ export function HouseholdDashboard({ dataset, onScenarioChange }: {
 
   return (
     <>
-      <aside className="rounded-panel border border-rule bg-surface p-4 lg:min-h-[calc(100dvh-6.5rem)]">
+      <div className="min-w-0 lg:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-x-4">
+          <label htmlFor="demo-scenario" className="text-sm font-medium text-ink">Demo scenario</label>
+          <a href="#assistant-heading" className="ui-link text-accent">Ask AquaMind</a>
+        </div>
+        <select id="demo-scenario" name="scenario" className="ui-field" value={scenario.id}
+          onChange={(event) => {
+            const option = Object.values(SCENARIOS).find((item) => item.id === event.target.value);
+            if (option) onScenarioChange(option.id);
+          }}>
+          {Object.values(SCENARIOS).map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
+        </select>
+      </div>
+
+      <aside className="hidden rounded-panel border border-rule bg-surface p-4 lg:block lg:min-h-[calc(100dvh-6.5rem)]">
         <p className="text-sm font-medium text-ink">
           Demo scenarios
         </p>
@@ -59,7 +73,7 @@ export function HouseholdDashboard({ dataset, onScenarioChange }: {
           {scenario.title}: {summary.todayGallons.toFixed(1)} gallons.
           {summary.anomalyDetected ? ` ${summary.excessGallons.toFixed(1)} gallons of generated excess usage.` : " No generated anomaly."}
         </p>
-        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+        <div className="divide-y divide-rule overflow-hidden rounded-panel border border-rule bg-surface sm:grid sm:grid-cols-3 sm:divide-x sm:divide-y-0 lg:block lg:divide-x-0 lg:divide-y xl:grid xl:grid-cols-3 xl:divide-x xl:divide-y-0">
           <SummaryCard
             label="Simulated day"
             value={`${summary.todayGallons.toFixed(1)} gal`}
@@ -97,19 +111,14 @@ export function HouseholdDashboard({ dataset, onScenarioChange }: {
           <UsageChart readings={today} />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <InfoPanel
-            eyebrow="Synthetic scenario"
-            title={scenario.title}
-            body={`${scenario.description} ${scenario.id === "irrigation-after-rain" ? "This is a conservation opportunity, not evidence of a physical leak." : "Anomaly flags are defined by the simulator, not a machine-learning prediction."}`}
-          />
-
-          <InfoPanel
-            eyebrow="Synthetic environmental context"
-            title={`${scenario.rainfallInchesLast24h.toFixed(2)} in rain in the last 24 hours`}
-            body={`${scenario.temperatureF}°F. Weather context is part of this synthetic scenario. The usage baseline is the mean of the preceding six simulated days.`}
-          />
+        <div className="hidden lg:block">
+          <ScenarioContext dataset={dataset} />
         </div>
+        <details className="border-t border-rule pt-3 lg:hidden">
+          <summary className="ui-link cursor-pointer list-item text-accent">Scenario and weather details</summary>
+          <div className="mt-3"><ScenarioContext dataset={dataset} /></div>
+          <p className="mt-3 text-xs leading-5 text-muted">Seven synthetic days, seeded household events, and a rule-defined anomaly window. Select a scenario to compare usage in the same household.</p>
+        </details>
       </section>
     </>
   );
@@ -127,10 +136,10 @@ function SummaryCard({
   detail: string;
 }) {
   return (
-    <article className="rounded-panel border border-rule bg-surface p-4">
+    <article className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 px-4 py-3 sm:block sm:p-4 lg:grid lg:px-4 lg:py-3 xl:block xl:p-4">
       <p className="text-xs text-muted">{label}</p>
 
-      <div className="mt-2 flex flex-wrap items-baseline gap-1.5">
+      <div className="flex flex-wrap items-baseline gap-1.5 sm:mt-2 lg:mt-0 xl:mt-2">
         <span className="break-words text-2xl font-semibold tracking-tight text-ink tabular-nums">
           {value}
         </span>
@@ -138,9 +147,25 @@ function SummaryCard({
         {unit ? <span className="text-xs text-muted">{unit}</span> : null}
       </div>
 
-      <p className="mt-2 text-xs text-muted">{detail}</p>
+      <p className="col-span-2 text-xs text-muted sm:mt-2 lg:mt-0 xl:mt-2">{detail}</p>
     </article>
   );
+}
+
+function ScenarioContext({ dataset }: { dataset: HouseholdDataset }) {
+  const { scenario } = dataset;
+  return <div className="grid gap-4 md:grid-cols-2">
+    <InfoPanel
+      eyebrow="Synthetic scenario"
+      title={scenario.title}
+      body={`${scenario.description} ${scenario.id === "irrigation-after-rain" ? "This is a conservation opportunity, not evidence of a physical leak." : "Anomaly flags are defined by the simulator, not a machine-learning prediction."}`}
+    />
+    <InfoPanel
+      eyebrow="Synthetic environmental context"
+      title={`${scenario.rainfallInchesLast24h.toFixed(2)} in rain in the last 24 hours`}
+      body={`${scenario.temperatureF}°F. Weather context is part of this synthetic scenario. The usage baseline is the mean of the preceding six simulated days.`}
+    />
+  </div>;
 }
 
 function formatTime(timestamp: string) {
