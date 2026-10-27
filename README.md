@@ -2,7 +2,7 @@
 
 AquaMind is a household water-intelligence application built with Next.js, FastAPI, PyTorch and MCP. It combines water-usage evidence with an AI assistant to help users investigate unusual consumption and explore conservation actions.
 
-The current release is a local development application. It includes a synthetic household dashboard, an optional live text assistant, experimental anomaly detection and manual bill analysis.
+The current release is a local development application. It includes household bill analysis with optional document import, a synthetic household dashboard, an optional live text assistant and experimental anomaly detection.
 
 ## Features
 
@@ -11,13 +11,14 @@ The current release is a local development application. It includes a synthetic 
 - Conservation-goal proposals with explicit approval or rejection before changes take effect.
 - PyTorch LSTM autoencoder training, frozen inference artifacts and a typed FastAPI prediction endpoint.
 - Manual-bill entry at `/analyze`, with validation and normalization for US gallons, CCF, cubic meters and liters, plus optional bill-only AI questions after explicit sharing consent.
+- PDF and photo bill import from the homepage, with explicit OpenAI sharing consent, editable extracted fields and a required review before calculation. Supports PDF, PNG, JPEG and WebP reports up to 4 MiB.
 
 ## Requirements
 
 - Node.js 22 or newer.
 - pnpm 12.5.1, pinned in `package.json`.
 - Python 3.12 or newer for the backend and ML workflows.
-- An OpenAI API key and a Responses-compatible model for the optional text assistant.
+- An OpenAI API key and a Responses-compatible model for the optional text assistant. Report import also requires image/PDF input and structured-output support from that model.
 
 The synthetic dashboard runs without credentials or a database.
 
@@ -137,7 +138,7 @@ docs/               Technical reference and dataset documentation
 
 Demo meter readings and weather are synthetic. Chart highlights come from simulator labels; model predictions are a separate experimental signal. Utility calculations use a disclosed illustrative rate, not a user's actual tariff. Anomaly scores do not prove a physical leak or identify its fixture.
 
-The manual bill form sends structured fields to a stateless calculation API. Only an explicitly submitted bill question shares the entered fields, normalized values and question with OpenAI; no bill history is saved. Bill-only questions have no meter, weather, tariff, anomaly or goal tools. There is no bill history, PDF/photo extraction, fixture-image analysis or voice interaction. Sessions and approved goals live in process memory; restarting the backend clears them. Use a single worker and loopback binding for local development; this configuration is not a public production deployment.
+The manual bill form sends structured fields to a stateless calculation API without a model call. Document import separately requires consent to send the entire report to OpenAI; redact identifying details first. Extraction may make mistakes and its fields require review. Optional bill questions separately share the entered fields, normalized values and question with OpenAI. No bill history or uploaded files are saved by AquaMind; provider retention follows OpenAI's API data policy. Bill-only questions have no meter, weather, tariff, anomaly or goal tools. Fixture-image analysis and voice interaction are not implemented. Sessions and approved goals live in process memory; restarting the backend clears them. Use a single worker and loopback binding for local development; this configuration is not a public production deployment.
 
 Assistant questions and requested evidence are sent to OpenAI. Avoid entering personal information into the demo. Application request logs omit prompts, bill values and credentials.
 
