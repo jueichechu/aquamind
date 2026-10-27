@@ -16,6 +16,17 @@
   --color-selection: #224550;
   --radius-panel: 0.75rem;
   --radius-control: 0.5rem;
+  --color-paper: #f4f1ec;
+  --color-paper-sheet: #fdfbf7;
+  --color-paper-ink: #211e1c;
+  --color-paper-secondary: #57504b;
+  --color-paper-muted: #716962;
+  --color-paper-rule: #d7cfc5;
+  --color-paper-control: #91857a;
+  --color-terracotta: #b5523c;
+  --color-terracotta-soft: #f5e5dd;
+  --color-paper-warning: #854422;
+  --color-paper-warning-soft: #faeee0;
 }
 
 @theme inline {
@@ -24,8 +35,11 @@
 }
 
 :root {
+  --font-desk: "General Sans", var(--font-sans);
   --background: var(--color-canvas);
   --foreground: var(--color-ink);
   --control-height: 2.75rem;
   --duration-ui: 120ms;
+  --shadow-paper: 0 1px 2px #38291e12, 12px 20px 34px -18px #38291e38;
+  --shadow-paper-button: 0 2px 3px #38291e18;
 }

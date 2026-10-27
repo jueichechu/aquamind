@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "AquaMind",
   description:
-    "A multimodal water intelligence agent for understanding household water usage.",
+    "Understand your household water bill, review usage in everyday units and explore practical next steps.",
 };
 
 type RootLayoutProps = Readonly<{

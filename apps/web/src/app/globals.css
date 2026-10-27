@@ -1,5 +1,7 @@
+@import url("https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap");
 @import "tailwindcss";
 @import "./tokens.css";
+@import "./water-desk.css";
 
 :root {
   color-scheme: dark;
