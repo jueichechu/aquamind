@@ -1,8 +1,10 @@
-// Only these demo endpoints are exposed through the same-origin relay.
+import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
+
+// Only these application endpoints are exposed through the same-origin relay.
 const allowed = new Set([
   "POST v1/sessions", "DELETE v1/session", "GET v1/goals/current", "POST v1/goals/proposals",
   "POST v1/agent/turn", "POST v1/agent/continue", "POST v1/agent/bill",
-  "POST v1/bills/normalize",
+  "POST v1/bills/normalize", "POST v1/bills/import",
 ]);
 
 class RequestTooLarge extends Error {}
@@ -44,9 +46,10 @@ async function relay(request: Request, context: { params: Promise<{ path: string
   const base = process.env.AQUAMIND_API_URL;
   if (!base) return failure("Demo backend unavailable", 503);
   const newTurn = route === "v1/agent/turn" || route === "v1/agent/bill";
-  const agent = newTurn || route === "v1/agent/continue";
+  const importing = route === "v1/bills/import";
+  const agent = newTurn || route === "v1/agent/continue" || importing;
   try {
-    const body = request.method === "POST" ? await boundedBody(request, newTurn ? 16384 : 1024) : undefined;
+    const body = request.method === "POST" ? await boundedBody(request, importing ? IMPORT_BODY_LIMIT : newTurn ? 16384 : 1024) : undefined;
     const headers = new Headers({ "Content-Type": "application/json" });
     const auth = request.headers.get("authorization");
     if (auth) headers.set("Authorization", auth);

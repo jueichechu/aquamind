@@ -1,6 +1,7 @@
 import { SCENARIOS } from "../../lib/water/scenarios";
 import type { ScenarioId } from "../../lib/water/types";
 import { createBillEntry, parseBillResult, type BillDraft, type ManualBill } from "../../lib/bills";
+import { checkReportSize, encodeReport, parseImportedBill } from "../../lib/bill-import";
 
 export type Proposal = {
   approval_id: string;
@@ -57,21 +58,25 @@ export class DemoClient {
   #busy = false;
 
   private async call(path: string, body?: object, forBill = false): Promise<unknown> {
+    const importing = path === "bills/import";
     const billQuestion = path === "agent/bill";
-    const bill = forBill || path === "bills/normalize" || billQuestion;
+    const bill = forBill || path === "bills/normalize" || billQuestion || importing;
     let response: Response;
     try {
       response = await fetch(`/api/aquamind/v1/${path}`, {
         method: body ? "POST" : "GET", credentials: "omit",
         headers: { "Content-Type": "application/json", ...(this.#token ? { Authorization: `Bearer ${this.#token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined, cache: "no-store",
-        signal: AbortSignal.timeout(path === "agent/turn" || path === "agent/continue" || billQuestion ? 150_000 : 15_000),
+        signal: AbortSignal.timeout(path === "agent/turn" || path === "agent/continue" || billQuestion || importing ? 150_000 : 15_000),
       });
-    } catch { throw new Error(billQuestion ? "Your bill question could not be confirmed. It will not be retried automatically." : bill ? "Your bill result could not be confirmed. Check your connection and submit again." :
+    } catch { throw new Error(importing ? "Report extraction could not be confirmed. It will not be retried automatically; another attempt may incur another charge." : billQuestion ? "Your bill question could not be confirmed. It will not be retried automatically." : bill ? "Your bill result could not be confirmed. Check your connection and submit again." :
       "The request could not be confirmed. It will not be retried automatically. Goals need your separate approval."); }
     if (response.status === 401) { this.#token = null; throw new SessionExpired(); }
     if (response.status === 429) throw new Error("The demo is busy or has reached its request limit. Please try later.");
     if (response.status === 409) throw new Error("A question is already being processed. Please wait before trying again.");
+    if (importing && response.status === 413) throw new Error("Choose a report of up to 4 MiB.");
+    if (importing && response.status === 422) throw new Error("Check the report format and confirm sharing with OpenAI.");
+    if (importing && !response.ok) throw new Error("Report extraction is unavailable or could not be confirmed. There is no automatic retry; you can still enter your bill manually.");
     if (billQuestion && response.status === 422) throw new Error("Check your question and bill fields, and confirm sharing with OpenAI.");
     if (billQuestion && !response.ok) throw new Error("The bill assistant is unavailable. Your bill calculation is still available.");
     if (bill && response.status === 422) throw new Error("Check the billing dates, usage, units and charges. Usage must not exceed 1,000,000 US gallons after conversion.");
@@ -108,6 +113,14 @@ export class DemoClient {
     try { entry = createBillEntry(draft); }
     catch (cause) { return Promise.reject(cause); }
     return this.perform(async () => parseBillResult(await this.call("bills/normalize", entry), entry), true);
+  }
+  importBill(file: File, shareWithAI: boolean) {
+    if (shareWithAI !== true) return Promise.reject(new Error("Confirm sharing this report with OpenAI first."));
+    try { checkReportSize(file); } catch (cause) { return Promise.reject(cause); }
+    return this.perform(async () => {
+      const body = await encodeReport(file);
+      return parseImportedBill(await this.call("bills/import", body));
+    }, true);
   }
   askBill(text: string, bill: ManualBill, isExample: boolean, shareWithAI: boolean) {
     if (shareWithAI !== true) return Promise.reject(new Error("Confirm sharing this bill and question with OpenAI first."));
