@@ -12,7 +12,7 @@ export function DemoWorkspace({ initialDataset }: { initialDataset: HouseholdDat
     setDataset(generateHouseholdDataset(scenarioId));
   }
 
-  return <div className="grid gap-4 py-4 lg:grid-cols-[240px_minmax(0,1fr)_360px]">
+  return <div className="grid items-start gap-8 py-6 xl:grid-cols-[minmax(0,1fr)_340px]">
     <HouseholdDashboard dataset={dataset} onScenarioChange={selectScenario} />
     <WaterAssistant scenarioId={dataset.scenario.id} />
   </div>;

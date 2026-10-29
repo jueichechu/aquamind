@@ -100,7 +100,7 @@ export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
     });
   }
 
-  return <section aria-labelledby="assistant-heading" className="min-w-0 self-start rounded-panel border border-rule bg-surface p-5">
+  return <section aria-labelledby="assistant-heading" className="min-w-0 self-start border-t border-rule pt-6 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-6">
     <h2 id="assistant-heading" tabIndex={-1} className="scroll-mt-4 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">Ask AquaMind</h2>
     <p className="mt-1 text-xs text-muted">AI text assistant, local demo</p>
     <p className="mt-2 text-sm leading-6 text-ink-secondary">Explore the selected synthetic meter readings and weather, demo rates, savings, or a daily goal. Model findings are experimental and do not prove a physical leak.</p>
