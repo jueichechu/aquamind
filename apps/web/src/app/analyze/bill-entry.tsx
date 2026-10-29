@@ -30,8 +30,15 @@ export function BillEntry({ initialDraft, initialExample = false, imported = fal
   const [error, setError] = useState("");
   const working = useRef(false);
   const errorBox = useRef<HTMLParagraphElement>(null);
+  const resultHeading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => { if (error) errorBox.current?.focus(); }, [error]);
+  useEffect(() => {
+    if (result) {
+      resultHeading.current?.focus({ preventScroll: true });
+      resultHeading.current?.scrollIntoView({ block: "start", behavior: "instant" });
+    }
+  }, [result]);
   useEffect(() => { onBusyChange?.(busy || asking); return () => onBusyChange?.(false); }, [busy, asking, onBusyChange]);
 
   function edit(key: keyof BillDraft, value: string) {
@@ -58,7 +65,7 @@ export function BillEntry({ initialDraft, initialExample = false, imported = fal
 
   return <div className="grid items-start gap-5 pb-8 lg:grid-cols-2">
     <section aria-labelledby="bill-entry-heading" className="min-w-0 rounded-2xl border border-rule bg-surface p-5 sm:p-6">
-      <h2 id="bill-entry-heading" className="text-lg font-semibold">Enter your bill</h2>
+      <h2 id="bill-entry-heading" tabIndex={-1} className="scroll-mt-6 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">Enter your bill</h2>
       <p className="mt-2 text-sm leading-6 text-ink-secondary">Only these fields go to AquaMind for this calculation. Calculating does not send them to OpenAI. There is no saved bill history. Leave out your name, address and account number.</p>
       {fromImport && <p className="mt-3 text-sm leading-6 text-ink-secondary">These are AI-extracted candidates. Check every field against your original report and correct any mistakes.</p>}
       <form method="post" autoComplete="off" className="mt-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
@@ -129,10 +136,11 @@ export function BillEntry({ initialDraft, initialExample = false, imported = fal
 
     <section aria-labelledby="bill-result-heading" className="min-w-0 rounded-2xl border border-rule bg-surface p-5 sm:p-6">
       <p className="text-xs font-medium text-ink-secondary">Bill only; Limited evidence</p>
-      <h2 id="bill-result-heading" className="mt-2 text-lg font-semibold">{result ? "Your bill breakdown" : "What this bill can tell you"}</h2>
+      <h2 ref={resultHeading} id="bill-result-heading" tabIndex={-1} className="mt-2 scroll-mt-6 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">{result ? "Your bill breakdown" : "What this bill can tell you"}</h2>
       {result ? <>
         {result.example && <p className="mt-3 text-sm text-ink-secondary">Example calculation; not your household data</p>}
         <p className="mt-3 text-sm leading-6 text-ink-secondary">{result.value.bill.period_start} to {result.value.bill.period_end_exclusive} (exclusive); {result.value.billing_days} days</p>
+        <a href="#bill-entry-heading" className="ui-link mt-2 underline underline-offset-4">Edit bill details</a>
         <dl className="mt-5 space-y-4">
           <div className="rounded-xl border border-rule bg-accent-soft p-4">
             <dt className="text-sm text-ink">Average US gallons per day</dt>

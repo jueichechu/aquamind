@@ -6,8 +6,8 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
   return <main className="water-desk min-h-screen px-4 py-6 sm:px-6 lg:px-8">
     <div className="mx-auto max-w-5xl">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-rule pb-5">
-        <Link href="/" className="desk-wordmark rounded focus-visible:outline-2 focus-visible:outline-focus">AquaMind</Link>
-        <Link href="/demo" className="rounded text-sm text-ink-secondary hover:text-ink focus-visible:outline-2 focus-visible:outline-focus">Explore the synthetic demo</Link>
+        <Link href="/" className="ui-link desk-wordmark text-ink">AquaMind</Link>
+        <Link href="/demo" className="ui-link">Explore the synthetic demo</Link>
       </header>
       <div className="max-w-2xl py-8">
         <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Understand one water bill</h1>
