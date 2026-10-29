@@ -34,8 +34,8 @@ export function BillAssistant({ client, bill, isExample, onBusyChange }: {
 
   return <div className="mt-6 border-t border-rule pt-5">
     <h3 id="bill-assistant-heading" className="font-semibold">Ask about this bill (optional)</h3>
-    <p id="bill-sharing-help" className="mt-2 text-sm leading-6 text-ink-secondary">Only if you choose to ask, your question, entered bill fields and normalized values will be sent to OpenAI. Live answers use paid API requests. No document is uploaded with this question. Leave names, addresses and account numbers out of your question.</p>
-    <p className="mt-2 text-xs leading-5 text-muted">Each question stands alone and uses only this bill. Editing or clearing the bill removes the answer and resets sharing consent. No bill history is saved here; provider retention is governed by <a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer" className="underline decoration-control-border underline-offset-2 focus-visible:outline-2 focus-visible:outline-focus">OpenAI&apos;s API data policy</a>.</p>
+    <p id="bill-sharing-help" className="mt-2 text-sm leading-6 text-ink-secondary">Your bill details and question are sent to an external AI service. Leave out personal information.</p>
+    <p className="mt-2 text-xs leading-5 text-muted">Each question uses only this bill. Editing or clearing removes the answer and resets sharing consent. No bill history is saved. <a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer" className="underline decoration-control-border underline-offset-2 focus-visible:outline-2 focus-visible:outline-focus">Data policy</a></p>
     <form method="post" autoComplete="off" aria-labelledby="bill-assistant-heading" className="mt-4 space-y-4"
       onSubmit={(event) => { event.preventDefault(); void ask(); }}>
       <label htmlFor="bill-question" className="block text-sm text-ink-secondary">Your bill question
@@ -47,7 +47,7 @@ export function BillAssistant({ client, bill, isExample, onBusyChange }: {
       <label className="flex items-start gap-3 text-sm leading-6 text-ink-secondary">
         <input type="checkbox" required checked={share} disabled={busy} aria-describedby="bill-sharing-help"
           onChange={(event) => setShare(event.target.checked)} className="mt-1 size-4 shrink-0 accent-accent focus-visible:outline-2 focus-visible:outline-focus" />
-        Share this bill and my question with OpenAI for bill-only answers.
+        Allow AI to read this bill and answer my question.
       </label>
       <button disabled={busy || !share || !question.trim()}
         className="ui-button ui-button-secondary">

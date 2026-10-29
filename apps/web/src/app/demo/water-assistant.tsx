@@ -105,7 +105,7 @@ export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
     <p className="mt-1 text-xs text-muted">AI text assistant, local demo</p>
     <p className="mt-2 text-sm leading-6 text-ink-secondary">Explore the selected synthetic meter readings and weather, demo rates, savings, or a daily goal. Model findings are experimental and do not prove a physical leak.</p>
     <p className="mt-3 text-sm font-medium text-ink">Selected scenario: {SCENARIOS[scenarioId].title}</p>
-    <p className="mt-2 text-xs leading-5 text-muted">New questions stand on their own and use the scenario selected when sent. Earlier replies and goal follow-ups keep their original scenario. Questions and requested synthetic evidence go to OpenAI; avoid personal information.</p>
+    <p className="mt-2 text-xs leading-5 text-muted">New questions stand on their own and use the scenario selected when sent. Earlier replies and goal follow-ups keep their original scenario. Questions and requested synthetic evidence are sent to an external AI service; avoid personal information.</p>
 
     <div ref={log} role="log" aria-label="Conversation" aria-live="polite" className="mt-4 max-h-[420px] space-y-3 overflow-y-auto overscroll-contain">
       {messages.map((message, index) => <article key={index} className="border-b border-rule py-3 text-sm">

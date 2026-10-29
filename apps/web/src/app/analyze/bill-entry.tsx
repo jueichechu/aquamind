@@ -66,7 +66,7 @@ export function BillEntry({ initialDraft, initialExample = false, imported = fal
   return <div className="grid items-start gap-5 pb-8 lg:grid-cols-2">
     <section aria-labelledby="bill-entry-heading" className="min-w-0 rounded-2xl border border-rule bg-surface p-5 sm:p-6">
       <h2 id="bill-entry-heading" tabIndex={-1} className="scroll-mt-6 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">Enter your bill</h2>
-      <p className="mt-2 text-sm leading-6 text-ink-secondary">Only these fields go to AquaMind for this calculation. Calculating does not send them to OpenAI. There is no saved bill history. Leave out your name, address and account number.</p>
+      <p className="mt-2 text-sm leading-6 text-ink-secondary">Calculating uses only these fields and does not use AI. There is no saved bill history. Leave out personal details.</p>
       {fromImport && <p className="mt-3 text-sm leading-6 text-ink-secondary">These are AI-extracted candidates. Check every field against your original report and correct any mistakes.</p>}
       <form method="post" autoComplete="off" className="mt-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
         <fieldset disabled={busy || asking} className="min-w-0 space-y-5">

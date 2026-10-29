@@ -48,9 +48,9 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
     {!file ? <button type="button" className="desk-primary report-choose" disabled={locked} onClick={() => input.current?.click()}>Choose a report</button> :
       <form onSubmit={(event) => { event.preventDefault(); void extract(); }} className="report-consent">
         <p className="report-filename">{file.name}</p>
-        <p id="report-sharing" className="report-disclosure">The entire report, including any visible personal details, will be sent to OpenAI to read its fields. Redact names, addresses and account numbers first. This uses a paid API request. AquaMind does not save the file; <a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer">OpenAI&apos;s retention policy</a> applies.</p>
+        <p id="report-sharing" className="report-disclosure">An external AI service reads your report. Remove personal details first. <a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer">Data policy</a></p>
         <label className="report-share-label"><input type="checkbox" checked={share} disabled={busy} required aria-describedby="report-sharing"
-          onChange={(event) => setShare(event.target.checked)} />Share this report with OpenAI to extract fields for my review.</label>
+          onChange={(event) => setShare(event.target.checked)} />Allow AI to read this report.</label>
         <button className="desk-primary" disabled={!share || busy} aria-busy={busy}>{busy ? "Reading your report…" : "Read report"}</button>
         <button type="button" className="desk-text-button" disabled={busy} onClick={() => { choose(null); if (input.current) input.current.value = ""; }}>Remove report</button>
       </form>}

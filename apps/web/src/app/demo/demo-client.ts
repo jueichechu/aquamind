@@ -75,9 +75,9 @@ export class DemoClient {
     if (response.status === 429) throw new Error("The demo is busy or has reached its request limit. Please try later.");
     if (response.status === 409) throw new Error("A question is already being processed. Please wait before trying again.");
     if (importing && response.status === 413) throw new Error("Choose a report of up to 4 MiB.");
-    if (importing && response.status === 422) throw new Error("Check the report format and confirm sharing with OpenAI.");
+    if (importing && response.status === 422) throw new Error("Check the report format and confirm sharing with the AI service.");
     if (importing && !response.ok) throw new Error("Report extraction is unavailable or could not be confirmed. There is no automatic retry; you can still enter your bill manually.");
-    if (billQuestion && response.status === 422) throw new Error("Check your question and bill fields, and confirm sharing with OpenAI.");
+    if (billQuestion && response.status === 422) throw new Error("Check your question and bill fields, and confirm sharing with the AI service.");
     if (billQuestion && !response.ok) throw new Error("The bill assistant is unavailable. Your bill calculation is still available.");
     if (bill && response.status === 422) throw new Error("Check the billing dates, usage, units and charges. Usage must not exceed 1,000,000 US gallons after conversion.");
     if (bill && !response.ok) throw new Error("Bill analysis is unavailable. Please try again later.");
@@ -115,7 +115,7 @@ export class DemoClient {
     return this.perform(async () => parseBillResult(await this.call("bills/normalize", entry), entry), true);
   }
   importBill(file: File, shareWithAI: boolean) {
-    if (shareWithAI !== true) return Promise.reject(new Error("Confirm sharing this report with OpenAI first."));
+    if (shareWithAI !== true) return Promise.reject(new Error("Confirm sharing this report with the AI service first."));
     try { checkReportSize(file); } catch (cause) { return Promise.reject(cause); }
     return this.perform(async () => {
       const body = await encodeReport(file);
@@ -123,7 +123,7 @@ export class DemoClient {
     }, true);
   }
   askBill(text: string, bill: ManualBill, isExample: boolean, shareWithAI: boolean) {
-    if (shareWithAI !== true) return Promise.reject(new Error("Confirm sharing this bill and question with OpenAI first."));
+    if (shareWithAI !== true) return Promise.reject(new Error("Confirm sharing this bill and question with the AI service first."));
     if (!text.trim() || new TextEncoder().encode(text).length > 8192) return Promise.reject(new Error("Enter a question of up to 8 KiB."));
     if (typeof isExample !== "boolean") return Promise.reject(invalid());
     let entry: ManualBill;
