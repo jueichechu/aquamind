@@ -181,15 +181,18 @@ html:has(.water-desk) {
   font-weight: 700;
   letter-spacing: -0.05em;
 }
+.example-calculation {
+  position: relative;
+  padding-bottom: 64px;
+}
 .example-report-facts {
-  border-top: 1px solid var(--color-rule);
+  border-block: 1px solid var(--color-rule);
   font-size: 21px;
   letter-spacing: -0.035em;
 }
 .example-report-facts > div {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
   gap: 8px;
   padding-block: 20px;
 }
@@ -200,15 +203,27 @@ html:has(.water-desk) {
   color: var(--color-ink-secondary);
 }
 .example-report-facts dd {
+  grid-column: 3;
+  text-align: right;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .example-conversion {
-  height: 76px;
-  width: 32px;
-  margin: 0 auto;
+  position: absolute;
+  top: 32px;
+  bottom: 12px;
+  left: 50%;
+  width: 24px;
+  transform: translateX(-50%);
+  background: var(--color-surface);
+  pointer-events: none;
+}
+.example-conversion::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background-color: var(--color-terracotta);
-  mask: url("/icons/arrow-down.svg") center / 32px 76px no-repeat;
+  mask: url("/icons/arrow-down.svg") center / 100% 100% no-repeat;
 }
 .example-daily {
   font-size: clamp(22px, 2vw, 29px);
@@ -479,9 +494,6 @@ html:has(.water-desk) {
   }
   .example-report-facts {
     font-size: 18px;
-  }
-  .example-conversion {
-    height: 28px;
   }
   .example-daily span {
     font-size: 100px;

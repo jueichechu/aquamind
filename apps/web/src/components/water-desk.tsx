@@ -30,8 +30,10 @@ export function WaterDesk() {
       </div>
       <aside className="example-report" aria-labelledby="example-report-heading">
         <h2 id="example-report-heading">Example report</h2>
-        <dl className="example-report-facts"><div><dt>Water used</dt><dd>8.5 CCF</dd></div><div><dt>Billing period</dt><dd>30 days</dd></div></dl>
-        <div className="example-conversion" aria-hidden="true" />
+        <div className="example-calculation">
+          <dl className="example-report-facts"><div><dt>Water used</dt><dd>8.5 CCF</dd></div><div><dt>Billing period</dt><dd>30 days</dd></div></dl>
+          <div className="example-conversion" aria-hidden="true" />
+        </div>
         <p className="example-daily"><span>212</span>US gallons per day</p>
         <p className="example-average">Household daily average</p>
         <p className="example-method">Total water used divided by billing days.</p>
