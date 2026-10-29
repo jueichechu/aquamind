@@ -4,36 +4,21 @@ import { DemoWorkspace } from "./demo-workspace";
 
 export default function DemoPage() {
   return (
-    <main className="min-h-screen bg-[#07111b] text-white">
-      <div className="mx-auto min-h-screen max-w-[1600px] px-4 py-4 sm:px-6 lg:px-8">
-        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3 sm:px-5">
-          <Link
-            href="/"
-            className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-          >
-            <span className="flex size-8 items-center justify-center rounded-lg border border-cyan-300/15 bg-cyan-300/10 text-xs font-bold text-cyan-200">
-              A
-            </span>
-
-            <div>
-              <p className="text-sm font-semibold">AquaMind</p>
-              <p className="hidden text-[10px] text-slate-600 sm:block">
-                Demo workspace
-              </p>
-            </div>
-          </Link>
+    <main className="water-desk min-h-screen">
+      <div className="mx-auto min-h-screen max-w-[1376px] px-4 py-4 sm:px-6 lg:px-8">
+        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-rule py-3">
+          <div>
+            <Link href="/" className="ui-link desk-wordmark text-ink">AquaMind</Link>
+            <h1 className="text-sm text-muted">Synthetic meter demo</h1>
+          </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/analyze" className="rounded-lg px-2 py-2 text-sm text-cyan-200 hover:text-white focus-visible:outline-2 focus-visible:outline-cyan-300">
+            <Link href="/analyze" className="ui-link px-2">
               Analyze a bill
             </Link>
-            <span className="hidden rounded-full border border-white/8 px-3 py-1 text-xs text-slate-500 sm:inline-flex">
-              Synthetic household
-            </span>
-
             <Link
               href="/"
-              className="rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:text-white"
+              className="ui-link px-3"
             >
               Exit demo
             </Link>

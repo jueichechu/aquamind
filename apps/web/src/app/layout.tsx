@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "AquaMind",
   description:
-    "A multimodal water intelligence agent for understanding household water usage.",
+    "Understand your household water bill, review usage in everyday units and explore practical next steps.",
 };
 
 type RootLayoutProps = Readonly<{
@@ -27,6 +27,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">{children}</body>

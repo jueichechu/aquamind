@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { SCENARIOS, type ScenarioId } from "@/lib/water";
 import { DemoClient, SessionExpired, type AgentReply, type Proposal, type ToolEvent } from "./demo-client";
 
-const button = "rounded-lg border border-cyan-300/30 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-300/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:opacity-50";
+const button = "ui-button ui-button-secondary";
 type Message = { who: "You" | "AquaMind"; text: string; scenarioId: ScenarioId; tools?: ToolEvent[] };
 type Continuation = { approvalId: string; scenarioId: ScenarioId };
 const outcomeText: Record<Exclude<AgentReply["status"], "answer">, string> = {
@@ -100,52 +100,52 @@ export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
     });
   }
 
-  return <section aria-labelledby="assistant-heading" className="min-w-0 self-start rounded-2xl border border-white/10 bg-[#0a1521] p-5">
-    <p className="text-xs text-cyan-200">AI text assistant · local demo</p>
-    <h2 id="assistant-heading" className="mt-2 text-lg font-semibold">Ask AquaMind</h2>
-    <p className="mt-2 text-sm leading-6 text-slate-300">Explore the selected synthetic meter readings and weather, demo rates, savings, or a daily goal. Model findings are experimental and do not prove a physical leak.</p>
-    <p className="mt-3 rounded-lg border border-cyan-300/15 bg-cyan-300/5 p-3 text-sm text-cyan-100">Selected scenario: {SCENARIOS[scenarioId].title}</p>
-    <p className="mt-2 text-xs leading-5 text-slate-400">New questions stand on their own and use the scenario selected when sent. Earlier replies and goal follow-ups keep their original scenario. Questions and requested synthetic evidence go to OpenAI; avoid personal information.</p>
+  return <section aria-labelledby="assistant-heading" className="min-w-0 self-start border-t border-rule pt-6 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-6">
+    <h2 id="assistant-heading" tabIndex={-1} className="scroll-mt-4 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">Ask AquaMind</h2>
+    <p className="mt-1 text-xs text-muted">AI text assistant, local demo</p>
+    <p className="mt-2 text-sm leading-6 text-ink-secondary">Explore the selected synthetic meter readings and weather, demo rates, savings, or a daily goal. Model findings are experimental and do not prove a physical leak.</p>
+    <p className="mt-3 text-sm font-medium text-ink">Selected scenario: {SCENARIOS[scenarioId].title}</p>
+    <p className="mt-2 text-xs leading-5 text-muted">New questions stand on their own and use the scenario selected when sent. Earlier replies and goal follow-ups keep their original scenario. Questions and requested synthetic evidence are sent to an external AI service; avoid personal information.</p>
 
     <div ref={log} role="log" aria-label="Conversation" aria-live="polite" className="mt-4 max-h-[420px] space-y-3 overflow-y-auto overscroll-contain">
-      {messages.map((message, index) => <article key={index} className={`rounded-xl p-3 text-sm ${message.who === "You" ? "bg-white/5" : "border border-cyan-300/15 bg-cyan-300/5"}`}>
-        <p className="text-xs font-semibold text-cyan-100">{message.who}</p>
-        <p className="mt-1 text-xs text-slate-400">Scenario: {SCENARIOS[message.scenarioId].title}</p>
-        <p className="mt-2 whitespace-pre-wrap break-words leading-6 text-slate-200">{message.text}</p>
-        {!!message.tools?.length && <details className="mt-3 text-xs text-slate-300">
-          <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-cyan-300">Tools used</summary>
+      {messages.map((message, index) => <article key={index} className="border-b border-rule py-3 text-sm">
+        <p className="text-xs font-semibold text-accent">{message.who}</p>
+        <p className="mt-1 text-xs text-muted">Scenario: {SCENARIOS[message.scenarioId].title}</p>
+        <p className="mt-2 whitespace-pre-wrap break-words leading-6 text-ink">{message.text}</p>
+        {!!message.tools?.length && <details className="mt-3 text-xs text-ink-secondary">
+          <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-focus">Tools used</summary>
           <ul className="mt-2 space-y-1">{message.tools.map((tool, position) => <li key={position} className="break-words">
-            {toolLabels[tool.tool_name] ?? "Tool"}: {tool.status.replaceAll("_", " ")} · {Math.round(tool.elapsed_ms)} ms
+            {toolLabels[tool.tool_name] ?? "Tool"}: {tool.status.replaceAll("_", " ")}, {Math.round(tool.elapsed_ms)} ms
           </li>)}</ul>
         </details>}
       </article>)}
     </div>
     <form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); void send(); }}>
-      <label htmlFor="water-question" className="block text-sm text-slate-200">Your water question</label>
+      <label htmlFor="water-question" className="block text-sm text-ink">Your water question</label>
       <textarea id="water-question" required rows={3} maxLength={2000} value={question}
         placeholder="How does this day compare with the six-day baseline?" disabled={busy || pending}
         onChange={(event) => setQuestion(event.target.value)}
-        className="w-full resize-y rounded-lg border border-white/20 bg-[#07111b] px-3 py-2 text-sm text-white placeholder:text-slate-500 focus-visible:outline-2 focus-visible:outline-cyan-300" />
-      <button className={button} disabled={busy || pending || !question.trim()}>Send question</button>
+        className="ui-field resize-y" />
+      <button className="ui-button ui-button-primary" aria-busy={busy} disabled={busy || pending || !question.trim()}>Send question</button>
     </form>
 
-    <div className="mt-6 border-t border-white/10 pt-5">
+    <div className="mt-6 border-t border-rule pt-5">
       <h3 id="goal-heading" className="font-semibold">Conservation goal</h3>
-      <p className="mt-2 text-sm text-slate-200">Approved goal: {goal === null ? "None this session" : `${goal} gallons/day`}</p>
-      <p className="mt-2 text-xs leading-5 text-slate-400">Only your explicit approval applies a temporary goal. No household equipment is controlled.</p>
+      <p className="mt-2 text-sm text-ink">Approved goal: {goal === null ? "None this session" : `${goal} gallons/day`}</p>
+      <p className="mt-2 text-xs leading-5 text-muted">Only your explicit approval applies a temporary goal. No household equipment is controlled.</p>
       <details className="mt-3">
-        <summary className="cursor-pointer rounded text-sm text-cyan-100 focus-visible:outline-2 focus-visible:outline-cyan-300">Enter a goal manually</summary>
+        <summary className="cursor-pointer rounded text-sm text-accent focus-visible:outline-2 focus-visible:outline-focus">Enter a goal manually</summary>
         <form className="mt-3 space-y-3" onSubmit={(event) => { event.preventDefault();
           if (!pending) void perform(async () => { showProposal(await client.propose(Number(gallons))); setContinuation(null); setProposalScenario(null); }); }}>
-          <label htmlFor="daily-goal" className="block text-sm text-slate-200">Daily target (gallons)</label>
+          <label htmlFor="daily-goal" className="block text-sm text-ink">Daily target (gallons)</label>
           <input id="daily-goal" type="number" required min="0.01" max="10000" step="0.01" value={gallons}
             onChange={(event) => setGallons(event.target.value)} disabled={busy || pending}
-            className="w-full rounded-lg border border-white/20 bg-[#07111b] px-3 py-2 text-white focus-visible:outline-2 focus-visible:outline-cyan-300" />
+            className="ui-field" />
           <button className={button} disabled={busy || pending}>Review proposed goal</button>
         </form>
       </details>
-      {proposal && <div aria-labelledby="goal-heading" className="mt-4 rounded-xl border border-cyan-300/20 p-3 text-sm text-slate-200">
-        {proposalScenario && <p className="mb-2 text-xs text-slate-400">Proposed with: {SCENARIOS[proposalScenario].title}</p>}
+      {proposal && <div aria-labelledby="goal-heading" className="mt-4 border-t border-rule pt-4 text-sm text-ink">
+        {proposalScenario && <p className="mb-2 text-xs text-muted">Proposed with: {SCENARIOS[proposalScenario].title}</p>}
         <p className="font-medium">{proposal.summary}</p>
         <p className="mt-2">{proposalText[proposal.status]}</p>
         {pending && <div className="mt-3 flex flex-wrap gap-2">
@@ -160,10 +160,10 @@ export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
       {continuation && proposal && !pending && <button type="button" className={`${button} mt-3`} disabled={busy}
         onClick={() => void perform(async () => continueDecision(proposal, continuation.scenarioId))}>Check assistant follow-up</button>}
     </div>
-    <p role="status" aria-live="polite" aria-atomic="true" className="mt-3 text-sm text-slate-300">
+    <p role="status" aria-live="polite" aria-atomic="true" className="mt-3 text-sm text-ink-secondary">
       {busy ? "Waiting for AquaMind…" : pending ? "Review the pending proposal before sending another question." : proposal ? proposalText[proposal.status] : ""}
     </p>
-    {error && <p role="alert" className="mt-3 text-sm text-amber-200">{error}</p>}
-    <p className="mt-4 text-xs leading-5 text-slate-400">Session lasts up to one hour. Reloading starts fresh; goals and questions are not saved permanently.</p>
+    {error && <p role="alert" className="mt-3 text-sm text-warning">{error}</p>}
+    <p className="mt-4 text-xs leading-5 text-muted">Session lasts up to one hour. Reloading starts fresh; goals and questions are not saved permanently.</p>
   </section>;
 }

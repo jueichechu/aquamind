@@ -517,3 +517,48 @@ AQUAMIND_DETECTOR_PATH=ml/artifacts/detector-v1 PYTHONPATH=ml ml/.venv/bin/pytho
 This explicitly paid smoke run checks model readiness before provider work and cleans up its session, provider client and API lifespan without opening a listening port. Automated checks require successful tool execution and a final answer; they do not grade full diagnostic quality or establish new ML accuracy, latency or agent pass-rate metrics. Review the saved answers and limitations alongside the deterministic integration tests. `--with-continuation` may also be added within the existing per-session stage budget.
 
 Recorded smoke reports describe the source hashes at the time of their original runs. Internal naming refactors can change those hashes without changing runtime behavior. Generate a new report when validating current sources; do not edit historical reports to imply a new provider run.
+
+## Water report import
+
+The homepage accepts one PDF, PNG, JPEG or WebP water report of up to 4 MiB. Choosing a
+file does not transmit it. A separate, unchecked sharing control discloses that the
+entire report, including visible identifying details, goes to OpenAI for extraction.
+Users should redact personal details first. The application holds the selected file
+in memory and does not persist it, log its contents or use browser storage for it.
+The existing agent configuration enables import; `OPENAI_MODEL` must support image
+and PDF inputs and strict structured outputs. Manual calculation remains independent
+of provider configuration. Imported fields require human review before calculation.
+
+`POST /v1/bills/import` requires a bearer session and JSON containing only
+`media_type`, `data_base64` and strict `share_with_ai: true`. The API and same-origin
+relay enforce a streamed byte limit of `4 * ceil(4 MiB / 3) + 1024`; the API also
+checks decoded size and format signatures. This format check is not a malware scan
+or full document parser. Files are never served or executed by AquaMind. Large,
+complex, encrypted or unreadable PDFs may fail; use a short report or manual entry.
+The size limit does not guarantee a particular page count or provider input cost.
+
+The host makes one bounded Responses request with inline document content,
+`store=False`, no tools and SDK retries explicitly disabled. No Files API object is
+created. Session/global attempt budgets and concurrency checks are shared with agent
+questions, and a pending goal approval blocks import on that session. Session liveness
+is checked before provider work and before extracted values are released. Revocation
+cannot undo a request already sent to the provider. Errors never include document
+text or raw provider messages; uncertain paid requests are not automatically retried.
+Provider retention follows [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data);
+`store=False` is not a zero-retention guarantee.
+
+Extraction uses a strict, bounded field schema and a fixed set of warning codes,
+never free-form document text. Missing/ambiguous fields remain null; unknown charges
+stay separate from zero. Only USD charges and existing supported usage units can be
+returned. The model is instructed to disregard document instructions, distinguish
+consumption from meter readings and convert an inclusive billing end only when clear.
+These are candidate interpretations, not a correctness guarantee. The user checks
+and corrects the fields, explicitly confirms review, then submits through the existing
+authoritative normalization endpoint. Changing a value invalidates review and results.
+Selecting a new report clears the prior import review; bill-only questions still need
+their own sharing consent and do not re-upload the document.
+
+The public-facing bill pages use General Sans through Fontshare's hosted stylesheet,
+with the existing Geist font as fallback. Font files are not redistributed in this
+repository. Small report icons come from Phosphor; their MIT license is kept beside
+the assets in `apps/web/public/icons/LICENSE`.

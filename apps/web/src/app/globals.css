@@ -1,22 +1,28 @@
+@import url("https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap");
 @import "tailwindcss";
+@import "./tokens.css";
+@import "./water-desk.css";
 
 :root {
   color-scheme: dark;
-  --background: #07111b;
-  --foreground: #f8fafc;
+  scrollbar-color: var(--color-control-border) var(--color-canvas);
 }
 
 html {
   scroll-behavior: smooth;
 }
 
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 34rem),
-    radial-gradient(circle at top right, rgba(6, 182, 212, 0.07), transparent 30rem),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+  caret-color: var(--color-accent);
 }
 
 * {
@@ -29,7 +35,79 @@ a {
 }
 
 ::selection {
-  background: rgba(34, 211, 238, 0.25);
+  background: var(--color-selection);
+  color: var(--color-ink);
+}
+
+@layer base {
+  :where(h1, h2, h3) {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .ui-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-control border px-4 py-2 text-sm font-medium whitespace-nowrap;
+    min-height: var(--control-height);
+    cursor: pointer;
+    transition: background-color var(--duration-ui), border-color var(--duration-ui);
+  }
+
+  .ui-button-primary {
+    @apply border-accent bg-accent text-accent-ink;
+  }
+
+  .ui-button-secondary {
+    @apply border-control-border bg-transparent text-ink;
+  }
+
+  @media (hover: hover) {
+    .ui-button-primary:hover:not(:disabled) {
+      @apply border-focus bg-focus;
+    }
+
+    .ui-button-secondary:hover:not(:disabled) {
+      @apply bg-surface-raised;
+    }
+  }
+
+  .ui-button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .scenario-option:active {
+    @apply bg-surface-raised;
+  }
+
+  .ui-button:disabled,
+  .ui-field:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .ui-button[aria-busy="true"] {
+    cursor: progress;
+  }
+
+  .ui-field {
+    @apply w-full min-w-0 rounded-control border border-control-border bg-canvas px-3 py-2 text-base text-ink placeholder:text-muted;
+    min-height: var(--control-height);
+  }
+
+  .ui-field:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .ui-link {
+    @apply inline-flex items-center rounded-control text-sm font-medium text-ink-secondary hover:text-accent;
+    min-height: var(--control-height);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

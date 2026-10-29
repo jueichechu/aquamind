@@ -11,59 +11,52 @@ export function HouseholdDashboard({ dataset, onScenarioChange }: {
   const today = readings.slice(-96);
 
   return (
-    <>
-      <aside className="rounded-2xl border border-white/8 bg-white/[0.02] p-4 lg:min-h-[calc(100vh-6.5rem)]">
-        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-600">
+    <section className="min-w-0 space-y-6" aria-label="Household usage dashboard">
+      <div className="min-w-0 xl:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-x-4">
+          <label htmlFor="demo-scenario" className="text-sm font-medium text-ink">Demo scenario</label>
+          <a href="#assistant-heading" className="ui-link text-accent">Ask AquaMind</a>
+        </div>
+        <select id="demo-scenario" name="scenario" className="ui-field" value={scenario.id}
+          onChange={(event) => {
+            const option = Object.values(SCENARIOS).find((item) => item.id === event.target.value);
+            if (option) onScenarioChange(option.id);
+          }}>
+          {Object.values(SCENARIOS).map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
+        </select>
+      </div>
+
+      <div className="hidden xl:block">
+        <p className="text-sm font-medium text-ink">
           Demo scenarios
         </p>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 grid grid-cols-4 gap-2">
           {Object.values(SCENARIOS).map((option) => (
             <button
               key={option.id}
               type="button"
               onClick={() => onScenarioChange(option.id)}
               aria-pressed={option.id === scenario.id}
-              className={`w-full cursor-pointer rounded-xl border p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${
+              className={`scenario-option min-h-11 cursor-pointer rounded-control border p-3 text-left text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 option.id === scenario.id
-                  ? "border-cyan-300/15 bg-cyan-300/[0.06]"
-                  : "border-transparent hover:border-white/8 hover:bg-white/[0.025]"
+                  ? "border-accent bg-accent-soft"
+                  : "border-rule hover:bg-surface-raised"
               }`}
             >
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-medium text-slate-200">
-                  {option.title}
-                </p>
-
-                {option.id === scenario.id ? (
-                  <span className="mt-1 size-1.5 shrink-0 rounded-full bg-cyan-300" />
-                ) : null}
-              </div>
-
-              <p className="mt-2 text-xs leading-5 text-slate-600">
-                {option.description}
-              </p>
+              {option.title}
             </button>
           ))}
         </div>
 
-        <div className="mt-8 rounded-xl border border-dashed border-white/10 p-3">
-          <p className="text-xs font-medium text-slate-400">
-            Deterministic household
-          </p>
-          <p className="mt-1.5 text-xs leading-5 text-slate-600">
-            Seven synthetic days, seeded household events, and a rule-defined
-            anomaly window. Select a scenario to compare usage in the same household.
-          </p>
-        </div>
-      </aside>
+      </div>
 
-      <section className="min-w-0 space-y-4" aria-label="Household usage dashboard">
+      <div className="space-y-6">
         <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {scenario.title}: {summary.todayGallons.toFixed(1)} gallons.
           {summary.anomalyDetected ? ` ${summary.excessGallons.toFixed(1)} gallons of generated excess usage.` : " No generated anomaly."}
         </p>
-        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+        <div className="divide-y divide-rule border-y border-rule sm:grid sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <SummaryCard
             label="Simulated day"
             value={`${summary.todayGallons.toFixed(1)} gal`}
@@ -82,18 +75,18 @@ export function HouseholdDashboard({ dataset, onScenarioChange }: {
           />
         </div>
 
-        <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 sm:p-6">
+        <div className="rounded-panel border border-rule bg-surface p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-200">
+              <h2 className="text-sm font-medium text-ink">
                 Household water usage
-              </p>
-              <p className="mt-1 text-xs text-slate-600">
-                {today[0].timestamp.slice(0, 10)} · 15-minute intervals · synthetic data · UTC
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                {today[0].timestamp.slice(0, 10)}, 15-minute intervals, synthetic data, UTC
               </p>
             </div>
 
-            <span className={`w-fit rounded-full border px-3 py-1 text-xs ${summary.anomalyDetected ? "border-amber-300/10 bg-amber-300/[0.06] text-amber-200" : "border-cyan-300/10 bg-cyan-300/[0.06] text-cyan-200"}`}>
+            <span className={`w-fit rounded-full border px-3 py-1 text-xs ${summary.anomalyDetected ? "border-warning bg-warning-soft text-warning" : "border-rule bg-accent-soft text-accent"}`}>
               {summary.anomalyDetected ? "Rule-defined anomaly" : "Normal usage"}
             </span>
           </div>
@@ -101,21 +94,15 @@ export function HouseholdDashboard({ dataset, onScenarioChange }: {
           <UsageChart readings={today} />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <InfoPanel
-            eyebrow="Synthetic scenario"
-            title={scenario.title}
-            body={`${scenario.description} ${scenario.id === "irrigation-after-rain" ? "This is a conservation opportunity, not evidence of a physical leak." : "Anomaly flags are defined by the simulator, not a machine-learning prediction."}`}
-          />
-
-          <InfoPanel
-            eyebrow="Synthetic environmental context"
-            title={`${scenario.rainfallInchesLast24h.toFixed(2)} in rain in the last 24 hours`}
-            body={`${scenario.temperatureF}°F. Weather context is part of this synthetic scenario. The usage baseline is the mean of the preceding six simulated days.`}
-          />
+        <div className="hidden xl:block">
+          <ScenarioContext dataset={dataset} />
         </div>
-      </section>
-    </>
+        <details className="border-t border-rule pt-3 xl:hidden">
+          <summary className="ui-link cursor-pointer list-item text-accent">Scenario and weather details</summary>
+          <div className="mt-3"><ScenarioContext dataset={dataset} /></div>
+        </details>
+      </div>
+    </section>
   );
 }
 
@@ -131,20 +118,39 @@ function SummaryCard({
   detail: string;
 }) {
   return (
-    <article className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <p className="text-xs text-slate-600">{label}</p>
+    <article className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 py-3 sm:block sm:p-4">
+      <p className="text-xs text-muted">{label}</p>
 
-      <div className="mt-2 flex flex-wrap items-baseline gap-1.5">
-        <span className="break-words text-2xl font-semibold tracking-tight text-white">
+      <div className="flex flex-wrap items-baseline gap-1.5 sm:mt-2">
+        <span className="break-words text-2xl font-semibold tracking-tight text-ink tabular-nums">
           {value}
         </span>
 
-        {unit ? <span className="text-xs text-slate-600">{unit}</span> : null}
+        {unit ? <span className="text-xs text-muted">{unit}</span> : null}
       </div>
 
-      <p className="mt-2 text-xs text-slate-500">{detail}</p>
+      <p className="col-span-2 text-xs text-muted sm:mt-2">{detail}</p>
     </article>
   );
+}
+
+function ScenarioContext({ dataset }: { dataset: HouseholdDataset }) {
+  const { scenario } = dataset;
+  return <div className="space-y-4">
+    <div className="grid gap-6 md:grid-cols-2">
+      <InfoPanel
+        eyebrow="Synthetic scenario"
+        title={scenario.title}
+        body={`${scenario.description} ${scenario.id === "irrigation-after-rain" ? "This is a conservation opportunity, not evidence of a physical leak." : "Anomaly flags are defined by the simulator, not a machine-learning prediction."}`}
+      />
+      <InfoPanel
+        eyebrow="Synthetic environmental context"
+        title={`${scenario.rainfallInchesLast24h.toFixed(2)} in rain in the last 24 hours`}
+        body={`${scenario.temperatureF}°F. Weather context is part of this synthetic scenario. The usage baseline is the mean of the preceding six simulated days.`}
+      />
+    </div>
+    <p className="text-xs leading-5 text-muted">Seven synthetic days, seeded household events, and a rule-defined anomaly window. Select a scenario to compare usage in the same household.</p>
+  </div>;
 }
 
 function formatTime(timestamp: string) {
@@ -160,15 +166,15 @@ function UsageChart({ readings }: { readings: MeterReading[] }) {
 
   return (
     <figure className="mt-7">
-      <figcaption className="mb-3 text-xs text-slate-400">
-        Gallons per interval · scale 0–{maximum.toFixed(1)} gal
-        <span className="mt-1 block">Cyan: ordinary usage · Amber: rule-defined anomaly</span>
+      <figcaption className="mb-3 text-xs text-muted">
+        Gallons per interval, scale 0 to {maximum.toFixed(1)} gal
+        <span className="mt-1 block">Charcoal: ordinary usage. Terracotta: rule-defined anomaly.</span>
       </figcaption>
       <svg
         viewBox="0 0 960 240"
         role="img"
-        aria-label="96 meter intervals for the final simulated day; amber bars mark injected anomalies. Interval values are available below."
-        className="h-64 w-full rounded-xl border border-white/8 bg-[#07111b] p-3"
+        aria-label="96 meter intervals for the final simulated day; terracotta bars mark injected anomalies. Interval values are available below."
+        className="h-64 w-full"
         preserveAspectRatio="none"
       >
         {readings.map((reading, index) => {
@@ -180,25 +186,24 @@ function UsageChart({ readings }: { readings: MeterReading[] }) {
               y={240 - height}
               width={8}
               height={height}
-              fill={reading.isAnomaly ? "#fcd34d" : "#67e8f9"}
-              opacity={0.75}
+              fill={reading.isAnomaly ? "var(--color-chart-anomaly)" : "var(--color-chart-usage)"}
             >
               <title>{`${formatTime(reading.timestamp)} UTC: ${reading.gallons.toFixed(3)} gal${reading.isAnomaly ? " (generated anomaly)" : ""}`}</title>
             </rect>
           );
         })}
       </svg>
-      <div className="mt-2 flex justify-between text-[10px] text-slate-400">
+      <div className="mt-2 flex justify-between text-xs text-muted tabular-nums">
         <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span>
       </div>
-      <details className="mt-4 text-xs text-slate-400">
-        <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-cyan-300">View interval data (UTC)</summary>
+      <details className="mt-4 text-xs text-muted">
+        <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-focus">View interval data (UTC)</summary>
         <div className="mt-3 max-h-64 overflow-auto">
           <table className="w-full text-left tabular-nums">
             <caption className="sr-only">Synthetic meter readings for the final day</caption>
             <thead><tr><th scope="col">Time</th><th scope="col">Gallons</th><th scope="col">Excess</th><th scope="col">Anomaly</th></tr></thead>
             <tbody>{readings.map((reading) => (
-              <tr key={reading.timestamp} className="border-t border-white/8">
+              <tr key={reading.timestamp} className="border-t border-rule">
                 <th scope="row" className="py-2 font-normal">{formatTime(reading.timestamp)}</th>
                 <td>{reading.gallons.toFixed(3)}</td><td>{reading.excessGallons.toFixed(3)}</td><td>{reading.isAnomaly ? "Yes" : "No"}</td>
               </tr>
@@ -220,14 +225,11 @@ function InfoPanel({
   body: string;
 }) {
   return (
-    <article className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-600">
-        {eyebrow}
-      </p>
+    <article>
+      <h3 className="text-sm font-medium text-ink">{title}</h3>
 
-      <h2 className="mt-3 text-sm font-medium text-slate-200">{title}</h2>
-
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+      <p className="mt-2 text-sm leading-6 text-muted">{body}</p>
+      <p className="mt-3 text-xs text-muted">{eyebrow}</p>
     </article>
   );
 }

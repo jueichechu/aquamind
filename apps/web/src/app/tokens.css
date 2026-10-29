@@ -1,0 +1,47 @@
+@theme static {
+  --color-canvas: #0c151c;
+  --color-surface: #14222c;
+  --color-surface-raised: #1c2e39;
+  --color-ink: #edf4f5;
+  --color-ink-secondary: #c1d0d7;
+  --color-muted: #a0b4bf;
+  --color-rule: #374e5c;
+  --color-control-border: #718b9a;
+  --color-accent: #92d8e2;
+  --color-accent-ink: #092a33;
+  --color-accent-soft: #19323b;
+  --color-focus: #b6edf2;
+  --color-warning: #f2d095;
+  --color-warning-soft: #382f24;
+  --color-chart-usage: var(--color-accent);
+  --color-chart-anomaly: var(--color-warning);
+  --color-selection: #224550;
+  --radius-panel: 0.75rem;
+  --radius-control: 0.5rem;
+  --color-paper: #f4f1ec;
+  --color-paper-sheet: #fdfbf7;
+  --color-paper-ink: #211e1c;
+  --color-paper-secondary: #57504b;
+  --color-paper-muted: #716962;
+  --color-paper-rule: #d7cfc5;
+  --color-paper-control: #91857a;
+  --color-terracotta: #b5523c;
+  --color-terracotta-soft: #f5e5dd;
+  --color-paper-warning: #854422;
+  --color-paper-warning-soft: #faeee0;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), sans-serif;
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --font-desk: "General Sans", var(--font-sans);
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+  --control-height: 2.75rem;
+  --duration-ui: 120ms;
+  --shadow-paper: 0 1px 2px #38291e12, 12px 20px 34px -18px #38291e38;
+  --shadow-paper-button: 0 2px 3px #38291e18;
+}
