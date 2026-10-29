@@ -14,6 +14,8 @@
   --color-warning: var(--color-paper-warning);
   --color-warning-soft: var(--color-paper-warning-soft);
   --color-selection: var(--color-terracotta-soft);
+  --color-chart-usage: var(--color-paper-secondary);
+  --color-chart-anomaly: var(--color-terracotta);
   color-scheme: light;
   min-height: 100vh;
   background: var(--color-canvas);

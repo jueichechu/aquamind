@@ -13,6 +13,8 @@
   --color-focus: #b6edf2;
   --color-warning: #f2d095;
   --color-warning-soft: #382f24;
+  --color-chart-usage: var(--color-accent);
+  --color-chart-anomaly: var(--color-warning);
   --color-selection: #224550;
   --radius-panel: 0.75rem;
   --radius-control: 0.5rem;

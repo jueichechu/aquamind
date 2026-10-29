@@ -183,12 +183,12 @@ function UsageChart({ readings }: { readings: MeterReading[] }) {
     <figure className="mt-7">
       <figcaption className="mb-3 text-xs text-muted">
         Gallons per interval, scale 0 to {maximum.toFixed(1)} gal
-        <span className="mt-1 block">Cyan: ordinary usage. Amber: rule-defined anomaly.</span>
+        <span className="mt-1 block">Charcoal: ordinary usage. Terracotta: rule-defined anomaly.</span>
       </figcaption>
       <svg
         viewBox="0 0 960 240"
         role="img"
-        aria-label="96 meter intervals for the final simulated day; amber bars mark injected anomalies. Interval values are available below."
+        aria-label="96 meter intervals for the final simulated day; terracotta bars mark injected anomalies. Interval values are available below."
         className="h-64 w-full"
         preserveAspectRatio="none"
       >
@@ -201,7 +201,7 @@ function UsageChart({ readings }: { readings: MeterReading[] }) {
               y={240 - height}
               width={8}
               height={height}
-              fill={reading.isAnomaly ? "var(--color-warning)" : "var(--color-accent)"}
+              fill={reading.isAnomaly ? "var(--color-chart-anomaly)" : "var(--color-chart-usage)"}
             >
               <title>{`${formatTime(reading.timestamp)} UTC: ${reading.gallons.toFixed(3)} gal${reading.isAnomaly ? " (generated anomaly)" : ""}`}</title>
             </rect>
