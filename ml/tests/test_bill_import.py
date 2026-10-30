@@ -18,6 +18,8 @@ from aquamind_ml.bill_import import IMPORT_BODY_LIMIT, MAX_DOCUMENT_BYTES, IMPOR
 from aquamind_ml.sessions import DemoSessions
 from test_agent import message, response
 
+FIXTURES = Path(__file__).resolve().parents[2] / 'evals/fixtures/bill-import-review-v1.json'
+
 
 def report_payload(fields, warnings=()):
     return {'fields': fields, 'warnings': list(warnings), 'evidence': {
@@ -247,6 +249,60 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.requests, [])
         schema = self.app.openapi()['paths']['/v1/bills/import']['post']['requestBody']
         self.assertTrue(schema['content']['application/json']['schema']['properties']['share_with_ai']['const'])
+
+    def test_shared_review_fixtures_cover_units_formats_and_reading_types(self):
+        corpus = json.loads(FIXTURES.read_text())
+        self.assertEqual(corpus['schema_version'], 1)
+        self.assertIs(corpus['synthetic'], True)
+        cases = corpus['cases']
+        self.assertEqual(len({case['id'] for case in cases}), len(cases))
+        self.assertEqual({case['media_type'] for case in cases},
+                         {'application/pdf', 'image/png', 'image/jpeg', 'image/webp'})
+        self.assertEqual({case['extraction']['evidence']['reading_type'] for case in cases},
+                         {'actual', 'estimated', 'mixed', 'unknown'})
+        self.assertEqual({case['extraction']['fields']['usage_unit'] for case in cases} - {None},
+                         {'ccf', 'cubic_meters', 'liters', 'us_gallons'})
+        for case in cases:
+            with self.subTest(case=case['id']):
+                ExtractedReport.model_validate(case['extraction'])
+                if 'provider_output' in case:
+                    ExtractedReport.model_validate(case['provider_output'])
+
+    async def test_shared_review_fixtures_cross_import_and_normalization_endpoints(self):
+        # Signature probes exercise transport/validation, not real PDF/image decoding.
+        probes = {'application/pdf': b'%PDF-1.7\nSYNTHETIC_PRIVATE_SOURCE_CONTENT',
+                  'image/png': b'\x89PNG\r\n\x1a\nSYNTHETIC_PRIVATE_SOURCE_CONTENT',
+                  'image/jpeg': b'\xff\xd8\xffSYNTHETIC_PRIVATE_SOURCE_CONTENT',
+                  'image/webp': b'RIFF\x00\x00\x00\x00WEBPSYNTHETIC_PRIVATE_SOURCE_CONTENT'}
+        for case in json.loads(FIXTURES.read_text())['cases']:
+            with self.subTest(case=case['id']):
+                headers = await self.headers()
+                body = {'media_type': case['media_type'], 'share_with_ai': True,
+                        'data_base64': base64.b64encode(probes[case['media_type']]).decode()}
+                self.payload = case.get('provider_output', case['extraction'])
+                before = len(self.requests)
+                with self.assertLogs('aquamind.api', level='INFO') as logs:
+                    imported = await self.post(body, headers)
+                    self.assertEqual(imported.status_code, 200)
+                    expected = case['extraction'] | {'source': 'document_import', 'needs_review': True,
+                                                     'request_id': imported.headers['x-request-id']}
+                    self.assertEqual(imported.json(), expected)
+                    fields = imported.json()['fields']
+                    if case['review_edits'] or case['normalized'] is None:
+                        rejected = await self.http.post('/v1/bills/normalize', headers=headers, json=fields)
+                        self.assertEqual(rejected.status_code, 422)
+                    if case['normalized'] is not None:
+                        reviewed = fields | case['review_edits']
+                        normalized = await self.http.post('/v1/bills/normalize', headers=headers, json=reviewed)
+                        self.assertEqual(normalized.status_code, 200)
+                        self.assertEqual({key: normalized.json()[key] for key in case['normalized']},
+                                         case['normalized'])
+                        self.assertEqual(normalized.json()['source'], 'manual_entry')
+                        self.assertEqual(normalized.json()['evidence_level'], 'bill_only')
+                for private in ('SYNTHETIC_PRIVATE_SOURCE_CONTENT', body['data_base64'], headers['Authorization']):
+                    self.assertNotIn(private, str(logs.output))
+                # Normalization never makes another provider request.
+                self.assertEqual(len(self.requests), before + 1)
 
 
 if __name__ == '__main__':

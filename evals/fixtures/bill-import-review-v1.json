@@ -1,0 +1,311 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "scope": "Simulated extraction responses and reviewed normalization expectations, not real documents or an extraction accuracy benchmark.",
+  "cases": [
+    {
+      "id": "monthly-ccf-actual",
+      "description": "CCF consumption over 30 days; optional sewer charge is unknown.",
+      "media_type": "application/pdf",
+      "extraction": {
+        "fields": {"period_start": "2026-06-01", "period_end_exclusive": "2026-07-01", "usage": "8.5", "usage_unit": "ccf", "water_charge": "45.12", "sewer_charge": null, "currency": "USD"},
+        "warnings": [],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "actual",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "derived", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "printed", "page": 1},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "printed", "page": 1}
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": {"billing_days": 30, "total_us_gallons": "6358.441558", "us_gallons_per_day": "211.948052", "water_and_sewer_subtotal": null}
+    },
+    {
+      "id": "quarterly-cubic-meters-estimated",
+      "description": "Quarterly consumption with an explicitly estimated reading and two source pages.",
+      "media_type": "application/pdf",
+      "extraction": {
+        "fields": {"period_start": "2026-01-01", "period_end_exclusive": "2026-04-01", "usage": "27.3", "usage_unit": "cubic_meters", "water_charge": "72.30", "sewer_charge": "18.00", "currency": "USD"},
+        "warnings": [],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "estimated",
+          "reading_type_page": 2,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 2},
+            "period_end_exclusive": {"kind": "printed", "page": 2},
+            "usage": {"kind": "printed", "page": 2},
+            "usage_unit": {"kind": "printed", "page": 2},
+            "water_charge": {"kind": "printed", "page": 2},
+            "sewer_charge": {"kind": "printed", "page": 2},
+            "currency": {"kind": "printed", "page": 2}
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": {"billing_days": 90, "total_us_gallons": "7211.897029", "us_gallons_per_day": "80.132189", "water_and_sewer_subtotal": "90.30"}
+    },
+    {
+      "id": "irregular-liters-mixed",
+      "description": "A 45-day billing period with both actual and estimated readings.",
+      "media_type": "image/jpeg",
+      "extraction": {
+        "fields": {"period_start": "2026-07-01", "period_end_exclusive": "2026-08-15", "usage": "9600", "usage_unit": "liters", "water_charge": null, "sewer_charge": null, "currency": null},
+        "warnings": [],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "mixed",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "printed", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "missing", "page": null},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "missing", "page": null}
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": {"billing_days": 45, "total_us_gallons": "2536.051703", "us_gallons_per_day": "56.356705", "water_and_sewer_subtotal": null}
+    },
+    {
+      "id": "explicit-zero-charges",
+      "description": "Explicit zero water and sewer charges are distinct from unknown charges.",
+      "media_type": "image/webp",
+      "extraction": {
+        "fields": {"period_start": "2026-02-01", "period_end_exclusive": "2026-03-01", "usage": "2800", "usage_unit": "us_gallons", "water_charge": "0", "sewer_charge": "0", "currency": "USD"},
+        "warnings": [],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "unknown",
+          "reading_type_page": null,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "printed", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "printed", "page": 1},
+            "sewer_charge": {"kind": "printed", "page": 1},
+            "currency": {"kind": "printed", "page": 1}
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": {"billing_days": 28, "total_us_gallons": "2800.000000", "us_gallons_per_day": "100.000000", "water_and_sewer_subtotal": "0.00"}
+    },
+    {
+      "id": "ambiguous-gallons",
+      "description": "The simulated output abstains on an ambiguous unit; the user confirms US gallons.",
+      "media_type": "image/png",
+      "extraction": {
+        "fields": {"period_start": "2026-06-01", "period_end_exclusive": "2026-07-01", "usage": "8500", "usage_unit": null, "water_charge": null, "sewer_charge": null, "currency": null},
+        "warnings": ["ambiguous_unit"],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "unknown",
+          "reading_type_page": null,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "printed", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "unclear", "page": 1},
+            "water_charge": {"kind": "missing", "page": null},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "missing", "page": null}
+          }
+        }
+      },
+      "review_edits": {"usage_unit": "us_gallons"},
+      "normalized": {"billing_days": 30, "total_us_gallons": "8500.000000", "us_gallons_per_day": "283.333333", "water_and_sewer_subtotal": null}
+    },
+    {
+      "id": "missing-dates",
+      "description": "Missing dates prevent calculation until the user enters a 30-day period.",
+      "media_type": "image/png",
+      "extraction": {
+        "fields": {"period_start": null, "period_end_exclusive": null, "usage": "6400", "usage_unit": "us_gallons", "water_charge": null, "sewer_charge": null, "currency": null},
+        "warnings": ["missing_dates"],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "estimated",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {"kind": "unclear", "page": 1},
+            "period_end_exclusive": {"kind": "unclear", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "missing", "page": null},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "missing", "page": null}
+          }
+        }
+      },
+      "review_edits": {"period_start": "2026-06-01", "period_end_exclusive": "2026-07-01"},
+      "normalized": {"billing_days": 30, "total_us_gallons": "6400.000000", "us_gallons_per_day": "213.333333", "water_and_sewer_subtotal": null}
+    },
+    {
+      "id": "unsupported-currency",
+      "description": "Unsupported charges are suppressed while usage analysis remains available.",
+      "media_type": "application/pdf",
+      "extraction": {
+        "fields": {"period_start": "2026-01-01", "period_end_exclusive": "2026-02-01", "usage": "2000", "usage_unit": "liters", "water_charge": null, "sewer_charge": null, "currency": null},
+        "warnings": ["unsupported_currency"],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "actual",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "printed", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "missing", "page": null},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "missing", "page": null}
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": {"billing_days": 31, "total_us_gallons": "528.344105", "us_gallons_per_day": "17.043358", "water_and_sewer_subtotal": null},
+      "provider_output": {
+        "fields": {"period_start": "2026-01-01", "period_end_exclusive": "2026-02-01", "usage": "2000", "usage_unit": "liters", "water_charge": "12", "sewer_charge": "14", "currency": null},
+        "warnings": ["unsupported_currency"],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "actual",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "printed", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "printed", "page": 1},
+            "sewer_charge": {"kind": "printed", "page": 1},
+            "currency": {"kind": "missing", "page": null}
+          }
+        }
+      }
+    },
+    {
+      "id": "combined-services",
+      "description": "Water 45 and sewer 30 exclude garbage 100 and prior balance 75 from a 250 invoice.",
+      "media_type": "application/pdf",
+      "extraction": {
+        "fields": {"period_start": "2026-06-01", "period_end_exclusive": "2026-07-16", "usage": "4500", "usage_unit": "us_gallons", "water_charge": "45", "sewer_charge": "30", "currency": "USD"},
+        "warnings": [],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "actual",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "printed", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "printed", "page": 1},
+            "sewer_charge": {"kind": "printed", "page": 1},
+            "currency": {"kind": "printed", "page": 1}
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": {"billing_days": 45, "total_us_gallons": "4500.000000", "us_gallons_per_day": "100.000000", "water_and_sewer_subtotal": "75.00"}
+    },
+    {
+      "id": "non-water-document",
+      "description": "A non-water warning discards even otherwise plausible model output.",
+      "media_type": "application/pdf",
+      "extraction": {
+        "fields": {"period_start": null, "period_end_exclusive": null, "usage": null, "usage_unit": null, "water_charge": null, "sewer_charge": null, "currency": null},
+        "warnings": ["not_water_bill"],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "unknown",
+          "reading_type_page": null,
+          "fields": {
+            "period_start": {"kind": "missing", "page": null},
+            "period_end_exclusive": {"kind": "missing", "page": null},
+            "usage": {"kind": "missing", "page": null},
+            "usage_unit": {"kind": "missing", "page": null},
+            "water_charge": {"kind": "missing", "page": null},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "missing", "page": null}
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": null,
+      "provider_output": {
+        "fields": {"period_start": "2026-06-01", "period_end_exclusive": "2026-07-01", "usage": "8.5", "usage_unit": "ccf", "water_charge": "45.12", "sewer_charge": null, "currency": "USD"},
+        "warnings": ["not_water_bill"],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "estimated",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "printed", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "printed", "page": 1},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "printed", "page": 1}
+          }
+        }
+      }
+    },
+    {
+      "id": "multiple-bills",
+      "description": "Several bills must not be silently treated as one household billing period.",
+      "media_type": "application/pdf",
+      "extraction": {
+        "fields": {"period_start": null, "period_end_exclusive": null, "usage": null, "usage_unit": null, "water_charge": null, "sewer_charge": null, "currency": null},
+        "warnings": ["multiple_bills"],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "unknown",
+          "reading_type_page": null,
+          "fields": {
+            "period_start": {"kind": "missing", "page": null},
+            "period_end_exclusive": {"kind": "missing", "page": null},
+            "usage": {"kind": "missing", "page": null},
+            "usage_unit": {"kind": "missing", "page": null},
+            "water_charge": {"kind": "missing", "page": null},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "missing", "page": null}
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": null,
+      "provider_output": {
+        "fields": {"period_start": "2026-06-01", "period_end_exclusive": "2026-07-01", "usage": "8.5", "usage_unit": "ccf", "water_charge": "45.12", "sewer_charge": null, "currency": "USD"},
+        "warnings": ["multiple_bills"],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "estimated",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {"kind": "printed", "page": 1},
+            "period_end_exclusive": {"kind": "printed", "page": 1},
+            "usage": {"kind": "printed", "page": 1},
+            "usage_unit": {"kind": "printed", "page": 1},
+            "water_charge": {"kind": "printed", "page": 1},
+            "sewer_charge": {"kind": "missing", "page": null},
+            "currency": {"kind": "printed", "page": 1}
+          }
+        }
+      }
+    }
+  ]
+}
