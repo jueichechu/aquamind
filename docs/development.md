@@ -597,6 +597,33 @@ the import context. Required values still use form validation; absent optional c
 can remain unknown. Legacy imports without evidence show an unknown reading type and
 no invented page references. Manual bill entry has no import-specific hints.
 
+### Synthetic bill-review fixtures
+
+`evals/fixtures/bill-import-review-v1.json` is a shared set of ten synthetic extraction
+responses and fixed normalization expectations, consumed by Python and web tests.
+It covers all four supported usage units, monthly/quarterly/irregular periods,
+actual/estimated/mixed/unknown readings, missing dates, ambiguous units, unknown
+versus zero charges, unsupported currency, combined services, and rejected non-water
+or multiple-bill documents. Unsupported charges and rejected-document evidence are
+checked after server-side suppression. Incomplete entries need explicit corrections
+before normalization; unrelated invoice charges never enter the water/sewer subtotal.
+
+The Python test uses mocked provider responses through the actual import and
+normalization endpoints. The web test uses the same responses through the client
+decoder and a server-rendered review form, then checks corrected normalization
+requests. Input bytes are format-signature probes, not complete PDFs or photos.
+These tests verify contracts, calculations, review defaults and transport behavior;
+they do not measure OCR, document-layout coverage, model interpretation accuracy,
+live-provider compatibility or browser interaction. No fixture contains real household
+data, and the tests require no provider credentials or paid requests.
+
+Run the focused checks from the repository root:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_import.py -v
+pnpm --filter web test src/app/analyze/bill-review-fixtures.test.tsx
+```
+
 The public-facing bill pages use General Sans through Fontshare's hosted stylesheet,
 with the existing Geist font as fallback. Font files are not redistributed in this
 repository. Small report icons come from Phosphor; their MIT license is kept beside
