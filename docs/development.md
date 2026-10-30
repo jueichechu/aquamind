@@ -558,6 +558,34 @@ authoritative normalization endpoint. Changing a value invalidates review and re
 Selecting a new report clears the prior import review; bill-only questions still need
 their own sharing consent and do not re-upload the document.
 
+### Extracted bill evidence
+
+Import responses retain the existing fields and warnings and add an `evidence`
+object with `schema_version: 1`. It contains `reading_type` (`actual`, `estimated`,
+`mixed`, or `unknown`), `reading_type_page`, and a source for each extracted field.
+Each source contains only `kind` (`printed`, `derived`, `unclear`, or `missing`) and
+a nullable, one-based `page`. No quotations, free-form explanations, personal
+identifiers or model-generated confidence percentages are accepted in this object.
+
+Printed and derived values require a page; missing values require a null page and
+null field. Unclear candidates may retain a value for review. Only the exclusive
+billing end may be derived, from a clearly inclusive printed end. Known reading
+types require a source page; unknown requires null. Non-water/multiple-bill results
+discard their values and evidence. Suppressed unsupported charges lose their sources.
+
+Page numbers are bounded to 1–1000; this is a schema bound, not a document page-count
+check. Images can cite only page 1. PDF pages and reading classifications are model
+claims and are not independently verified. They never establish correctness, human
+review, a leak diagnosis or suitability for a historical comparison. Calculations
+still use the separately reviewed fields through the normalization endpoint.
+
+The extraction schema requires every property and rejects extra properties, following
+the [structured-output contract](https://developers.openai.com/api/docs/guides/structured-outputs).
+Invalid evidence fails the extraction with a generic error and no automatic retry.
+The web decoder accepts older responses with no evidence, but validates and preserves
+the complete versioned object when present. Evidence is retained in memory alongside
+the import; the existing review form does not yet display the source references.
+
 The public-facing bill pages use General Sans through Fontshare's hosted stylesheet,
 with the existing Geist font as fallback. Font files are not redistributed in this
 repository. Small report icons come from Phosphor; their MIT license is kept beside
