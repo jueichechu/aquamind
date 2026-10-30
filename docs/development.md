@@ -584,7 +584,18 @@ the [structured-output contract](https://developers.openai.com/api/docs/guides/s
 Invalid evidence fails the extraction with a generic error and no automatic retry.
 The web decoder accepts older responses with no evidence, but validates and preserves
 the complete versioned object when present. Evidence is retained in memory alongside
-the import; the existing review form does not yet display the source references.
+the import. The review form shows the suggested reading type and field source pages,
+with prompts for unclear or missing required values. Estimated and mixed readings
+carry an explanation before the form and alongside the calculated result.
+
+Source hints are linked to their fields as accessible descriptions, separately from
+the visible labels. Editing a field removes its page citation; its new value is a
+user edit, not text supported by the original locator. The existing review checkbox
+marks values as reviewed by the user, never independently verified. Any subsequent
+edit resets review and removes the result. Clearing or loading example values removes
+the import context. Required values still use form validation; absent optional charges
+can remain unknown. Legacy imports without evidence show an unknown reading type and
+no invented page references. Manual bill entry has no import-specific hints.
 
 The public-facing bill pages use General Sans through Fontshare's hosted stylesheet,
 with the existing Geist font as fallback. Font files are not redistributed in this

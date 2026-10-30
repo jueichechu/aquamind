@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BILL_UNITS, type BillDraft, type BillResult } from "@/lib/bills";
+import { BILL_UNITS, type BillDraft, type BillResult } from "../../lib/bills";
 import { DemoClient } from "../demo/demo-client";
 import { BillAssistant } from "./bill-assistant";
+import type { BillEvidence } from "../../lib/bill-import";
+import { BillReadingNote, BillSourceHint } from "../../components/bill-evidence";
 
 const empty: BillDraft = { period_start: "", period_end_exclusive: "", usage: "", usage_unit: "",
   water_charge: "", sewer_charge: "", currency: "" };
@@ -15,8 +17,9 @@ const gallons = (value: string) => new Intl.NumberFormat("en-US", { maximumFract
 const money = (value: string | null) => value === null ? "Unknown" :
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value));
 
-export function BillEntry({ initialDraft, initialExample = false, imported = false, client: providedClient, onBusyChange }: {
+export function BillEntry({ initialDraft, initialExample = false, imported = false, evidence, client: providedClient, onBusyChange }: {
   initialDraft?: BillDraft; initialExample?: boolean; imported?: boolean; client?: DemoClient; onBusyChange?: (busy: boolean) => void;
+  evidence?: BillEvidence;
 } = {}) {
   // A separate mounted client keeps this entry independent of the synthetic demo's session.
   const [client] = useState(() => providedClient ?? new DemoClient());
@@ -63,11 +66,21 @@ export function BillEntry({ initialDraft, initialExample = false, imported = fal
     finally { working.current = false; setBusy(false); }
   }
 
+  function descriptionIds(field: keyof BillDraft, help?: string) {
+    return [help, fromImport && evidence ? `bill-${field}-source` : undefined].filter(Boolean).join(" ") || undefined;
+  }
+  function sourceHint(field: keyof BillDraft, required = false) {
+    if (!fromImport || !evidence) return null;
+    return <BillSourceHint id={`bill-${field}-source`} source={evidence.fields[field]}
+      changed={draft[field] !== (initialDraft?.[field] ?? "")} empty={!draft[field].trim()} required={required} reviewed={reviewed} />;
+  }
+
   return <div className="grid items-start gap-5 pb-8 lg:grid-cols-2">
+    {fromImport && <div className="border-y border-rule py-4 lg:col-span-2"><BillReadingNote evidence={evidence} /></div>}
     <section aria-labelledby="bill-entry-heading" className="min-w-0 rounded-2xl border border-rule bg-surface p-5 sm:p-6">
       <h2 id="bill-entry-heading" tabIndex={-1} className="scroll-mt-6 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">Enter your bill</h2>
       <p className="mt-2 text-sm leading-6 text-ink-secondary">Calculating uses only these fields and does not use AI. There is no saved bill history. Leave out personal details.</p>
-      {fromImport && <p className="mt-3 text-sm leading-6 text-ink-secondary">These are AI-extracted candidates. Check every field against your original report and correct any mistakes.</p>}
+      {fromImport && <p className="mt-3 text-sm leading-6 text-ink-secondary">These are AI-extracted candidates. Suggested source pages are unverified. Check every field against your report.</p>}
       <form method="post" autoComplete="off" className="mt-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
         <fieldset disabled={busy || asking} className="min-w-0 space-y-5">
           <legend className="sr-only">Billing dates, usage and optional charges</legend>
@@ -77,50 +90,51 @@ export function BillEntry({ initialDraft, initialExample = false, imported = fal
           </div>
           {isExample && <p className="text-sm text-ink-secondary">Example values; not your household data. Clear the form to enter your own bill.</p>}
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="min-w-0 text-sm text-ink-secondary" htmlFor="bill-start">Period start
+            <div className="min-w-0"><label className="block text-sm text-ink-secondary" htmlFor="bill-start">Period start
               <input id="bill-start" name="period_start" type="date" required min="0001-01-01" max="9999-12-31"
-                value={draft.period_start} onChange={(event) => edit("period_start", event.target.value)} className={inputStyle} />
-            </label>
-            <label className="min-w-0 text-sm text-ink-secondary" htmlFor="bill-end">Period end (exclusive)
-              <input id="bill-end" name="period_end_exclusive" type="date" required min="0001-01-01" max="9999-12-31" aria-describedby="bill-end-help"
+                value={draft.period_start} onChange={(event) => edit("period_start", event.target.value)} className={inputStyle} aria-describedby={descriptionIds("period_start")} />
+            </label>{sourceHint("period_start", true)}</div>
+            <div className="min-w-0"><label className="block text-sm text-ink-secondary" htmlFor="bill-end">Period end (exclusive)
+              <input id="bill-end" name="period_end_exclusive" type="date" required min="0001-01-01" max="9999-12-31" aria-describedby={descriptionIds("period_end_exclusive", "bill-end-help")}
                 value={draft.period_end_exclusive} onChange={(event) => edit("period_end_exclusive", event.target.value)} className={inputStyle} />
-            </label>
+            </label>{sourceHint("period_end_exclusive", true)}</div>
           </div>
           <p id="bill-end-help" className="text-xs leading-5 text-muted">Use the first day after the billed period. For a June 1–30 bill, enter June 1 and July 1. Periods must cover 1–366 days.</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="min-w-0 text-sm text-ink-secondary" htmlFor="bill-usage">Total water usage
-              <input id="bill-usage" name="usage" type="text" inputMode="decimal" required maxLength={16} placeholder="e.g. 8.5" aria-describedby="bill-usage-help"
+            <div className="min-w-0"><label className="block text-sm text-ink-secondary" htmlFor="bill-usage">Total water usage
+              <input id="bill-usage" name="usage" type="text" inputMode="decimal" required maxLength={16} placeholder="e.g. 8.5" aria-describedby={descriptionIds("usage", "bill-usage-help")}
                 value={draft.usage} onChange={(event) => edit("usage", event.target.value)} className={inputStyle} />
-            </label>
-            <label className="min-w-0 text-sm text-ink-secondary" htmlFor="bill-unit">Usage unit
-              <select id="bill-unit" name="usage_unit" required value={draft.usage_unit}
+            </label>{sourceHint("usage", true)}</div>
+            <div className="min-w-0"><label className="block text-sm text-ink-secondary" htmlFor="bill-unit">Usage unit
+              <select id="bill-unit" name="usage_unit" required value={draft.usage_unit} aria-describedby={descriptionIds("usage_unit")}
                 onChange={(event) => edit("usage_unit", event.target.value)} className={inputStyle}>
                 <option value="">Select the printed unit</option>
                 {Object.entries(BILL_UNITS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
-            </label>
+            </label>{sourceHint("usage_unit", true)}</div>
           </div>
           <p id="bill-usage-help" className="text-xs leading-5 text-muted">Enter the usage amount, without commas or unit suffixes. Choose US liquid gallons only if the bill uses US gallons. The limit after conversion is 1,000,000 US gallons.</p>
           <div className="border-t border-rule pt-5">
             <h3 className="font-medium">Charges (optional)</h3>
             <p className="mt-2 text-xs leading-5 text-muted">Leave missing charges blank. Enter 0 only when the bill explicitly shows zero. Only USD charges are supported; usage analysis works without charges.</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="min-w-0 text-sm text-ink-secondary" htmlFor="bill-water-charge">Water charge
-                <input id="bill-water-charge" name="water_charge" type="text" inputMode="decimal" maxLength={13} placeholder="Unknown"
+              <div className="min-w-0"><label className="block text-sm text-ink-secondary" htmlFor="bill-water-charge">Water charge
+                <input id="bill-water-charge" name="water_charge" type="text" inputMode="decimal" maxLength={13} placeholder="Unknown" aria-describedby={descriptionIds("water_charge")}
                   value={draft.water_charge} onChange={(event) => edit("water_charge", event.target.value)} className={inputStyle} />
-              </label>
-              <label className="min-w-0 text-sm text-ink-secondary" htmlFor="bill-sewer-charge">Sewer charge
-                <input id="bill-sewer-charge" name="sewer_charge" type="text" inputMode="decimal" maxLength={13} placeholder="Unknown"
+              </label>{sourceHint("water_charge")}</div>
+              <div className="min-w-0"><label className="block text-sm text-ink-secondary" htmlFor="bill-sewer-charge">Sewer charge
+                <input id="bill-sewer-charge" name="sewer_charge" type="text" inputMode="decimal" maxLength={13} placeholder="Unknown" aria-describedby={descriptionIds("sewer_charge")}
                   value={draft.sewer_charge} onChange={(event) => edit("sewer_charge", event.target.value)} className={inputStyle} />
-              </label>
+              </label>{sourceHint("sewer_charge")}</div>
             </div>
             <label className="mt-4 block text-sm text-ink-secondary" htmlFor="bill-currency">Charge currency
-              <select id="bill-currency" name="currency" value={draft.currency} required={!!(draft.water_charge.trim() || draft.sewer_charge.trim())}
+              <select id="bill-currency" name="currency" value={draft.currency} required={!!(draft.water_charge.trim() || draft.sewer_charge.trim())} aria-describedby={descriptionIds("currency")}
                 onChange={(event) => edit("currency", event.target.value)} className={inputStyle}>
                 <option value="">Select if entering charges</option>
                 <option value="USD">USD — US dollars</option>
               </select>
             </label>
+            {sourceHint("currency", !!(draft.water_charge.trim() || draft.sewer_charge.trim()))}
           </div>
           {fromImport && <label className="flex items-start gap-3 text-sm leading-6 text-ink-secondary"><input type="checkbox" required checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} className="mt-1 size-4 shrink-0 accent-accent" />I have checked the dates, usage, units and optional charges against my report.</label>}
           <button disabled={fromImport && !reviewed} className="ui-button ui-button-primary w-full">
@@ -140,6 +154,7 @@ export function BillEntry({ initialDraft, initialExample = false, imported = fal
       {result ? <>
         {result.example && <p className="mt-3 text-sm text-ink-secondary">Example calculation; not your household data</p>}
         <p className="mt-3 text-sm leading-6 text-ink-secondary">{result.value.bill.period_start} to {result.value.bill.period_end_exclusive} (exclusive); {result.value.billing_days} days</p>
+        {fromImport && <div className="mt-3"><BillReadingNote evidence={evidence} /></div>}
         <a href="#bill-entry-heading" className="ui-link mt-2 underline underline-offset-4">Edit bill details</a>
         <dl className="mt-5 space-y-4">
           <div className="rounded-xl border border-rule bg-accent-soft p-4">
