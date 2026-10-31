@@ -7,7 +7,10 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
     <div className="mx-auto max-w-5xl">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-rule pb-5">
         <Link href="/" className="ui-link desk-wordmark text-ink">AquaMind</Link>
-        <Link href="/demo" className="ui-link">Explore the synthetic demo</Link>
+        <nav aria-label="Analysis navigation" className="flex flex-wrap items-center gap-4">
+          <Link href="/compare" className="ui-link">Compare bills</Link>
+          <Link href="/demo" className="ui-link">Explore the synthetic demo</Link>
+        </nav>
       </header>
       <div className="max-w-2xl py-8">
         <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Understand one water bill</h1>

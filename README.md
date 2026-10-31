@@ -11,6 +11,7 @@ The current release is a local development application. It includes household bi
 - Conservation-goal proposals with explicit approval or rejection before changes take effect.
 - PyTorch LSTM autoencoder training, frozen inference artifacts and a typed FastAPI prediction endpoint.
 - Manual-bill entry at `/analyze`, with validation and normalization for US gallons, CCF, cubic meters and liters, plus optional bill-only AI questions after explicit sharing consent.
+- Manual comparison of 2–12 bills at `/compare`, with a day-weighted usage baseline, original units and explicit gaps between supplied periods. No AI configuration is required.
 - PDF and photo bill import from the homepage, with explicit OpenAI sharing consent, editable extracted fields and a required review before calculation. Supports PDF, PNG, JPEG and WebP reports up to 4 MiB.
 
 ## Requirements
@@ -42,7 +43,7 @@ python3 -m venv ml/.venv
 ml/.venv/bin/python -m pip install -r ml/requirements-agent.txt
 ```
 
-For bill analysis without AI configuration, start the backend and frontend in separate terminals, then open `/analyze`:
+For bill analysis without AI configuration, start the backend and frontend in separate terminals, then open `/analyze` or `/compare`:
 
 ```sh
 AQUAMIND_AGENT_ENABLED=0 PYTHONPATH=ml ml/.venv/bin/python -m uvicorn aquamind_ml.api:app --host 127.0.0.1 --port 8000 --workers 1

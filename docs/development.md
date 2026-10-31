@@ -151,8 +151,37 @@ no-store requests and 15-second calculation deadline. Invalid fields or overlaps
 are rejected before any request. Expiry clears the token and requires explicit
 resubmission; transport failures are sanitized and never retried automatically.
 The method does not store bill history, ask the agent or change goals. Its result
-passes through the comparison decoder before returning. A multi-bill entry/results
-screen is not yet connected; `/analyze` still accepts one bill at a time.
+passes through the comparison decoder before returning. The `/compare` screen uses
+this client; `/analyze` continues to accept one bill at a time.
+
+### Comparison interface
+
+Open `/compare`, or select **Compare bills** from `/analyze`. Two blank entries are
+shown initially; add or remove entries within the 2–12 bill limit. All entries use
+the same shared date, unit, usage and optional-charge fields as single-bill entry.
+Confirm that the periods describe the same household and meter before submitting.
+This is an assumption the application cannot independently verify. Example bills
+are explicitly labeled and require submission; their provenance stays marked after
+edits until **Clear all bills** starts a fresh entry.
+
+Requests lock entry controls and share the client's concurrency guard. Editing,
+adding, removing, clearing or replacing entries clears the old comparison and
+household confirmation. Errors preserve entries for correction or explicit
+resubmission. No browser storage, document import, model calls, saved history or
+conservation-goal changes are introduced by this screen.
+
+Successful calculations focus the result heading. Results show the day-weighted
+earlier baseline, latest daily usage, absolute and percentage change, excluded gap
+days and a chronological table retaining original units and unknown/zero charges.
+Percentage formatting preserves decimal strings beyond JavaScript's safe integer
+range; small negative changes retain their sign. A true zero baseline has no
+defined percentage, while a positive baseline rounded to display zero is explained.
+The table provides row/column headers, an exclusive-end caption and a keyboard
+focusable horizontal scroll region for narrow viewports. Entry layouts collapse
+to one column; controls reuse the existing theme tokens and focus styles.
+
+Comparisons remain unverified aggregate evidence. They do not explain occupancy,
+weather or leaks, diagnose fixtures, compare tariffs or predict savings.
 
 Run the comparison checks without credentials or a listening server:
 
