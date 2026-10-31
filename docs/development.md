@@ -20,7 +20,7 @@ These are transparent simulation assumptions, not a scientifically validated hou
 
 ## Manual bill normalization
 
-`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills, available through a session-gated HTTP endpoint and the `/analyze` form. There is no upload/OCR or persistence yet. Optional bill-only AI questions are described below. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
+`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills, available through a session-gated HTTP endpoint and the `/analyze` form. This calculation accepts entered fields and does not itself upload documents or persist entries. Optional bill-only AI questions and report import are described below. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
 
 Example from a Python process started with `PYTHONPATH=ml`:
 
@@ -60,11 +60,11 @@ PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bills
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_http.py -v
 ```
 
-## Comparing manually entered bills in Python
+## Comparing manually entered bills
 
 `BillComparisonRequest` and `compare_bills` in `ml/aquamind_ml/bills.py` compare
-2–12 supplied bills. This calculation is currently a Python interface; the HTTP
-API and `/analyze` still accept one bill at a time.
+2–12 supplied bills, also available through `POST /v1/bills/compare`.
+The `/analyze` interface still accepts one bill at a time.
 
 ```python
 from aquamind_ml.bills import BillComparisonRequest, compare_bills
@@ -102,10 +102,28 @@ are comparisons of unverified aggregate averages, not a seasonal model, a judgme
 that usage is unusually high or evidence of a particular leak or fixture.
 The calculation has no model calls, persistence or changes to session goals.
 
+The comparison endpoint requires the bearer credential from `POST /v1/sessions`
+and an `application/json` body shaped as `{"bills": [bill, bill, ...]}`. Submit
+original entered fields, not previously normalized results or a supplied baseline.
+The server validates and recalculates the comparison, returning its fields plus
+`request_id`, matching the backend's `X-Request-ID` header. OpenAPI includes the
+nested bill request and comparison response schemas.
+
+The actual streamed body is limited to 12 KiB, regardless of `Content-Length`.
+Strict parsing rejects duplicate keys at every nesting level, non-finite numbers,
+unknown fields, invalid or overlapping periods and counts outside 2–12. Missing,
+expired or revoked sessions return 401; oversized bodies return 413, unsupported
+media types 415 and invalid entries 422 with a generic error. Session liveness is
+checked before parsing, after reading and before releasing results. Responses are
+`no-store` with `nosniff`; no cross-origin access, bill-value request logging,
+saved history, model calls or goal changes are introduced. Comparison works with
+the agent and detector disabled and needs no new API keys.
+
 Run the comparison checks without credentials or a listening server:
 
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_comparison.py -v
+PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_comparison_http.py -v
 ```
 
 ## Preparing meter sequences
