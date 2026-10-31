@@ -126,6 +126,24 @@ limit, disables caching and redirects, and uses a 10-second calculation deadline
 Backend error statuses are preserved; an unconfirmed network failure returns a
 generic 503 without an automatic retry. Other methods are not exposed by the relay.
 
+The browser contract in `apps/web/src/lib/bill-comparison.ts` captures 2–12 validated
+entries in chronological order without changing the caller's drafts, rejects
+overlaps and preserves original decimal text and unknown charges. Its response
+decoder checks the limited historical-bill evidence labels, request ID, every
+echoed bill, billing-day counts, covered/gap days and bounded decimal strings.
+True zero baselines require a null percentage; positive baselines that round to
+display zero retain their defined percentage. Percentage bounds use exact integer
+hundredths to support values larger than JavaScript's safe integer range. Python
+remains authoritative for conversions and comparison arithmetic; the browser does
+not recompute them. Returned data is copied, and unrelated fields and free text
+are discarded.
+
+`evals/fixtures/bill-comparison-contract-v1.json` contains five fictional bill-field
+cases with offline API responses shared by the Python endpoint and browser decoder
+tests: mixed-unit weighted history with a gap, exact zero baseline, tiny positive
+baseline, falling usage and the maximum 12 bills. These are calculation/contract
+fixtures, not document extraction or leak-detection accuracy evidence.
+
 Run the comparison checks without credentials or a listening server:
 
 ```sh

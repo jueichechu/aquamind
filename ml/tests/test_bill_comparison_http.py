@@ -1,6 +1,7 @@
 from contextlib import AsyncExitStack
 import json
 import os
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -42,6 +43,21 @@ class BillComparisonHttpTests(unittest.IsolatedAsyncioTestCase):
     async def post(self, **kwargs):
         return await self.http.post('/v1/bills/compare', headers=self.headers,
                                     **(kwargs or {'json': self.body}))
+
+    async def test_shared_browser_contract_fixtures_match_actual_api_responses(self):
+        path = Path(__file__).resolve().parents[2] / 'evals/fixtures/bill-comparison-contract-v1.json'
+        corpus = json.loads(path.read_text())
+        self.assertEqual(corpus['schema_version'], 1)
+        self.assertIs(corpus['synthetic'], True)
+        self.assertEqual(len(corpus['cases']), 5)
+        for case in corpus['cases']:
+            with self.subTest(case=case['name']):
+                entries = [{key: (None if value == '' else value) for key, value in draft.items()}
+                           for draft in case['drafts']]
+                response = await self.post(json={'bills': entries})
+                self.assertEqual(response.status_code, 200)
+                expected = case['response'] | {'request_id': response.headers['x-request-id']}
+                self.assertEqual(response.json(), expected)
 
     async def test_weighted_comparison_preserves_entries_and_privacy_without_agent(self):
         self.assertIsNone(self.app.state.detector)
