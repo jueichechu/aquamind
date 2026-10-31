@@ -144,6 +144,16 @@ tests: mixed-unit weighted history with a gap, exact zero baseline, tiny positiv
 baseline, falling usage and the maximum 12 bills. These are calculation/contract
 fixtures, not document extraction or leak-detection accuracy evidence.
 
+`DemoClient.compareBills(drafts)` validates and snapshots all drafts before creating
+a session, then sends only the structured entered bills to the same-origin relay.
+It shares the client's concurrency guard, in-memory bearer session, omitted cookies,
+no-store requests and 15-second calculation deadline. Invalid fields or overlaps
+are rejected before any request. Expiry clears the token and requires explicit
+resubmission; transport failures are sanitized and never retried automatically.
+The method does not store bill history, ask the agent or change goals. Its result
+passes through the comparison decoder before returning. A multi-bill entry/results
+screen is not yet connected; `/analyze` still accepts one bill at a time.
+
 Run the comparison checks without credentials or a listening server:
 
 ```sh

@@ -2,6 +2,7 @@ import { SCENARIOS } from "../../lib/water/scenarios";
 import type { ScenarioId } from "../../lib/water/types";
 import { createBillEntry, parseBillResult, type BillDraft, type ManualBill } from "../../lib/bills";
 import { checkReportSize, encodeReport, parseImportedBill } from "../../lib/bill-import";
+import { createBillComparisonEntries, parseBillComparisonResult } from "../../lib/bill-comparison";
 
 export type Proposal = {
   approval_id: string;
@@ -60,7 +61,8 @@ export class DemoClient {
   private async call(path: string, body?: object, forBill = false): Promise<unknown> {
     const importing = path === "bills/import";
     const billQuestion = path === "agent/bill";
-    const bill = forBill || path === "bills/normalize" || billQuestion || importing;
+    const comparing = path === "bills/compare";
+    const bill = forBill || path === "bills/normalize" || comparing || billQuestion || importing;
     let response: Response;
     try {
       response = await fetch(`/api/aquamind/v1/${path}`, {
@@ -79,6 +81,7 @@ export class DemoClient {
     if (importing && !response.ok) throw new Error("Report extraction is unavailable or could not be confirmed. There is no automatic retry; you can still enter your bill manually.");
     if (billQuestion && response.status === 422) throw new Error("Check your question and bill fields, and confirm sharing with the AI service.");
     if (billQuestion && !response.ok) throw new Error("The bill assistant is unavailable. Your bill calculation is still available.");
+    if (comparing && response.status === 422) throw new Error("Check the 2–12 bills, their dates, units and charges. Periods must not overlap or repeat; each bill must be at most 1,000,000 US gallons after conversion.");
     if (bill && response.status === 422) throw new Error("Check the billing dates, usage, units and charges. Usage must not exceed 1,000,000 US gallons after conversion.");
     if (bill && !response.ok) throw new Error("Bill analysis is unavailable. Please try again later.");
     if (!response.ok) throw new Error("The request could not be confirmed. Check the backend connection. Goals need your separate approval.");
@@ -113,6 +116,12 @@ export class DemoClient {
     try { entry = createBillEntry(draft); }
     catch (cause) { return Promise.reject(cause); }
     return this.perform(async () => parseBillResult(await this.call("bills/normalize", entry), entry), true);
+  }
+  compareBills(drafts: readonly BillDraft[]) {
+    let entries: ManualBill[];
+    try { entries = createBillComparisonEntries(drafts); }
+    catch (cause) { return Promise.reject(cause); }
+    return this.perform(async () => parseBillComparisonResult(await this.call("bills/compare", { bills: entries }), entries), true);
   }
   importBill(file: File, shareWithAI: boolean) {
     if (shareWithAI !== true) return Promise.reject(new Error("Confirm sharing this report with the AI service first."));
