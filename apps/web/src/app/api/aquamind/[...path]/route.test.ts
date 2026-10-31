@@ -1,9 +1,80 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GET, POST } from "./route";
+import { DELETE, GET, POST } from "./route";
 import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split("/") }) });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("approval relay", () => {
+  it("relays bill comparisons with a twelve-KiB limit, session auth and a calculation deadline", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000/");
+    const payload = { evidence_level: "historical_bills", request_id: "test-request" };
+    const fetcher = vi.fn().mockImplementation(async () => Response.json(payload));
+    vi.stubGlobal("fetch", fetcher);
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    try {
+      const body = JSON.stringify({ bills: Array.from({ length: 12 }, (_, index) => ({
+        period_start: `2026-01-${String(index + 1).padStart(2, "0")}`,
+        period_end_exclusive: `2026-01-${String(index + 2).padStart(2, "0")}`,
+        usage: "100.123456", usage_unit: "us_gallons",
+      })) });
+      expect(body.length).toBeGreaterThan(1024);
+      const response = await POST(new Request("http://localhost/api", { method: "POST", body,
+        headers: { authorization: "Bearer test-session", cookie: "private=value" } }), context("v1/bills/compare"));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(payload);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      const [url, options] = fetcher.mock.calls[0];
+      expect(url).toBe("http://localhost:8000/v1/bills/compare");
+      expect(options.body).toBe(body);
+      expect(options.headers.get("authorization")).toBe("Bearer test-session");
+      expect(options.headers.has("cookie")).toBe(false);
+      expect(options.cache).toBe("no-store");
+      expect(options.redirect).toBe("error");
+      expect(timeout).toHaveBeenCalledWith(10_000);
+      for (const handler of [GET, DELETE]) {
+        expect((await handler(new Request("http://localhost/api", {
+          method: handler === GET ? "GET" : "DELETE",
+        }), context("v1/bills/compare"))).status).toBe(404);
+      }
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally { timeout.mockRestore(); }
+  });
+  it("bounds streamed comparison bytes without trusting Content-Length", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
+    const fetcher = vi.fn().mockImplementation(async () => Response.json({}));
+    vi.stubGlobal("fetch", fetcher);
+    const limit = 12 * 1024;
+    expect((await POST(new Request("http://localhost/api", {
+      method: "POST", body: " ".repeat(limit),
+    }), context("v1/bills/compare"))).status).toBe(200);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const body = new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode(" ".repeat(limit - 1)));
+      controller.enqueue(new TextEncoder().encode("é"));
+      controller.close();
+    } });
+    const request = new Request("http://localhost/api", {
+      method: "POST", body, headers: { "Content-Length": "1" }, duplex: "half",
+    } as RequestInit);
+    const response = await POST(request, context("v1/bills/compare"));
+    expect(response.status).toBe(413);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it("preserves comparison failures and never retries unavailable calculations", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
+    const fetcher = vi.fn().mockImplementation(async () => Response.json({ detail: "Session unavailable" }, { status: 401 }));
+    vi.stubGlobal("fetch", fetcher);
+    const request = () => new Request("http://localhost/api", { method: "POST", body: '{"bills":[]}' });
+    const denied = await POST(request(), context("v1/bills/compare"));
+    expect(denied.status).toBe(401);
+    expect(await denied.json()).toEqual({ detail: "Session unavailable" });
+    fetcher.mockRejectedValueOnce(new Error("private upstream details"));
+    const failed = await POST(request(), context("v1/bills/compare"));
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toEqual({ detail: "Demo backend unavailable" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
   it("bounds report import separately and preserves no-store, auth and the paid request deadline", async () => {
     vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
     const fetcher = vi.fn().mockResolvedValue(Response.json({ needs_review: true }));

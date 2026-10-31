@@ -119,6 +119,13 @@ checked before parsing, after reading and before releasing results. Responses ar
 saved history, model calls or goal changes are introduced. Comparison works with
 the agent and detector disabled and needs no new API keys.
 
+The same-origin relay exposes the calculation at
+`POST /api/aquamind/v1/bills/compare`, forwarding the bearer credential and JSON
+body without browser cookies. It independently enforces the 12 KiB streamed body
+limit, disables caching and redirects, and uses a 10-second calculation deadline.
+Backend error statuses are preserved; an unconfirmed network failure returns a
+generic 503 without an automatic retry. Other methods are not exposed by the relay.
+
 Run the comparison checks without credentials or a listening server:
 
 ```sh
