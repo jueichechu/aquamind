@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+# Initial manual-analysis deployment. Read docs/deployment.md before provisioning.
+services:
+  - type: pserv
+    name: aquamind-api
+    runtime: python
+    region: oregon
+    plan: 1c-2g
+    branch: main
+    numInstances: 1
+    autoDeployTrigger: "off"
+    buildCommand: >-
+      python -m pip install --index-url https://download.pytorch.org/whl/cpu -r ml/requirements.txt
+      && python -m pip install -r ml/requirements-agent.txt
+      && python -m pip check
+    startCommand: >-
+      python -m uvicorn aquamind_ml.api:app --host 0.0.0.0 --port 8000 --workers 1
+      --no-proxy-headers --no-access-log
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14.2"
+      - key: PYTHONPATH
+        value: ml
+      - key: PORT
+        value: "8000"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: AQUAMIND_AGENT_ENABLED
+        value: "0"
+
+  - type: web
+    name: aquamind-web
+    runtime: node
+    region: oregon
+    plan: 0.5c-512mb
+    branch: main
+    numInstances: 1
+    autoDeployTrigger: "off"
+    buildCommand: >-
+      corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build --webpack
+    startCommand: >-
+      AQUAMIND_API_URL="http://${AQUAMIND_API_HOSTPORT}"
+      pnpm --filter web start --hostname 0.0.0.0 --port "$PORT"
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24.21.0"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: AQUAMIND_API_HOSTPORT
+        fromService:
+          type: pserv
+          name: aquamind-api
+          property: hostport
