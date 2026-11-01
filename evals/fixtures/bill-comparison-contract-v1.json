@@ -1,0 +1,830 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "description": "Fictional bill fields and offline API calculation responses for cross-language contract checks. Not extraction or diagnostic accuracy evidence.",
+  "cases": [
+    {
+      "name": "weighted_mixed_units_with_gap",
+      "drafts": [
+        {
+          "period_start": "2024-04-01",
+          "period_end_exclusive": "2024-05-01",
+          "usage": "6000",
+          "usage_unit": "us_gallons",
+          "water_charge": "0",
+          "sewer_charge": "0",
+          "currency": "USD"
+        },
+        {
+          "period_start": "2024-01-01",
+          "period_end_exclusive": "2024-02-01",
+          "usage": "03100.00",
+          "usage_unit": "us_gallons",
+          "water_charge": "12.34",
+          "currency": "USD",
+          "sewer_charge": ""
+        },
+        {
+          "period_start": "2024-02-01",
+          "period_end_exclusive": "2024-03-01",
+          "usage": "21955.388347",
+          "usage_unit": "liters",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        }
+      ],
+      "response": {
+        "source": "manual_entry",
+        "evidence_level": "historical_bills",
+        "confidence": "limited",
+        "bills": [
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2024-01-01",
+              "period_end_exclusive": "2024-02-01",
+              "usage": "3100.00",
+              "usage_unit": "us_gallons",
+              "water_charge": "12.34",
+              "sewer_charge": null,
+              "currency": "USD"
+            },
+            "billing_days": 31,
+            "total_us_gallons": "3100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2024-02-01",
+              "period_end_exclusive": "2024-03-01",
+              "usage": "21955.388347",
+              "usage_unit": "liters",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 29,
+            "total_us_gallons": "5800.000000",
+            "us_gallons_per_day": "200.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2024-04-01",
+              "period_end_exclusive": "2024-05-01",
+              "usage": "6000",
+              "usage_unit": "us_gallons",
+              "water_charge": "0",
+              "sewer_charge": "0",
+              "currency": "USD"
+            },
+            "billing_days": 30,
+            "total_us_gallons": "6000.000000",
+            "us_gallons_per_day": "200.000000",
+            "water_and_sewer_subtotal": "0.00",
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          }
+        ],
+        "covered_days": 90,
+        "gap_days": 31,
+        "baseline_bill_count": 2,
+        "baseline_billing_days": 60,
+        "baseline_us_gallons_per_day": "148.333333",
+        "latest_us_gallons_per_day_change": "51.666667",
+        "latest_percent_change": "34.83",
+        "limitations": [
+          "Entries are unverified and assumed to describe the same household and meter.",
+          "The baseline includes only earlier supplied billing periods, not missing days.",
+          "Differences in daily averages do not establish seasonality, occupancy changes or a leak diagnosis.",
+          "No tariff, cost-change calculation or savings prediction is inferred; missing charges remain unknown."
+        ],
+        "request_id": "12345678-abcd-1234-abcd-123456789abc"
+      }
+    },
+    {
+      "name": "exact_zero_baseline",
+      "drafts": [
+        {
+          "period_start": "2026-01-01",
+          "period_end_exclusive": "2026-02-01",
+          "usage": "0",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-02-01",
+          "period_end_exclusive": "2026-03-01",
+          "usage": "2800",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        }
+      ],
+      "response": {
+        "source": "manual_entry",
+        "evidence_level": "historical_bills",
+        "confidence": "limited",
+        "bills": [
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-01",
+              "period_end_exclusive": "2026-02-01",
+              "usage": "0",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 31,
+            "total_us_gallons": "0.000000",
+            "us_gallons_per_day": "0.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-02-01",
+              "period_end_exclusive": "2026-03-01",
+              "usage": "2800",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 28,
+            "total_us_gallons": "2800.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          }
+        ],
+        "covered_days": 59,
+        "gap_days": 0,
+        "baseline_bill_count": 1,
+        "baseline_billing_days": 31,
+        "baseline_us_gallons_per_day": "0.000000",
+        "latest_us_gallons_per_day_change": "100.000000",
+        "latest_percent_change": null,
+        "limitations": [
+          "Entries are unverified and assumed to describe the same household and meter.",
+          "The baseline includes only earlier supplied billing periods, not missing days.",
+          "Differences in daily averages do not establish seasonality, occupancy changes or a leak diagnosis.",
+          "No tariff, cost-change calculation or savings prediction is inferred; missing charges remain unknown."
+        ],
+        "request_id": "12345678-abcd-1234-abcd-123456789abc"
+      }
+    },
+    {
+      "name": "positive_baseline_display_zero",
+      "drafts": [
+        {
+          "period_start": "2024-01-01",
+          "period_end_exclusive": "2025-01-01",
+          "usage": "0.000001",
+          "usage_unit": "liters",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2025-01-01",
+          "period_end_exclusive": "2025-01-02",
+          "usage": "1000000",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        }
+      ],
+      "response": {
+        "source": "manual_entry",
+        "evidence_level": "historical_bills",
+        "confidence": "limited",
+        "bills": [
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2024-01-01",
+              "period_end_exclusive": "2025-01-01",
+              "usage": "0.000001",
+              "usage_unit": "liters",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 366,
+            "total_us_gallons": "0.000000",
+            "us_gallons_per_day": "0.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2025-01-01",
+              "period_end_exclusive": "2025-01-02",
+              "usage": "1000000",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "1000000.000000",
+            "us_gallons_per_day": "1000000.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          }
+        ],
+        "covered_days": 367,
+        "gap_days": 0,
+        "baseline_bill_count": 1,
+        "baseline_billing_days": 366,
+        "baseline_us_gallons_per_day": "0.000000",
+        "latest_us_gallons_per_day_change": "1000000.000000",
+        "latest_percent_change": "138546071294399900.00",
+        "limitations": [
+          "Entries are unverified and assumed to describe the same household and meter.",
+          "The baseline includes only earlier supplied billing periods, not missing days.",
+          "Differences in daily averages do not establish seasonality, occupancy changes or a leak diagnosis.",
+          "No tariff, cost-change calculation or savings prediction is inferred; missing charges remain unknown."
+        ],
+        "request_id": "12345678-abcd-1234-abcd-123456789abc"
+      }
+    },
+    {
+      "name": "decrease_to_zero",
+      "drafts": [
+        {
+          "period_start": "2026-01-01",
+          "period_end_exclusive": "2026-01-02",
+          "usage": "1",
+          "usage_unit": "ccf",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-02",
+          "period_end_exclusive": "2026-01-03",
+          "usage": "0",
+          "usage_unit": "cubic_meters",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        }
+      ],
+      "response": {
+        "source": "manual_entry",
+        "evidence_level": "historical_bills",
+        "confidence": "limited",
+        "bills": [
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-01",
+              "period_end_exclusive": "2026-01-02",
+              "usage": "1",
+              "usage_unit": "ccf",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "748.051948",
+            "us_gallons_per_day": "748.051948",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-02",
+              "period_end_exclusive": "2026-01-03",
+              "usage": "0",
+              "usage_unit": "cubic_meters",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "0.000000",
+            "us_gallons_per_day": "0.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          }
+        ],
+        "covered_days": 2,
+        "gap_days": 0,
+        "baseline_bill_count": 1,
+        "baseline_billing_days": 1,
+        "baseline_us_gallons_per_day": "748.051948",
+        "latest_us_gallons_per_day_change": "-748.051948",
+        "latest_percent_change": "-100.00",
+        "limitations": [
+          "Entries are unverified and assumed to describe the same household and meter.",
+          "The baseline includes only earlier supplied billing periods, not missing days.",
+          "Differences in daily averages do not establish seasonality, occupancy changes or a leak diagnosis.",
+          "No tariff, cost-change calculation or savings prediction is inferred; missing charges remain unknown."
+        ],
+        "request_id": "12345678-abcd-1234-abcd-123456789abc"
+      }
+    },
+    {
+      "name": "twelve_adjacent_bills",
+      "drafts": [
+        {
+          "period_start": "2026-01-01",
+          "period_end_exclusive": "2026-01-02",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-02",
+          "period_end_exclusive": "2026-01-03",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-03",
+          "period_end_exclusive": "2026-01-04",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-04",
+          "period_end_exclusive": "2026-01-05",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-05",
+          "period_end_exclusive": "2026-01-06",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-06",
+          "period_end_exclusive": "2026-01-07",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-07",
+          "period_end_exclusive": "2026-01-08",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-08",
+          "period_end_exclusive": "2026-01-09",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-09",
+          "period_end_exclusive": "2026-01-10",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-10",
+          "period_end_exclusive": "2026-01-11",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-11",
+          "period_end_exclusive": "2026-01-12",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        },
+        {
+          "period_start": "2026-01-12",
+          "period_end_exclusive": "2026-01-13",
+          "usage": "100",
+          "usage_unit": "us_gallons",
+          "water_charge": "",
+          "sewer_charge": "",
+          "currency": ""
+        }
+      ],
+      "response": {
+        "source": "manual_entry",
+        "evidence_level": "historical_bills",
+        "confidence": "limited",
+        "bills": [
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-01",
+              "period_end_exclusive": "2026-01-02",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-02",
+              "period_end_exclusive": "2026-01-03",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-03",
+              "period_end_exclusive": "2026-01-04",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-04",
+              "period_end_exclusive": "2026-01-05",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-05",
+              "period_end_exclusive": "2026-01-06",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-06",
+              "period_end_exclusive": "2026-01-07",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-07",
+              "period_end_exclusive": "2026-01-08",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-08",
+              "period_end_exclusive": "2026-01-09",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-09",
+              "period_end_exclusive": "2026-01-10",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-10",
+              "period_end_exclusive": "2026-01-11",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-11",
+              "period_end_exclusive": "2026-01-12",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          },
+          {
+            "source": "manual_entry",
+            "evidence_level": "bill_only",
+            "confidence": "limited",
+            "bill": {
+              "period_start": "2026-01-12",
+              "period_end_exclusive": "2026-01-13",
+              "usage": "100",
+              "usage_unit": "us_gallons",
+              "water_charge": null,
+              "sewer_charge": null,
+              "currency": null
+            },
+            "billing_days": 1,
+            "total_us_gallons": "100.000000",
+            "us_gallons_per_day": "100.000000",
+            "water_and_sewer_subtotal": null,
+            "limitations": [
+              "Entered values are unverified; no original bill was inspected.",
+              "One aggregate bill cannot establish a usage trend, precise leak timing or a fixture diagnosis.",
+              "The water/sewer subtotal covers only entered line items, not a verified total bill.",
+              "No tariff, savings estimate or leak prediction is inferred."
+            ]
+          }
+        ],
+        "covered_days": 12,
+        "gap_days": 0,
+        "baseline_bill_count": 11,
+        "baseline_billing_days": 11,
+        "baseline_us_gallons_per_day": "100.000000",
+        "latest_us_gallons_per_day_change": "0.000000",
+        "latest_percent_change": "0.00",
+        "limitations": [
+          "Entries are unverified and assumed to describe the same household and meter.",
+          "The baseline includes only earlier supplied billing periods, not missing days.",
+          "Differences in daily averages do not establish seasonality, occupancy changes or a leak diagnosis.",
+          "No tariff, cost-change calculation or savings prediction is inferred; missing charges remain unknown."
+        ],
+        "request_id": "12345678-abcd-1234-abcd-123456789abc"
+      }
+    }
+  ]
+}

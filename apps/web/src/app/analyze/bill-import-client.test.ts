@@ -9,6 +9,12 @@ const result = () => ({ source: "document_import", needs_review: true,
     period_start: "2026-06-01", period_end_exclusive: "2026-07-01", usage: "8.5", usage_unit: "ccf",
     water_charge: "45.12", sewer_charge: null, currency: "USD",
   }, warnings: [] });
+const evidencedResult = () => {
+  const value = result();
+  return { ...value, evidence: { schema_version: 1, reading_type: "estimated", reading_type_page: 1,
+    fields: Object.fromEntries(Object.entries(value.fields).map(([name, field]) =>
+      [name, { kind: field === null ? "missing" : "printed", page: field === null ? null : 1 }])) } };
+};
 const session = () => Response.json({ session_token: token });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
@@ -73,5 +79,47 @@ describe("report import", () => {
       { ...result(), fields: { ...result().fields, usage_unit: "gallons" } },
       { ...result(), fields: { ...result().fields, usage: "x".repeat(1000) } },
     ]) expect(() => parseImportedBill(value)).toThrow("could not be read safely");
+  });
+  it("preserves bounded evidence separately from editable values without marking them reviewed", () => {
+    const value = evidencedResult();
+    value.evidence.fields.period_end_exclusive = { kind: "derived", page: 2 };
+    const imported = parseImportedBill(value);
+    expect(imported.evidence).toEqual(value.evidence);
+    expect(imported.draft.usage).toBe("8.5");
+    value.evidence.fields.usage.page = 2;
+    expect(imported.evidence?.fields.usage.page).toBe(1);
+    expect(parseImportedBill(result()).evidence).toBeUndefined();
+  });
+  it("accepts actual, estimated, mixed and unknown readings with consistent page references", () => {
+    for (const reading_type of ["actual", "estimated", "mixed", "unknown"]) {
+      const value = evidencedResult();
+      const evidence = { ...value.evidence, reading_type, reading_type_page: reading_type === "unknown" ? null : 2 };
+      expect(parseImportedBill({ ...value, evidence }).evidence?.reading_type).toBe(reading_type);
+    }
+  });
+  it("rejects unsupported or inconsistent evidence rather than silently dropping it", () => {
+    const value = evidencedResult();
+    for (const evidence of [null, [], { ...value.evidence, schema_version: 2 },
+      { ...value.evidence, schema_version: true }, { ...value.evidence, reading_type: "verified" },
+      { ...value.evidence, reading_type_page: null }, { ...value.evidence, reading_type: "unknown" },
+      { ...value.evidence, confidence: 0.99 }, { ...value.evidence, fields: {} },
+      { ...value.evidence, fields: { ...value.evidence.fields, private_text: "private" } }]) {
+      expect(() => parseImportedBill({ ...value, evidence })).toThrow("could not be read safely");
+    }
+    for (const source of [{ kind: "printed", page: 0 }, { kind: "printed", page: 1001 },
+      { kind: "printed", page: true }, { kind: "printed", page: "1" }, { kind: "printed", page: 1.5 },
+      { kind: "printed", page: null }, { kind: "missing", page: 1 }, { kind: "missing", page: null },
+      { kind: "derived", page: 1 }, { kind: "reviewed", page: 1 },
+      { kind: "printed", page: 1, quote: "private document text" }]) {
+      expect(() => parseImportedBill({ ...value, evidence: { ...value.evidence,
+        fields: { ...value.evidence.fields, usage: source } } })).toThrow("could not be read safely");
+    }
+    expect(() => parseImportedBill({ ...value, evidence: { ...value.evidence,
+      fields: { ...value.evidence.fields, sewer_charge: { kind: "printed", page: 1 } } } })).toThrow();
+  });
+  it("allows unclear candidate values without treating them as located or confirmed", () => {
+    const value = evidencedResult();
+    const evidence = { ...value.evidence, fields: { ...value.evidence.fields, usage: { kind: "unclear", page: null } } };
+    expect(parseImportedBill({ ...value, evidence }).evidence?.fields.usage).toEqual({ kind: "unclear", page: null });
   });
 });

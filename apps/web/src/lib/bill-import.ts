@@ -12,7 +12,39 @@ export const IMPORT_WARNINGS = {
   not_water_bill: "A water bill could not be identified. Choose a water bill or enter its values manually.",
   unclear_document: "Some details could not be read. Check every field against your report.",
 } as const;
-export type ImportedBill = { draft: BillDraft; warnings: (keyof typeof IMPORT_WARNINGS)[] };
+export type BillFieldSource = { kind: 'printed' | 'derived' | 'unclear' | 'missing'; page: number | null };
+export type BillEvidence = {
+  schema_version: 1;
+  reading_type: 'actual' | 'estimated' | 'mixed' | 'unknown';
+  reading_type_page: number | null;
+  fields: Record<keyof BillDraft, BillFieldSource>;
+};
+export type ImportedBill = { draft: BillDraft; warnings: (keyof typeof IMPORT_WARNINGS)[]; evidence?: BillEvidence };
+
+const invalidImport = () => new Error("The report could not be read safely. Enter the values manually or choose another report.");
+const record = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+const page = (value: unknown): value is number | null => value === null ||
+  (typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 1000);
+
+function parseEvidence(value: unknown, fields: Record<string, unknown>): BillEvidence {
+  if (!record(value) || Object.keys(value).length !== 4 || value.schema_version !== 1 ||
+      !["actual", "estimated", "mixed", "unknown"].includes(value.reading_type as string) ||
+      !page(value.reading_type_page) || (value.reading_type === "unknown") !== (value.reading_type_page === null) ||
+      !record(value.fields) || Object.keys(value.fields).length !== Object.keys(fields).length) throw invalidImport();
+  const sources = {} as BillEvidence["fields"];
+  for (const key of Object.keys(fields) as (keyof BillDraft)[]) {
+    const source = value.fields[key];
+    if (!record(source) || Object.keys(source).length !== 2 ||
+        !["printed", "derived", "unclear", "missing"].includes(source.kind as string) || !page(source.page) ||
+        ((source.kind === "printed" || source.kind === "derived") && (source.page === null || fields[key] === null)) ||
+        (source.kind === "missing" && (source.page !== null || fields[key] !== null)) ||
+        (source.kind === "derived" && key !== "period_end_exclusive")) throw invalidImport();
+    sources[key] = { kind: source.kind as BillFieldSource["kind"], page: source.page };
+  }
+  return { schema_version: 1, reading_type: value.reading_type as BillEvidence["reading_type"],
+    reading_type_page: value.reading_type_page, fields: sources };
+}
 
 export function checkReportSize(file: Pick<File, "size">) {
   if (file.size === 0 || file.size > MAX_REPORT_BYTES) throw new Error("Choose a non-empty report of up to 4 MiB.");
@@ -36,7 +68,7 @@ export async function encodeReport(file: File) {
 }
 
 export function parseImportedBill(value: unknown): ImportedBill {
-  const invalid = () => new Error("The report could not be read safely. Enter the values manually or choose another report.");
+  const invalid = invalidImport;
   if (!value || typeof value !== "object") throw invalid();
   const data = value as Record<string, unknown>;
   if (data.source !== "document_import" || data.needs_review !== true ||
@@ -57,5 +89,6 @@ export function parseImportedBill(value: unknown): ImportedBill {
     if (field !== null && (typeof field !== "string" || !patterns[key].test(field))) throw invalid();
     draft[key] = field === null ? "" : field as string;
   }
-  return { draft, warnings: [...new Set(data.warnings)] as ImportedBill["warnings"] };
+  return { draft, warnings: [...new Set(data.warnings)] as ImportedBill["warnings"],
+    ...(Object.hasOwn(data, "evidence") ? { evidence: parseEvidence(data.evidence, fields) } : {}) };
 }

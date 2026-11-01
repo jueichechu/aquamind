@@ -8,7 +8,7 @@ import json
 from typing import Literal
 
 from fastapi import HTTPException
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .bill_http import _invalid_constant, _unique_object
 
@@ -70,10 +70,74 @@ class ExtractedBillFields(BaseModel):
         return value
 
 
+class FieldSource(BaseModel):
+    """Unverified model locator; never raw document text or a confidence score."""
+    model_config = ConfigDict(extra='forbid', strict=True)
+    kind: Literal['printed', 'derived', 'unclear', 'missing']
+    page: int | None = Field(ge=1, le=1000)
+
+    @model_validator(mode='after')
+    def consistent_locator(self):
+        if self.kind in {'printed', 'derived'} and self.page is None:
+            raise ValueError('A located value needs a page')
+        if self.kind == 'missing' and self.page is not None:
+            raise ValueError('A missing value has no source page')
+        return self
+
+
+class BillFieldSources(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    period_start: FieldSource
+    period_end_exclusive: FieldSource
+    usage: FieldSource
+    usage_unit: FieldSource
+    water_charge: FieldSource
+    sewer_charge: FieldSource
+    currency: FieldSource
+
+
+class BillEvidence(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    schema_version: Literal[1]
+    reading_type: Literal['actual', 'estimated', 'mixed', 'unknown']
+    reading_type_page: int | None = Field(ge=1, le=1000)
+    fields: BillFieldSources
+
+    @field_validator('schema_version', mode='before')
+    @classmethod
+    def integer_version(cls, value):
+        if type(value) is not int or value != 1:
+            raise ValueError('Unsupported evidence version')
+        return value
+
+    @model_validator(mode='after')
+    def located_reading_type(self):
+        if (self.reading_type == 'unknown') != (self.reading_type_page is None):
+            raise ValueError('A known reading type needs a source page')
+        return self
+
+    @classmethod
+    def unknown(cls):
+        return cls(schema_version=1, reading_type='unknown', reading_type_page=None, fields=BillFieldSources(**{
+            name: FieldSource(kind='missing', page=None) for name in BillFieldSources.model_fields}))
+
+
 class ExtractedReport(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     fields: ExtractedBillFields
     warnings: list[ImportWarning] = Field(max_length=7)
+    evidence: BillEvidence
+
+    @model_validator(mode='after')
+    def consistent_sources(self):
+        for name, value in self.fields.model_dump().items():
+            source = getattr(self.evidence.fields, name)
+            if (source.kind == 'missing' and value is not None or
+                    source.kind in {'printed', 'derived'} and value is None):
+                raise ValueError('Field value and source disagree')
+            if source.kind == 'derived' and name != 'period_end_exclusive':
+                raise ValueError('Only an inclusive billing end may be derived')
+        return self
 
 
 class BillImportResponse(ExtractedReport):
@@ -98,6 +162,15 @@ do not mistake the invoice total, taxes or prior balance for these charges. Only
 USD charges are supported; other/unclear currencies require null charges and currency.
 For multiple bills or a document that is not a water bill, return all fields null and
 the appropriate warning. Flag unreadable data, missing dates/usage or ambiguous units.
+For each field, return its source kind and 1-based document page, never a quotation.
+Use printed for a directly stated value, derived ONLY for a clearly inclusive billing
+end converted to an exclusive end, unclear for ambiguous/unreadable evidence, and
+missing for an absent value (null page). Printed/derived values need a page; unclear
+may have a page or null. Do not invent page references. Images have only page 1.
+Classify the consumption readings as actual, estimated, mixed (both), or unknown.
+Only use a known type when explicitly marked in the document and cite its page.
+Otherwise use unknown and a null reading_type_page. Never infer actual from a total.
+Source pages and classifications are unverified candidates, not proof of correctness.
 All values are unverified candidates for a human to review, not a confirmed calculation.
 """
 
@@ -122,10 +195,18 @@ async def extract_report(client, config, body: BillImportRequest) -> ExtractedRe
     try:
         result = ExtractedReport.model_validate(json.loads(response.output_text,
             parse_constant=_invalid_constant, object_pairs_hook=_unique_object))
+        if body.media_type != 'application/pdf':
+            pages = [result.evidence.reading_type_page, *(source.page for source in
+                (getattr(result.evidence.fields, name) for name in BillFieldSources.model_fields))]
+            if any(page not in (None, 1) for page in pages):
+                raise ValueError('An image has only one page')
     except (ValueError, RecursionError):
         raise HTTPException(502, 'Report could not be read; enter its values manually') from None
     if {'not_water_bill', 'multiple_bills'} & set(result.warnings):
         result.fields = ExtractedBillFields(**dict.fromkeys(ExtractedBillFields.model_fields))
+        result.evidence = BillEvidence.unknown()
     if result.fields.currency is None:
         result.fields.water_charge = result.fields.sewer_charge = None
+        result.evidence.fields.water_charge = FieldSource(kind='missing', page=None)
+        result.evidence.fields.sewer_charge = FieldSource(kind='missing', page=None)
     return result

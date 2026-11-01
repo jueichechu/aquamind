@@ -40,10 +40,10 @@ export function WaterDesk() {
       </aside>
     </section>
     {imported && <section className="desk-review desk-container" aria-labelledby="review-heading">
-      <h2 ref={review} tabIndex={-1} id="review-heading">Review your report</h2>
+      <h2 ref={review} tabIndex={-1} id="review-heading" className="focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">Review your report</h2>
       <p className="desk-review-intro">Check every value against the original, including dates and units. Fill in anything missing before calculating.</p>
       {!!imported.result.warnings.length && <ul className="desk-import-warnings">{imported.result.warnings.map((warning) => <li key={warning}>{IMPORT_WARNINGS[warning]}</li>)}</ul>}
-      <BillEntry key={imported.version} initialDraft={imported.result.draft} imported client={client} onBusyChange={setAnalyzing} />
+      <BillEntry key={imported.version} initialDraft={imported.result.draft} evidence={imported.result.evidence} imported client={client} onBusyChange={setAnalyzing} />
     </section>}
     <section id="how-it-works" className="desk-how"><div className="desk-container desk-how-grid">
       <h2>Read the numbers.<br />Choose your next step.</h2>

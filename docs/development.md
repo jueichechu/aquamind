@@ -20,7 +20,7 @@ These are transparent simulation assumptions, not a scientifically validated hou
 
 ## Manual bill normalization
 
-`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills, available through a session-gated HTTP endpoint and the `/analyze` form. There is no upload/OCR or persistence yet. Optional bill-only AI questions are described below. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
+`ml/aquamind_ml/bills.py` adds the Python contract for manually entered aggregate bills, available through a session-gated HTTP endpoint and the `/analyze` form. This calculation accepts entered fields and does not itself upload documents or persist entries. Optional bill-only AI questions and report import are described below. Entries contain a start date, an **exclusive** end date, usage and an explicit unit. Supported units are `us_gallons` (US liquid gallons), `ccf` (100 cubic feet), `cubic_meters`, and `liters`. Ambiguous `gallons`, imperial gallons, unit suffixes and thousands separators are rejected.
 
 Example from a Python process started with `PYTHONPATH=ml`:
 
@@ -60,11 +60,11 @@ PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bills
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_http.py -v
 ```
 
-## Comparing manually entered bills in Python
+## Comparing manually entered bills
 
 `BillComparisonRequest` and `compare_bills` in `ml/aquamind_ml/bills.py` compare
-2–12 supplied bills. This calculation is currently a Python interface; the HTTP
-API and `/analyze` still accept one bill at a time.
+2–12 supplied bills, also available through `POST /v1/bills/compare`.
+The `/analyze` interface still accepts one bill at a time.
 
 ```python
 from aquamind_ml.bills import BillComparisonRequest, compare_bills
@@ -102,10 +102,92 @@ are comparisons of unverified aggregate averages, not a seasonal model, a judgme
 that usage is unusually high or evidence of a particular leak or fixture.
 The calculation has no model calls, persistence or changes to session goals.
 
+The comparison endpoint requires the bearer credential from `POST /v1/sessions`
+and an `application/json` body shaped as `{"bills": [bill, bill, ...]}`. Submit
+original entered fields, not previously normalized results or a supplied baseline.
+The server validates and recalculates the comparison, returning its fields plus
+`request_id`, matching the backend's `X-Request-ID` header. OpenAPI includes the
+nested bill request and comparison response schemas.
+
+The actual streamed body is limited to 12 KiB, regardless of `Content-Length`.
+Strict parsing rejects duplicate keys at every nesting level, non-finite numbers,
+unknown fields, invalid or overlapping periods and counts outside 2–12. Missing,
+expired or revoked sessions return 401; oversized bodies return 413, unsupported
+media types 415 and invalid entries 422 with a generic error. Session liveness is
+checked before parsing, after reading and before releasing results. Responses are
+`no-store` with `nosniff`; no cross-origin access, bill-value request logging,
+saved history, model calls or goal changes are introduced. Comparison works with
+the agent and detector disabled and needs no new API keys.
+
+The same-origin relay exposes the calculation at
+`POST /api/aquamind/v1/bills/compare`, forwarding the bearer credential and JSON
+body without browser cookies. It independently enforces the 12 KiB streamed body
+limit, disables caching and redirects, and uses a 10-second calculation deadline.
+Backend error statuses are preserved; an unconfirmed network failure returns a
+generic 503 without an automatic retry. Other methods are not exposed by the relay.
+
+The browser contract in `apps/web/src/lib/bill-comparison.ts` captures 2–12 validated
+entries in chronological order without changing the caller's drafts, rejects
+overlaps and preserves original decimal text and unknown charges. Its response
+decoder checks the limited historical-bill evidence labels, request ID, every
+echoed bill, billing-day counts, covered/gap days and bounded decimal strings.
+True zero baselines require a null percentage; positive baselines that round to
+display zero retain their defined percentage. Percentage bounds use exact integer
+hundredths to support values larger than JavaScript's safe integer range. Python
+remains authoritative for conversions and comparison arithmetic; the browser does
+not recompute them. Returned data is copied, and unrelated fields and free text
+are discarded.
+
+`evals/fixtures/bill-comparison-contract-v1.json` contains five fictional bill-field
+cases with offline API responses shared by the Python endpoint and browser decoder
+tests: mixed-unit weighted history with a gap, exact zero baseline, tiny positive
+baseline, falling usage and the maximum 12 bills. These are calculation/contract
+fixtures, not document extraction or leak-detection accuracy evidence.
+
+`DemoClient.compareBills(drafts)` validates and snapshots all drafts before creating
+a session, then sends only the structured entered bills to the same-origin relay.
+It shares the client's concurrency guard, in-memory bearer session, omitted cookies,
+no-store requests and 15-second calculation deadline. Invalid fields or overlaps
+are rejected before any request. Expiry clears the token and requires explicit
+resubmission; transport failures are sanitized and never retried automatically.
+The method does not store bill history, ask the agent or change goals. Its result
+passes through the comparison decoder before returning. The `/compare` screen uses
+this client; `/analyze` continues to accept one bill at a time.
+
+### Comparison interface
+
+Open `/compare`, or select **Compare bills** from `/analyze`. Two blank entries are
+shown initially; add or remove entries within the 2–12 bill limit. All entries use
+the same shared date, unit, usage and optional-charge fields as single-bill entry.
+Confirm that the periods describe the same household and meter before submitting.
+This is an assumption the application cannot independently verify. Example bills
+are explicitly labeled and require submission; their provenance stays marked after
+edits until **Clear all bills** starts a fresh entry.
+
+Requests lock entry controls and share the client's concurrency guard. Editing,
+adding, removing, clearing or replacing entries clears the old comparison and
+household confirmation. Errors preserve entries for correction or explicit
+resubmission. No browser storage, document import, model calls, saved history or
+conservation-goal changes are introduced by this screen.
+
+Successful calculations focus the result heading. Results show the day-weighted
+earlier baseline, latest daily usage, absolute and percentage change, excluded gap
+days and a chronological table retaining original units and unknown/zero charges.
+Percentage formatting preserves decimal strings beyond JavaScript's safe integer
+range; small negative changes retain their sign. A true zero baseline has no
+defined percentage, while a positive baseline rounded to display zero is explained.
+The table provides row/column headers, an exclusive-end caption and a keyboard
+focusable horizontal scroll region for narrow viewports. Entry layouts collapse
+to one column; controls reuse the existing theme tokens and focus styles.
+
+Comparisons remain unverified aggregate evidence. They do not explain occupancy,
+weather or leaks, diagnose fixtures, compare tariffs or predict savings.
+
 Run the comparison checks without credentials or a listening server:
 
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_comparison.py -v
+PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_comparison_http.py -v
 ```
 
 ## Preparing meter sequences
@@ -557,6 +639,72 @@ and corrects the fields, explicitly confirms review, then submits through the ex
 authoritative normalization endpoint. Changing a value invalidates review and results.
 Selecting a new report clears the prior import review; bill-only questions still need
 their own sharing consent and do not re-upload the document.
+
+### Extracted bill evidence
+
+Import responses retain the existing fields and warnings and add an `evidence`
+object with `schema_version: 1`. It contains `reading_type` (`actual`, `estimated`,
+`mixed`, or `unknown`), `reading_type_page`, and a source for each extracted field.
+Each source contains only `kind` (`printed`, `derived`, `unclear`, or `missing`) and
+a nullable, one-based `page`. No quotations, free-form explanations, personal
+identifiers or model-generated confidence percentages are accepted in this object.
+
+Printed and derived values require a page; missing values require a null page and
+null field. Unclear candidates may retain a value for review. Only the exclusive
+billing end may be derived, from a clearly inclusive printed end. Known reading
+types require a source page; unknown requires null. Non-water/multiple-bill results
+discard their values and evidence. Suppressed unsupported charges lose their sources.
+
+Page numbers are bounded to 1–1000; this is a schema bound, not a document page-count
+check. Images can cite only page 1. PDF pages and reading classifications are model
+claims and are not independently verified. They never establish correctness, human
+review, a leak diagnosis or suitability for a historical comparison. Calculations
+still use the separately reviewed fields through the normalization endpoint.
+
+The extraction schema requires every property and rejects extra properties, following
+the [structured-output contract](https://developers.openai.com/api/docs/guides/structured-outputs).
+Invalid evidence fails the extraction with a generic error and no automatic retry.
+The web decoder accepts older responses with no evidence, but validates and preserves
+the complete versioned object when present. Evidence is retained in memory alongside
+the import. The review form shows the suggested reading type and field source pages,
+with prompts for unclear or missing required values. Estimated and mixed readings
+carry an explanation before the form and alongside the calculated result.
+
+Source hints are linked to their fields as accessible descriptions, separately from
+the visible labels. Editing a field removes its page citation; its new value is a
+user edit, not text supported by the original locator. The existing review checkbox
+marks values as reviewed by the user, never independently verified. Any subsequent
+edit resets review and removes the result. Clearing or loading example values removes
+the import context. Required values still use form validation; absent optional charges
+can remain unknown. Legacy imports without evidence show an unknown reading type and
+no invented page references. Manual bill entry has no import-specific hints.
+
+### Synthetic bill-review fixtures
+
+`evals/fixtures/bill-import-review-v1.json` is a shared set of ten synthetic extraction
+responses and fixed normalization expectations, consumed by Python and web tests.
+It covers all four supported usage units, monthly/quarterly/irregular periods,
+actual/estimated/mixed/unknown readings, missing dates, ambiguous units, unknown
+versus zero charges, unsupported currency, combined services, and rejected non-water
+or multiple-bill documents. Unsupported charges and rejected-document evidence are
+checked after server-side suppression. Incomplete entries need explicit corrections
+before normalization; unrelated invoice charges never enter the water/sewer subtotal.
+
+The Python test uses mocked provider responses through the actual import and
+normalization endpoints. The web test uses the same responses through the client
+decoder and a server-rendered review form, then checks corrected normalization
+requests. Input bytes are format-signature probes, not complete PDFs or photos.
+These tests verify contracts, calculations, review defaults and transport behavior;
+they do not measure OCR, document-layout coverage, model interpretation accuracy,
+live-provider compatibility or browser interaction. No fixture contains real household
+data, and the tests require no provider credentials or paid requests.
+
+Run the focused checks from the repository root:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_bill_import.py -v
+pnpm --filter web test src/app/analyze/bill-review-fixtures.test.tsx
+```
 
 The public-facing bill pages use General Sans through Fontshare's hosted stylesheet,
 with the existing Geist font as fallback. Font files are not redistributed in this
