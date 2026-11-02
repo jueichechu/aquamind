@@ -1,3 +1,2 @@
--r requirements-mcp.txt
-openai==3.35.1
-python-dotenv==1.2.2
+-r requirements-cloud.txt
+-r requirements.txt

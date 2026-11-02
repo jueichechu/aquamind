@@ -276,7 +276,7 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(os.environ, {'AQUAMIND_AGENT_ENABLED': '1', 'OPENAI_API_KEY': 'test-placeholder',
                                      'OPENAI_MODEL': 'test-model'}), \
-                patch('aquamind_ml.api.FrozenDetector', return_value=detector) as load, \
+                patch('aquamind_ml.detector.FrozenDetector', return_value=detector) as load, \
                 patch('aquamind_ml.api.Lock', return_value=lock), \
                 patch('openai.AsyncOpenAI', side_effect=provider_context):
             app = create_app(Path('host-selected-detector'))

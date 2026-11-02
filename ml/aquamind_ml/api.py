@@ -15,10 +15,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-import torch
 
 from .data import MeterWindow
-from .detector import FrozenDetector
 from .sessions import DemoSessions, approval_router
 from .approvals import ApprovalSessionUnavailable
 from .bill_http import bill_router
@@ -82,11 +80,21 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
             daily_budget = DailyStageBudget(Path(path), int(limit))
             if agent_host is not None:
                 agent_host._daily_budget = daily_budget
-        previous_threads = torch.get_num_threads()
-        torch.set_num_threads(1)
+        inference_mode = os.environ.get('AQUAMIND_INFERENCE_ENABLED', '1')
+        if inference_mode not in {'0', '1'}:
+            raise ValueError('AQUAMIND_INFERENCE_ENABLED must be 0 or 1')
+        configured = detector_path or os.environ.get('AQUAMIND_DETECTOR_PATH')
+        if inference_mode == '0' and configured:
+            raise ValueError('A detector path requires inference to be enabled')
+        torch = None
+        previous_threads = None
+        if inference_mode == '1':
+            import torch
+            from .detector import FrozenDetector
+            previous_threads = torch.get_num_threads()
+            torch.set_num_threads(1)
         app.state.detector = None
         try:
-            configured = detector_path or os.environ.get("AQUAMIND_DETECTOR_PATH")
             if configured:
                 try:
                     app.state.detector = FrozenDetector(Path(configured))
@@ -115,7 +123,8 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
         finally:
             app.state.agent_host = None
             app.state.detector = None
-            torch.set_num_threads(previous_threads)
+            if torch is not None:
+                torch.set_num_threads(previous_threads)
 
     app = FastAPI(title="AquaMind inference", version="0.1.0", lifespan=lifespan)
     app.state.sessions = sessions if sessions is not None else DemoSessions()
