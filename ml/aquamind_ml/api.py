@@ -22,6 +22,7 @@ from .detector import FrozenDetector
 from .sessions import DemoSessions, approval_router
 from .approvals import ApprovalSessionUnavailable
 from .bill_http import bill_router
+from .admission import PublicAdmission, PublicAdmissionMiddleware
 
 logger = logging.getLogger("aquamind.api")
 if not logger.handlers:
@@ -67,6 +68,10 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
 
     @asynccontextmanager
     async def lifespan(app):
+        public_mode = os.environ.get('AQUAMIND_PUBLIC_MODE', '0')
+        if public_mode not in {'0', '1'}:
+            raise ValueError('AQUAMIND_PUBLIC_MODE must be 0 or 1')
+        app.state.public_admission = PublicAdmission() if public_mode == '1' else None
         previous_threads = torch.get_num_threads()
         torch.set_num_threads(1)
         app.state.detector = None
@@ -108,6 +113,7 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
     app.include_router(bill_router(app.state.sessions))
     from .agent_http import agent_router
     app.include_router(agent_router(app.state.sessions))
+    app.add_middleware(PublicAdmissionMiddleware)
 
     @app.middleware("http")
     async def trace(request: Request, call_next):
