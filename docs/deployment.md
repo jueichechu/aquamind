@@ -3,9 +3,9 @@
 The root [render.yaml](../render.yaml) defines a public Next.js Node service and a
 private FastAPI service in the same Render region. This initial configuration
 supports manual bill analysis, manual comparisons and the synthetic dashboard.
-**AI answers and document extraction are disabled.** Public request-admission and
-paid-AI abuse controls remain launch work; this is a staging configuration, not a
-completed production release.
+**AI answers and document extraction are disabled.** Public request admission and
+a durable daily AI-stage cap are included. Hosted verification and capacity
+measurement are still required before treating this as a production release.
 
 ## Before provisioning
 
@@ -14,11 +14,11 @@ completed production release.
   source. No Render API token is needed for dashboard deployment.
 - Merge the deployment configuration into `main` before selecting that branch.
 - Review the paid service plans in the Blueprint creation screen. The template
-  selects 512 MB for Next.js and 2 GB for Python/PyTorch. Capacity still needs
+  selects 512 MB for Next.js, 2 GB for Python/PyTorch and a 1 GB backend disk. Capacity still needs
   deployed measurement; these are starting sizes, not measured guarantees. Check
   [current pricing](https://render.com/pricing) before creating resources.
-- Keep `AQUAMIND_AGENT_ENABLED=0`. Do not add an OpenAI key or enable AI until public
-  request controls and the live-test plan are ready. Calculations need no key.
+- Keep `AQUAMIND_AGENT_ENABLED=0` for the first deployment. Verify the manual flows,
+  public-mode settings and persistent disk before enabling AI. Calculations need no key.
 - Use a new Blueprint without existing services of the same names. If those names
   are already used in the workspace, rename both services and the `fromService`
   reference before syncing. Review any existing environment variables separately:
@@ -43,23 +43,28 @@ completed production release.
    July 1. Expect 30 days and about 211.95 US gallons/day. On `/compare`, load the
    examples, confirm the same-household assumption, and expect 100 US gallons/day
    for both periods and 0.00% change. Check `/demo` as well.
-8. Keep the URL as staging until public request controls and deployed verification
-   are complete. Upload extraction and AI questions are unavailable with these
+8. Keep the URL as staging until deployed verification is complete.
+   Upload extraction and AI questions are unavailable with these
    defaults; an unavailable response is not a successful AI smoke test.
 
 The [Blueprint reference](https://render.com/docs/blueprint-spec) documents the
 service settings and [private networking](https://render.com/docs/private-network)
 describes the internal connection. Normal Git pushes do not deploy automatically
 in this template: `autoDeployTrigger: off` requires deliberate deployment from the
-dashboard. This setting does not prevent the initial Blueprint deployment.
+dashboard. This setting does not prevent the initial Blueprint deployment or
+Blueprint configuration syncs. For fully manual configuration changes, set the
+Blueprint's **Settings → Auto Sync → No** and use Manual Sync deliberately.
 
 ## Runtime and data boundaries
 
 Use exactly one backend instance and one Uvicorn worker. Sessions and approval
 state live in process memory; restarts, service replacement and deployments clear
-them. Users must reload and start a new session. Zero-downtime replacement can
-temporarily route traffic across old and new instances; do not assume a session
-survives it. Shared storage is required before scaling backend instances/workers.
+them. Users must reload and start a new session. The attached backend disk preserves
+only the daily AI-stage counter; it does not persist sessions, goals or bills.
+Render stops the old backend before starting its replacement when a disk is
+attached, so allow a brief interruption during updates. See
+[persistent disk limitations](https://render.com/docs/disks). Shared session storage
+and distributed admission controls are required before scaling workers/instances.
 
 The Python build installs the pinned CPU PyTorch package before the remaining
 agent dependencies, avoiding a CUDA installation. Existing dependency pins and
@@ -74,14 +79,55 @@ Git-based builds use the committed repository. Bill documents and entered data
 must not be added to durable storage or logs. The service disables Uvicorn access
 logs; application tracing records request ID, status and duration without bodies.
 
-## Enabling AI later
+## Public request controls
 
-After public admission controls are implemented and tested, add `OPENAI_API_KEY`
+Keep `AQUAMIND_PUBLIC_MODE=1` on both services. The frontend admits at most eight
+concurrent relay requests, including body reading. The API admits eight concurrent
+`/v1/*` requests and applies rolling 60-second, process-wide limits:
+
+| Request group | Limit per 60 seconds |
+| --- | --- |
+| All `/v1/*` requests | 60 |
+| New sessions | 6 |
+| AI turns, continuations, bill questions and imports combined | 6 |
+
+Both layers enforce a 15-second whole-body read deadline and actual-byte limits;
+an incomplete upload returns 408, oversized data returns 413, and admission
+exhaustion returns 429. Numeric Retry-After hints pass through the relay; clients
+still require deliberate resubmission and never retry paid calls automatically.
+Health checks do not create sessions, consume AI quota or use these request windows.
+
+These controls use no visitor IPs, cookies or durable identifiers. Forwarding
+headers do not establish identity or bypass limits. All visitors share capacity:
+these bounds limit resource use, without guaranteeing fairness or replacing the
+hosting edge's denial-of-service protections. Rolling windows reset on restart.
+
+Public AI additionally requires an absolute `AQUAMIND_USAGE_DB` path on persistent
+storage and `AQUAMIND_AI_DAILY_STAGE_LIMIT` from 1 to 100 (template: 20). A SQLite
+transaction reserves one stage before work starts. The database contains only one
+UTC date and a counter; new sessions and backend restarts cannot reset that count.
+The cap resets on the next UTC date. Failed/cancelled stages are not refunded;
+invalid requests and rejected busy stages do not reserve a stage. The existing
+one-active-stage-per-session, two-active-stages-per-host, eight-stage session and
+100-stage process limits also remain in place. Cached continuation results require
+no new paid stage. Each agent stage can contain multiple bounded provider calls;
+**the daily stage limit is not a dollar spending cap.**
+
+Missing/invalid public AI budget configuration prevents API startup. An unavailable,
+locked or corrupt budget database rejects paid admission before provider work.
+Do not delete, restore or replace the usage database to recover from an exhausted
+cap. If the disk fails, repair it and verify its count before re-enabling AI.
+The default manual-only deployment needs no database access to answer calculations.
+
+## Enabling AI after staging verification
+
+After verifying the public controls and persistent disk on Render, add `OPENAI_API_KEY`
 and `OPENAI_MODEL` under **aquamind-api → Environment**, and deliberately update
 `AQUAMIND_AGENT_ENABLED` in the Blueprint to `1` before syncing. Do not put a key in
-the web service, `NEXT_PUBLIC_*`, Git or a chat message. Existing process counters
-limit development requests but are not a distributed rate limiter or a dollar
-spending cap. Do not rely on them alone for an anonymous public AI endpoint.
+the web service, `NEXT_PUBLIC_*`, Git or a chat message. Check that the usage path
+is under the attached mount and retain the single-instance/worker configuration.
+The daily cap is shared by all users; deliberately choose its value before enabling
+paid requests. Distributed/public-scale abuse prevention needs additional controls.
 
 Use a fictional report for an explicitly authorized live extraction check; this
 incurs provider usage. Verify consent, extraction review and calculation through

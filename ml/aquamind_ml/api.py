@@ -23,6 +23,7 @@ from .sessions import DemoSessions, approval_router
 from .approvals import ApprovalSessionUnavailable
 from .bill_http import bill_router
 from .admission import PublicAdmission, PublicAdmissionMiddleware
+from .usage_budget import DailyStageBudget
 
 logger = logging.getLogger("aquamind.api")
 if not logger.handlers:
@@ -72,6 +73,15 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
         if public_mode not in {'0', '1'}:
             raise ValueError('AQUAMIND_PUBLIC_MODE must be 0 or 1')
         app.state.public_admission = PublicAdmission() if public_mode == '1' else None
+        daily_budget = None
+        if public_mode == '1' and (agent_host is not None or os.environ.get('AQUAMIND_AGENT_ENABLED') == '1'):
+            path = os.environ.get('AQUAMIND_USAGE_DB', '')
+            limit = os.environ.get('AQUAMIND_AI_DAILY_STAGE_LIMIT', '20')
+            if not path or not limit.isascii() or not limit.isdigit():
+                raise ValueError('Configure the public AI usage database and daily stage limit')
+            daily_budget = DailyStageBudget(Path(path), int(limit))
+            if agent_host is not None:
+                agent_host._daily_budget = daily_budget
         previous_threads = torch.get_num_threads()
         torch.set_num_threads(1)
         app.state.detector = None
@@ -97,7 +107,7 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
                             api_key=key,
                             base_url='https://api.openai.com/v1', max_retries=0, timeout=30))
                         app.state.agent_host = AgentHost(provider, config,
-                            detector=app.state.detector, detector_lock=lock)
+                            detector=app.state.detector, detector_lock=lock, daily_budget=daily_budget)
                     except Exception as error:
                         logger.error(json.dumps({'event': 'agent_configuration_failed',
                                                  'error_type': type(error).__name__}))

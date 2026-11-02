@@ -9,6 +9,10 @@ services:
     branch: main
     numInstances: 1
     autoDeployTrigger: "off"
+    disk:
+      name: aquamind-usage
+      mountPath: /var/data/aquamind
+      sizeGB: 1
     buildCommand: >-
       python -m pip install --index-url https://download.pytorch.org/whl/cpu -r ml/requirements.txt
       && python -m pip install -r ml/requirements-agent.txt
@@ -29,6 +33,12 @@ services:
         value: "1"
       - key: AQUAMIND_AGENT_ENABLED
         value: "0"
+      - key: AQUAMIND_PUBLIC_MODE
+        value: "1"
+      - key: AQUAMIND_USAGE_DB
+        value: /var/data/aquamind/usage.sqlite3
+      - key: AQUAMIND_AI_DAILY_STAGE_LIMIT
+        value: "20"
 
   - type: web
     name: aquamind-web
@@ -50,6 +60,8 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: AQUAMIND_PUBLIC_MODE
         value: "1"
       - key: AQUAMIND_API_HOSTPORT
         fromService:
