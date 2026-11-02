@@ -91,6 +91,7 @@ The backend also runs without OpenAI configuration when `AQUAMIND_AGENT_ENABLED`
 | `OPENAI_MODEL` | Python backend | Responses-compatible model for the assistant |
 | `AQUAMIND_AGENT_ENABLED` | Python backend | Set to `1` to enable the assistant; disabled by default |
 | `AQUAMIND_DETECTOR_PATH` | Python backend | Optional frozen detector directory, such as `ml/artifacts/detector-v1` |
+| `AQUAMIND_INFERENCE_ENABLED` | Python backend | Defaults to `1`; set `0` to run the bill/agent service without PyTorch |
 | `AQUAMIND_API_URL` | Next.js server | Backend URL used by the same-origin relay |
 
 The frontend never receives the OpenAI key. Set `AQUAMIND_DETECTOR_PATH` on the backend process after generating the artifact using the [training and freeze instructions](docs/development.md#pytorch-model). Missing model artifacts disable anomaly inference while other configured features remain available.
@@ -145,7 +146,7 @@ Assistant questions and requested evidence are sent to OpenAI. Avoid entering pe
 
 ## Documentation
 
-- [Deployment guide](docs/deployment.md): Render staging setup, private backend, health checks and launch limitations.
+- [Deployment guide](docs/deployment.md): free-tier Render setup, authenticated backend relay, optional AI configuration and usage limits.
 - [Development reference](docs/development.md): data generation, model training, API contracts, MCP scopes and agent behavior.
 - [AMPds2 dataset and experiments](docs/datasets/ampds2.md): provenance, reproducible processing, experimental results and limitations. External data has its own license and attribution requirements.
 

@@ -48,7 +48,7 @@ async function boundedBody(request: Request, limit: number) {
   return new TextDecoder().decode(bytes);
 }
 
-async function forward(request: Request, context: { params: Promise<{ path: string[] }> }) {
+async function forward(request: Request, context: { params: Promise<{ path: string[] }> }, relayKey?: string) {
   const { path } = await context.params;
   const route = path.join("/");
   const approval = /^v1\/approvals\/[0-9a-f-]{36}$/.test(route);
@@ -67,6 +67,7 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
     const limit = importing ? IMPORT_BODY_LIMIT : newTurn ? 16384 : comparing ? 12 * 1024 : 1024;
     const body = request.method === "POST" ? await boundedBody(request, limit) : undefined;
     const headers = new Headers({ "Content-Type": "application/json" });
+    if (relayKey) headers.set("X-AquaMind-Relay-Key", relayKey);
     const auth = request.headers.get("authorization");
     if (auth) headers.set("Authorization", auth);
     const upstream = await fetch(`${base.replace(/\/$/, "")}/${route}`, {
@@ -88,12 +89,18 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
 }
 
 async function relay(request: Request, context: { params: Promise<{ path: string[] }> }) {
+  const relayMode = process.env.AQUAMIND_RELAY_REQUIRED ?? "0";
+  const relayKey = relayMode === "1" ? process.env.AQUAMIND_RELAY_SECRET : undefined;
+  if ((relayMode !== "0" && relayMode !== "1") ||
+      (relayMode === "1" && (!relayKey || !/^[\x21-\x7e]{32,128}$/.test(relayKey)))) {
+    return failure("Demo backend unavailable", 503);
+  }
   const mode = process.env.AQUAMIND_PUBLIC_MODE ?? "0";
   if (mode !== "0" && mode !== "1") return failure("Demo backend unavailable", 503);
   const limited = mode === "1";
   if (limited && activePublicRequests >= 8) return failure("Service busy; try again later", 429, { "Retry-After": "1" });
   if (limited) activePublicRequests += 1;
-  try { return await forward(request, context); }
+  try { return await forward(request, context, relayKey); }
   finally { if (limited) activePublicRequests -= 1; }
 }
 

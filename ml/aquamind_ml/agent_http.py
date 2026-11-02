@@ -20,6 +20,7 @@ from .weather import ScenarioId
 from .bills import ManualBill, normalize_bill
 from .bill_http import _unique_object, _invalid_constant
 from .usage_budget import DailyStageBudget
+from .remote_budget import UpstashStageBudget
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
@@ -91,7 +92,7 @@ class AgentHost:
     def __init__(self, client: AsyncOpenAI, config: AgentConfig, *,
                  demo_meter_path=DEFAULT_DEMO_METER_PATH,
                  detector: FrozenDetector | None = None, detector_lock: Lock | None = None,
-                 daily_budget: DailyStageBudget | None = None):
+                 daily_budget: DailyStageBudget | UpstashStageBudget | None = None):
         self.client, self.config = client, config
         self._daily_budget = daily_budget
         self._detector = detector
@@ -136,12 +137,18 @@ class AgentHost:
             raise HTTPException(429, 'Agent is busy')
         if self._total >= 100 or self._counts.get(store, 0) >= 8:
             raise HTTPException(429, 'Local demo agent budget exhausted')
-        if self._daily_budget is not None:
-            self._daily_budget.reserve()
         self._active.add(store)
         self._counts[store] = self._counts.get(store, 0) + 1
         self._total += 1
+        admitted = False
         try:
+            # Reserve host/session capacity before awaiting the remote ledger.
+            if isinstance(self._daily_budget, UpstashStageBudget):
+                await self._daily_budget.reserve_async()
+            elif self._daily_budget is not None:
+                self._daily_budget.reserve()
+            admitted = True
+            _ = store.goal
             yield
         except HTTPException:
             raise
@@ -149,6 +156,9 @@ class AgentHost:
             _ = store.goal  # Map revocation/expiry during provider or transport work to 401.
             raise HTTPException(503, 'Agent unavailable') from None
         finally:
+            if not admitted:
+                self._counts[store] -= 1
+                self._total -= 1
             self._active.discard(store)
 
     async def run(self, text: str, store: GoalApprovals, *,

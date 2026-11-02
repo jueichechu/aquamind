@@ -1,0 +1,6 @@
+# Hosted agent/bill service without the optional local PyTorch detector.
+-r requirements-http.txt
+# Keep this MCP pin aligned with requirements-mcp.txt.
+mcp==2.3.0
+openai==3.35.1
+python-dotenv==1.2.2

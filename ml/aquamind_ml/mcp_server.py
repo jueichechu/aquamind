@@ -1,21 +1,21 @@
 """Local MCP tools with host-owned scopes and approval-only goal proposals."""
 
+from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
-import torch
 
 from .api import PredictionRequest, PredictionResponse
 from .data import MeterWindow
-from .detector import FrozenDetector
 from .approvals import ApprovalSessionUnavailable, GoalApprovals, GoalProposal, GoalRequest
 from .meter import MeterQuery, MeterSeries, MeterStore, MeterSummary
 from .demo_meter import DemoMeterStore, DemoMeterSummary, DemoMeterSeries
@@ -23,6 +23,9 @@ from .weather import DEFAULT_WEATHER_PATH, WeatherContext, WeatherQuery, Weather
 from .weather import ScenarioId
 from .utility import (CostRequest, CostEstimate, SavingsRequest, SavingsEstimate,
                       UtilityRate, estimate_cost, estimate_savings)
+
+if TYPE_CHECKING:
+    from .detector import FrozenDetector
 
 
 class DemoAnomalyResponse(PredictionResponse):
@@ -81,6 +84,7 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
         detector = None
     if detector_path is not None and "anomaly:read" in granted_scopes:
         try:
+            from .detector import FrozenDetector
             detector = FrozenDetector(detector_path)
         except Exception:
             logging.getLogger(__name__).error("AquaMind MCP detector unavailable")
@@ -268,10 +272,12 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
 
 
 def main():
-    torch.set_num_threads(1)
     path = os.environ.get("AQUAMIND_DETECTOR_PATH")
     meter_path = os.environ.get("AQUAMIND_METER_DATASET_PATH")
     scopes = frozenset(scope.strip() for scope in os.environ.get("AQUAMIND_MCP_SCOPES", "").split(",") if scope.strip())
+    if 'anomaly:read' in scopes:
+        import torch
+        torch.set_num_threads(1)
     create_server(Path(path) if path else None, scopes,
                   Path(meter_path) if meter_path else None).run(transport="stdio")
 

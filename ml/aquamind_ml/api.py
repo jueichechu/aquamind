@@ -15,15 +15,14 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-import torch
 
 from .data import MeterWindow
-from .detector import FrozenDetector
 from .sessions import DemoSessions, approval_router
 from .approvals import ApprovalSessionUnavailable
 from .bill_http import bill_router
 from .admission import PublicAdmission, PublicAdmissionMiddleware
 from .usage_budget import DailyStageBudget
+from .remote_budget import UpstashStageBudget
 
 logger = logging.getLogger("aquamind.api")
 if not logger.handlers:
@@ -72,27 +71,56 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
         public_mode = os.environ.get('AQUAMIND_PUBLIC_MODE', '0')
         if public_mode not in {'0', '1'}:
             raise ValueError('AQUAMIND_PUBLIC_MODE must be 0 or 1')
+        relay_mode = os.environ.get('AQUAMIND_RELAY_REQUIRED', '0')
+        relay_key = os.environ.get('AQUAMIND_RELAY_SECRET', '')
+        if relay_mode not in {'0', '1'} or (relay_mode == '1' and
+                (not 32 <= len(relay_key) <= 128 or not all(33 <= ord(c) <= 126 for c in relay_key))):
+            raise ValueError('Configure valid relay authorization settings')
+        app.state.relay_secret = relay_key.encode() if relay_mode == '1' else None
         app.state.public_admission = PublicAdmission() if public_mode == '1' else None
-        daily_budget = None
-        if public_mode == '1' and (agent_host is not None or os.environ.get('AQUAMIND_AGENT_ENABLED') == '1'):
-            path = os.environ.get('AQUAMIND_USAGE_DB', '')
-            limit = os.environ.get('AQUAMIND_AI_DAILY_STAGE_LIMIT', '20')
-            if not path or not limit.isascii() or not limit.isdigit():
-                raise ValueError('Configure the public AI usage database and daily stage limit')
-            daily_budget = DailyStageBudget(Path(path), int(limit))
-            if agent_host is not None:
-                agent_host._daily_budget = daily_budget
-        previous_threads = torch.get_num_threads()
-        torch.set_num_threads(1)
+        inference_mode = os.environ.get('AQUAMIND_INFERENCE_ENABLED', '1')
+        if inference_mode not in {'0', '1'}:
+            raise ValueError('AQUAMIND_INFERENCE_ENABLED must be 0 or 1')
+        configured = detector_path or os.environ.get('AQUAMIND_DETECTOR_PATH')
+        if inference_mode == '0' and configured:
+            raise ValueError('A detector path requires inference to be enabled')
+        torch = None
+        previous_threads = None
+        if inference_mode == '1':
+            import torch
+            from .detector import FrozenDetector
+            previous_threads = torch.get_num_threads()
+            torch.set_num_threads(1)
         app.state.detector = None
         try:
-            configured = detector_path or os.environ.get("AQUAMIND_DETECTOR_PATH")
             if configured:
                 try:
                     app.state.detector = FrozenDetector(Path(configured))
                 except Exception as error:
                     logger.error(json.dumps({"event": "model_load_failed", "error_type": type(error).__name__}))
             async with AsyncExitStack() as stack:
+                daily_budget = None
+                if public_mode == '1' and (agent_host is not None or os.environ.get('AQUAMIND_AGENT_ENABLED') == '1'):
+                    limit = os.environ.get('AQUAMIND_AI_DAILY_STAGE_LIMIT', '20')
+                    if not limit.isascii() or not limit.isdigit():
+                        raise ValueError('Configure a valid daily AI stage limit')
+                    usage_store = os.environ.get('AQUAMIND_USAGE_STORE', 'sqlite')
+                    if usage_store == 'upstash':
+                        import httpx
+                        ledger = await stack.enter_async_context(httpx.AsyncClient(
+                            transport=httpx.AsyncHTTPTransport(retries=0), follow_redirects=False, timeout=2))
+                        daily_budget = UpstashStageBudget(ledger,
+                            os.environ.get('UPSTASH_REDIS_REST_URL', ''),
+                            os.environ.get('UPSTASH_REDIS_REST_TOKEN', ''), int(limit))
+                    elif usage_store == 'sqlite':
+                        path = os.environ.get('AQUAMIND_USAGE_DB', '')
+                        if not path:
+                            raise ValueError('Configure the public AI usage database')
+                        daily_budget = DailyStageBudget(Path(path), int(limit))
+                    else:
+                        raise ValueError('Unsupported AI usage store')
+                    if agent_host is not None:
+                        agent_host._daily_budget = daily_budget
                 app.state.agent_host = agent_host
                 if agent_host is None and os.environ.get('AQUAMIND_AGENT_ENABLED') == '1':
                     try:
@@ -115,7 +143,8 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
         finally:
             app.state.agent_host = None
             app.state.detector = None
-            torch.set_num_threads(previous_threads)
+            if torch is not None:
+                torch.set_num_threads(previous_threads)
 
     app = FastAPI(title="AquaMind inference", version="0.1.0", lifespan=lifespan)
     app.state.sessions = sessions if sessions is not None else DemoSessions()
