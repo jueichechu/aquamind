@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import deque
+from hmac import compare_digest
 import math
 from threading import Lock
 from time import monotonic
@@ -64,13 +65,20 @@ class PublicAdmissionMiddleware:
 
     async def __call__(self, scope, receive, send):
         path = scope.get('path', '').rstrip('/')
-        policy = getattr(scope['app'].state, 'public_admission', None) if scope['type'] == 'http' else None
-        if policy is None or not path.startswith('/v1/'):
+        if scope['type'] != 'http' or not path.startswith('/v1/'):
             return await self.app(scope, receive, send)
 
         async def reject(status, detail, headers=None):
             await JSONResponse({'detail': detail}, status_code=status, headers=headers)(scope, receive, send)
 
+        secret = getattr(scope['app'].state, 'relay_secret', None)
+        if secret is not None:
+            supplied = [value for key, value in scope.get('headers', []) if key.lower() == b'x-aquamind-relay-key']
+            if len(supplied) != 1 or not compare_digest(supplied[0], secret):
+                return await reject(401, 'Relay authorization required')
+        policy = getattr(scope['app'].state, 'public_admission', None)
+        if policy is None:
+            return await self.app(scope, receive, send)
         try:
             policy.enter(scope['method'], path)
         except HTTPException as error:
