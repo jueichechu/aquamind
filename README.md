@@ -145,6 +145,7 @@ Assistant questions and requested evidence are sent to OpenAI. Avoid entering pe
 
 ## Documentation
 
+- [Deployment guide](docs/deployment.md): Render staging setup, private backend, health checks and launch limitations.
 - [Development reference](docs/development.md): data generation, model training, API contracts, MCP scopes and agent behavior.
 - [AMPds2 dataset and experiments](docs/datasets/ampds2.md): provenance, reproducible processing, experimental results and limitations. External data has its own license and attribution requirements.
 

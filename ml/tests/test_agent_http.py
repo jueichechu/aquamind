@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from threading import Lock
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -16,6 +17,7 @@ from aquamind_ml.agent import AgentConfig
 from aquamind_ml.agent_http import AgentHost
 from aquamind_ml.api import create_app
 from aquamind_ml.sessions import DemoSessions
+from aquamind_ml.usage_budget import DailyStageBudget
 from aquamind_ml.demo_meter import DemoMeterStore, SCENARIOS
 from test_agent import call, message, response
 
@@ -54,6 +56,22 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
 
     async def turn(self, headers, text='A private water question'):
         return await self.http.post('/v1/agent/turn', headers=headers, json={'text': text})
+
+    async def test_daily_budget_blocks_new_sessions_and_hosts_before_provider_work(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'usage.sqlite3'
+            self.host._daily_budget = DailyStageBudget(path, 1)
+            _, headers = await self.session()
+            self.assertEqual((await self.turn(headers)).status_code, 200)
+            self.assertEqual(len(self.requests), 1)
+            self.app.state.agent_host = AgentHost(self.provider, AgentConfig(model='test-model'),
+                                                  daily_budget=DailyStageBudget(path, 1))
+            _, stranger = await self.session()
+            denied = await self.turn(stranger)
+            self.assertEqual(denied.status_code, 429)
+            self.assertEqual(denied.json()['detail'], 'Daily AI request limit reached')
+            self.assertEqual(len(self.requests), 1)
+            self.assertEqual((await self.http.get('/health')).status_code, 200)
 
     async def test_authenticated_sdk_mcp_answer_and_private_logs(self):
         self.assertEqual((await self.turn({})).status_code, 401)
