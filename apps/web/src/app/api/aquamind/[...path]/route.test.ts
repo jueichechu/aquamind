@@ -2,8 +2,55 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DELETE, GET, POST } from "./route";
 import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split("/") }) });
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("approval relay", () => {
+  it("bounds public in-flight uploads and releases every timed-out reader without forwarding", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("AQUAMIND_PUBLIC_MODE", "1");
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
+    const fetcher = vi.fn().mockResolvedValue(Response.json({}));
+    vi.stubGlobal("fetch", fetcher);
+    // A malicious stream may also stall its cancellation hook.
+    const cancelled = vi.fn(() => new Promise<void>(() => {}));
+    const pending = Array.from({ length: 8 }, () => POST(new Request("http://localhost/api", {
+      method: "POST", body: new ReadableStream({ cancel: cancelled }), duplex: "half",
+    } as RequestInit), context("v1/bills/import")));
+    const denied = await POST(new Request("http://localhost/api", { method: "POST", body: "{}" }), context("v1/sessions"));
+    expect(denied.status).toBe(429);
+    expect(denied.headers.get("retry-after")).toBe("1");
+    await vi.advanceTimersByTimeAsync(15_000);
+    for (const response of await Promise.all(pending)) {
+      expect(response.status).toBe(408);
+      expect(await response.json()).toEqual({ detail: "Request body timed out" });
+    }
+    expect(cancelled).toHaveBeenCalledTimes(8);
+    expect(fetcher).not.toHaveBeenCalled();
+    const recovered = await POST(new Request("http://localhost/api", { method: "POST", body: "{}" }), context("v1/sessions"));
+    expect(recovered.status).toBe(200);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed on invalid public-mode settings", async () => {
+    vi.stubEnv("AQUAMIND_PUBLIC_MODE", "invalid");
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    expect((await POST(new Request("http://localhost/api"), context("v1/sessions"))).status).toBe(503);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("forwards only bounded numeric Retry-After values on throttled responses", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    for (const [status, retry, expected] of [[429, "60", "60"], [429, "86400", "86400"],
+      [429, "private-host", null], [429, "1000000", null], [200, "60", null]] as const) {
+      fetcher.mockResolvedValueOnce(Response.json({}, { status, headers: { "Retry-After": retry } }));
+      const result = await POST(new Request("http://localhost/api", { method: "POST", body: "{}" }), context("v1/sessions"));
+      expect(result.status).toBe(status);
+      expect(result.headers.get("retry-after")).toBe(expected);
+    }
+  });
+
   it("relays bill comparisons with a twelve-KiB limit, session auth and a calculation deadline", async () => {
     vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000/");
     const payload = { evidence_level: "historical_bills", request_id: "test-request" };
