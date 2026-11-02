@@ -4,6 +4,33 @@ import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split("/") }) });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("approval relay", () => {
+  it("supplies server relay credentials while ignoring browser-supplied credentials", async () => {
+    const secret = "server-only-test-key-".repeat(2);
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    vi.stubEnv("AQUAMIND_RELAY_REQUIRED", "1");
+    vi.stubEnv("AQUAMIND_RELAY_SECRET", secret);
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ session_token: "session" }));
+    vi.stubGlobal("fetch", fetcher);
+    const result = await POST(new Request("http://localhost/api", { method: "POST", body: "{}",
+      headers: { "X-AquaMind-Relay-Key": "browser-controlled", cookie: "private=value" },
+    }), context("v1/sessions"));
+    expect(result.status).toBe(200);
+    expect(fetcher.mock.calls[0][1].headers.get("x-aquamind-relay-key")).toBe(secret);
+    expect(fetcher.mock.calls[0][1].headers.has("cookie")).toBe(false);
+    expect(await result.text()).not.toContain(secret);
+    expect(result.headers.has("x-aquamind-relay-key")).toBe(false);
+  });
+
+  it.each([["1", ""], ["1", "short"], ["1", "a".repeat(129)], ["1", " ".repeat(40)], ["invalid", ""]])(
+    "fails closed before upstream work with relay settings %s", async (required, secret) => {
+      vi.stubEnv("AQUAMIND_RELAY_REQUIRED", required);
+      vi.stubEnv("AQUAMIND_RELAY_SECRET", secret);
+      const fetcher = vi.fn();
+      vi.stubGlobal("fetch", fetcher);
+      expect((await POST(new Request("http://localhost/api"), context("v1/sessions"))).status).toBe(503);
+      expect(fetcher).not.toHaveBeenCalled();
+    });
+
   it("bounds public in-flight uploads and releases every timed-out reader without forwarding", async () => {
     vi.useFakeTimers();
     vi.stubEnv("AQUAMIND_PUBLIC_MODE", "1");

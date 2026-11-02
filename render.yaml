@@ -1,59 +1,53 @@
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
-# Initial manual-analysis deployment. Read docs/deployment.md before provisioning.
+# Free-compute staging. Read docs/deployment.md for limits and optional AI setup.
 services:
-  - type: pserv
-    name: aquamind-api
+  - type: web
+    name: aquamind-api-free
     runtime: python
     region: oregon
-    plan: 1c-2g
+    plan: free
     branch: main
-    numInstances: 1
     autoDeployTrigger: "off"
-    disk:
-      name: aquamind-usage
-      mountPath: /var/data/aquamind
-      sizeGB: 1
-    buildCommand: >-
-      python -m pip install --index-url https://download.pytorch.org/whl/cpu -r ml/requirements.txt
-      && python -m pip install -r ml/requirements-agent.txt
-      && python -m pip check
+    buildCommand: python -m pip install -r ml/requirements-cloud.txt && python -m pip check
     startCommand: >-
-      python -m uvicorn aquamind_ml.api:app --host 0.0.0.0 --port 8000 --workers 1
+      python -m uvicorn aquamind_ml.api:app --host 0.0.0.0 --port "$PORT" --workers 1
       --no-proxy-headers --no-access-log
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.14.2"
       - key: PYTHONPATH
         value: ml
-      - key: PORT
-        value: "8000"
       - key: PYTHONUNBUFFERED
         value: "1"
-      - key: OMP_NUM_THREADS
-        value: "1"
+      - key: AQUAMIND_INFERENCE_ENABLED
+        value: "0"
       - key: AQUAMIND_AGENT_ENABLED
         value: "0"
       - key: AQUAMIND_PUBLIC_MODE
         value: "1"
-      - key: AQUAMIND_USAGE_DB
-        value: /var/data/aquamind/usage.sqlite3
+      - key: AQUAMIND_RELAY_REQUIRED
+        value: "1"
+      - key: AQUAMIND_RELAY_SECRET
+        generateValue: true
+      - key: AQUAMIND_USAGE_STORE
+        value: upstash
       - key: AQUAMIND_AI_DAILY_STAGE_LIMIT
         value: "20"
 
   - type: web
-    name: aquamind-web
+    name: aquamind-web-free
     runtime: node
     region: oregon
-    plan: 0.5c-512mb
+    plan: free
     branch: main
-    numInstances: 1
     autoDeployTrigger: "off"
     buildCommand: >-
       corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build --webpack
     startCommand: >-
-      AQUAMIND_API_URL="http://${AQUAMIND_API_HOSTPORT}"
+      AQUAMIND_API_URL="https://${AQUAMIND_API_HOSTNAME}"
       pnpm --filter web start --hostname 0.0.0.0 --port "$PORT"
-    healthCheckPath: /api/health
+    healthCheckPath: /
     envVars:
       - key: NODE_VERSION
         value: "24.21.0"
@@ -63,8 +57,15 @@ services:
         value: "1"
       - key: AQUAMIND_PUBLIC_MODE
         value: "1"
-      - key: AQUAMIND_API_HOSTPORT
+      - key: AQUAMIND_RELAY_REQUIRED
+        value: "1"
+      - key: AQUAMIND_RELAY_SECRET
         fromService:
-          type: pserv
-          name: aquamind-api
-          property: hostport
+          type: web
+          name: aquamind-api-free
+          envVarKey: AQUAMIND_RELAY_SECRET
+      - key: AQUAMIND_API_HOSTNAME
+        fromService:
+          type: web
+          name: aquamind-api-free
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
