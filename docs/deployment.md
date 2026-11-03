@@ -51,6 +51,9 @@ within provider allowances; it does not include OpenAI usage.
 Automatic service deploys are off. Blueprint edits can still sync automatically;
 set **Blueprint → Settings → Auto Sync → No** if configuration must also be manual.
 See the [Blueprint reference](https://render.com/docs/blueprint-spec).
+GitHub Actions checks pull requests and pushes to main; it does not merge or
+deploy them. Require the **CI gate** status in repository branch protection and
+deploy a passing main commit deliberately. See [continuous integration](ci.md).
 
 If the previous paid AquaMind services were already created, this new Blueprint
 does **not** stop or delete them. Verify the replacement, then check Billing and

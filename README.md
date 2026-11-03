@@ -146,6 +146,7 @@ Assistant questions and requested evidence are sent to OpenAI. Avoid entering pe
 
 ## Documentation
 
+- [Continuous integration](docs/ci.md): automated checks, required merge status and local Redis integration testing.
 - [Deployment guide](docs/deployment.md): free-tier Render setup, authenticated backend relay, optional AI configuration and usage limits.
 - [Development reference](docs/development.md): data generation, model training, API contracts, MCP scopes and agent behavior.
 - [AMPds2 dataset and experiments](docs/datasets/ampds2.md): provenance, reproducible processing, experimental results and limitations. External data has its own license and attribution requirements.
