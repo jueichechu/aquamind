@@ -110,10 +110,16 @@ AI-stage counter without relying on a temporary file or resetting it on app slee
    ending in .upstash.io and the **read/write** REST token, not the read-only token.
    Never put credentials in URLs, Git or chat.
 3. On that same API service, set **OPENAI_API_KEY** and **OPENAI_MODEL** using the
-   existing project key and a Responses-compatible model with document support.
+   existing project key and a Responses-compatible model with document support,
+   function calling and strict JSON-schema structured outputs.
 4. Verify public mode, relay authorization, **AQUAMIND_USAGE_STORE=upstash** and
-   the daily stage cap (template: 20). Change **AQUAMIND_AGENT_ENABLED** in the
-   Blueprint to **1**, publish the reviewed configuration and sync deliberately.
+   the daily stage cap (template: 20). Before public activation, evaluate the
+   [topic boundary](development.md#household-water-topic-admission) with the actual
+   configured model, including unrelated/mixed requests, adversarial overrides
+   and legitimate ambiguous water questions. Scripted tests do not measure live
+   classification. Keep **AQUAMIND_AGENT_ENABLED=0** until these checks and quota
+   readiness are reviewed. Then change that flag in the Blueprint to **1**,
+   publish the reviewed configuration and sync deliberately.
    A dashboard-only flag change would be overwritten on the next Blueprint sync.
 5. Verify health, then explicitly authorize a live test using a fictional report.
    Check consent, extracted fields, review and calculation. OpenAI bills this use;
@@ -127,6 +133,10 @@ quota exhaustion, malformed responses and uncertain network outcomes stop model
 work without retry or fallback. Keep eviction disabled and never delete or restore
 the ledger to reset quota. Instances using this database/key share the cap.
 A stage can include multiple bounded model calls: this is **not a dollar cap**.
+New questions include a paid, tool-free topic check, even when refused; bill
+questions allow that check and one answering request. Classification failures
+stop answering/tool work without fallback or retry. Topic admission does not
+establish visitor identity or stop one visitor exhausting shared capacity.
 
 Tests need no live Upstash/OpenAI calls. Actual provider connectivity, credentials
 and Free plan settings must be verified after deployment.

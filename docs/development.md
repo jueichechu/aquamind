@@ -576,6 +576,31 @@ host enforcement and failure handling, not live classifier accuracy or immunity
 to prompt injection. Public AI stays disabled pending live guardrail evaluation
 and deployment readiness checks.
 
+`test_topic_guard` covers malformed verdicts, failed/uncertain requests, bounded
+calls, direct Python entry and tool-discovery exclusion. `test_topic_guard_http`
+supplies scripted denials for unrelated requests, mixed tasks, role overrides,
+encoded instructions and keyword camouflage, plus scripted admissions for short,
+ambiguous and multilingual water questions. It checks both HTTP question routes,
+privacy, budget consumption, cancellation, session revocation/expiry during the
+check, rejected instruction-like bill fields and hostile tool evidence without
+scope expansion or self-approval. The scripts exercise the real SDK/ASGI/MCP
+boundaries; their expected verdicts do not establish that a live model produces
+those verdicts. Run them without provider credentials or network requests:
+
+```sh
+PYTHONPATH=ml:ml/tests ml/.venv/bin/python -m unittest -v test_topic_guard test_topic_guard_http
+```
+
+Anonymous sessions remain unsuitable as visitor identities: a visitor can obtain
+more sessions or exhaust shared capacity. The relay secret authenticates the
+frontend host, not a person. Keep shared rolling limits, concurrency and durable
+daily-stage quotas ahead of classification. No forwarded IP headers are used as
+identity, and no visitor identifiers or new persistence are introduced. A future
+bot challenge could reduce automated admissions but would need server-verified
+tokens and an accessibility/privacy review; neither it nor authentication is
+added here. These guardrails do not establish per-visitor fairness or eliminate
+denial-of-service and classification costs.
+
 ## Bill-only agent questions
 
 After calculating a bill at `/analyze`, users can opt in to share that bill and a question with OpenAI. The checkbox starts unchecked and resets when the bill is edited or cleared. Inputs are locked during an answer request so a reply cannot appear against an edited bill. Only the most recent answer and question stay in the mounted panel; new questions are independent, and reload clears the panel. Model output is displayed as escaped text, without HTML or automatic media/link rendering.
