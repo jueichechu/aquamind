@@ -36,7 +36,7 @@ services:
         value: "20"
 
   - type: web
-    name: aquamind
+    name: aqua
     runtime: node
     region: oregon
     plan: free

@@ -32,12 +32,12 @@ within provider allowances; it does not include OpenAI usage.
 2. After the configuration is merged, choose **New → Blueprint**, repository
    **jueichechu/aquamind**, branch **main**, path **render.yaml**, and a new Blueprint
    name such as **aquamind-free**. Both builds run from the repository root.
-3. Confirm the preview creates **aquamind-api-free** and **aquamind**, both
+3. Confirm the preview creates **aquamind-api-free** and **aqua**, both
    **Free** in **Oregon**, with no disk or paid database. Review updates carefully
    if those service names already exist. Other apps can stay in the workspace.
 4. Select **Deploy Blueprint** and wait for both services to show Live. No OpenAI
    or Upstash credentials are required for this first manual-only deployment.
-5. Open the HTTPS URL on **aquamind**. Render generates and shares a
+5. Open the HTTPS URL on **aqua**. Render generates and shares a
    server-only relay secret automatically; do not put it in browser settings/code.
 6. Open **/api/health**: once the API is awake, expect HTTP 200 with status ok.
    The web service's Render probe checks **/** for frontend liveness; /api/health
@@ -62,15 +62,15 @@ Leave unrelated projects alone.
 
 ## Replace an existing frontend service
 
-The frontend service is named **aquamind**; **aquamind-api-free** remains the
+The frontend service is named **aqua**; **aquamind-api-free** remains the
 Python backend. The name requests a cleaner generated address but does not
-guarantee **aquamind.onrender.com**. Use the exact URL Render assigns. See Render's
+guarantee **aqua.onrender.com**. Use the exact URL Render assigns. See Render's
 [subdomain change request](https://feedback.render.com/features/p/ability-to-change-onrendercom-sub-domain).
 
 For an existing deployment using **aquamind-web-free**:
 
 1. Set the existing Blueprint's **Auto Sync** to **No** before merging a service
-   replacement. Inspect the target workspace first. A service named **aquamind**
+   replacement. Inspect the target workspace first. A service named **aqua**
    might already exist; verify its service ID, repository, runtime and ownership
    before proceeding. A Blueprint can update an existing same-name service.
    Do not overwrite another project's service or assume a suspended URL is free.
