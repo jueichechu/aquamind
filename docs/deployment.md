@@ -32,12 +32,12 @@ within provider allowances; it does not include OpenAI usage.
 2. After the configuration is merged, choose **New → Blueprint**, repository
    **jueichechu/aquamind**, branch **main**, path **render.yaml**, and a new Blueprint
    name such as **aquamind-free**. Both builds run from the repository root.
-3. Confirm the preview creates **aquamind-api-free** and **aquamind-web-free**, both
+3. Confirm the preview creates **aquamind-api-free** and **aqua**, both
    **Free** in **Oregon**, with no disk or paid database. Review updates carefully
    if those service names already exist. Other apps can stay in the workspace.
 4. Select **Deploy Blueprint** and wait for both services to show Live. No OpenAI
    or Upstash credentials are required for this first manual-only deployment.
-5. Open the HTTPS URL on **aquamind-web-free**. Render generates and shares a
+5. Open the HTTPS URL on **aqua**. Render generates and shares a
    server-only relay secret automatically; do not put it in browser settings/code.
 6. Open **/api/health**: once the API is awake, expect HTTP 200 with status ok.
    The web service's Render probe checks **/** for frontend liveness; /api/health
@@ -59,6 +59,40 @@ If the previous paid AquaMind services were already created, this new Blueprint
 does **not** stop or delete them. Verify the replacement, then check Billing and
 suspend or remove those old services separately, preserving needed data first.
 Leave unrelated projects alone.
+
+## Replace an existing frontend service
+
+The frontend service is named **aqua**; **aquamind-api-free** remains the
+Python backend. The name requests a cleaner generated address but does not
+guarantee **aqua.onrender.com**. Use the exact URL Render assigns. See Render's
+[subdomain change request](https://feedback.render.com/features/p/ability-to-change-onrendercom-sub-domain).
+
+For an existing deployment using **aquamind-web-free**:
+
+1. Set the existing Blueprint's **Auto Sync** to **No** before merging a service
+   replacement. Inspect the target workspace first. A service named **aqua**
+   might already exist; verify its service ID, repository, runtime and ownership
+   before proceeding. A Blueprint can update an existing same-name service.
+   Do not overwrite another project's service or assume a suspended URL is free.
+2. Keep the working frontend and **aquamind-api-free** running. Review and merge
+   the new configuration through CI, then manually sync the **existing** Blueprint.
+   Expect the frontend replacement on **Free**, with the backend and its existing
+   relay secret preserved. Do not create a second copy of the whole Blueprint.
+3. Review the assigned URL. If Render adds a suffix or the desired name is taken,
+   stop the cutover and keep the original working site. Deleting the original
+   frontend does not free a different service's subdomain.
+4. Once the replacement is Live, verify **/api/health**, manual bill analysis and
+   comparison at its actual HTTPS URL. The generated relay references connect
+   it to the existing backend; do not copy credentials into browser code.
+5. Only after successful verification, retire **aquamind-web-free**. Removing its
+   definition does not delete the deployed service. Confirm it is no longer
+   managed by the Blueprint before deletion, or a later sync can recreate it.
+   Both frontends consume shared Free running hours while they coexist.
+
+See [Blueprint resource lifecycle](https://render.com/docs/infrastructure-as-code#deleting-resources).
+Recreating a service is a deployment operation; changing its display name alone
+does not establish a new public address. No custom-domain purchase is required
+to try a new generated address.
 
 ## Enable OpenAI with a free durable quota store
 

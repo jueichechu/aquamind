@@ -79,8 +79,21 @@ class UsageBudgetTests(unittest.TestCase):
 
         with ThreadPoolExecutor(max_workers=6) as pool:
             results = list(pool.map(attempt, budgets))
-        self.assertEqual(results.count(200), 1)
+        # Nonblocking SQLite locks can reject every contender, including a writer
+        # whose commit races another connection's shared lock. Safety guarantees
+        # at most one admission, not progress while the database is contended.
+        admitted = results.count(200)
+        self.assertLessEqual(admitted, 1)
         self.assertTrue(all(status in {200, 429, 503} for status in results))
+        with closing(sqlite3.connect(self.path)) as connection:
+            self.assertEqual(connection.execute('SELECT attempts FROM daily_usage').fetchone(),
+                             (1,) if admitted else None)
+        # Once all competing connections close, any unclaimed slot is usable.
+        if not admitted:
+            budgets[0].reserve()
+        with self.assertRaises(HTTPException) as exhausted:
+            budgets[-1].reserve()
+        self.assertEqual(exhausted.exception.status_code, 429)
         with closing(sqlite3.connect(self.path)) as connection:
             self.assertEqual(connection.execute('SELECT attempts FROM daily_usage').fetchone(), (1,))
 
