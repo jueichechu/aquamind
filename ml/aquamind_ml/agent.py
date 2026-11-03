@@ -12,6 +12,7 @@ from openai import APITimeoutError, AsyncOpenAI, RateLimitError
 from .agent_tools import McpAgentTools
 from .approvals import GoalProposal, GoalRequest
 from .bills import NormalizedBill
+from .topic_guard import request_topic_check, topic_allowed, TOPIC_REDIRECT
 
 POLICY = """You are AquaMind, a household water-intelligence assistant.
 Use available tools for measured quantities, anomaly findings, weather, rates and savings.
@@ -104,10 +105,12 @@ async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config
             raise ValueError('Bill-only questions cannot use tools or approval checkpoints')
         history.append({'role': 'user', 'content': json.dumps({
             'bill_evidence': bill_context.model_dump(mode='json'), 'is_example': is_example}, allow_nan=False)})
-        config = replace(config, max_model_calls=1)
+        # One relevance check plus at most one bill answer; never expand a host budget.
+        config = replace(config, max_model_calls=min(config.max_model_calls, 2))
     history.append({'role': 'user', 'content': text})
     return await _run(history, client, tools, config, check_active=check_active,
-                      on_pause=on_pause, instructions=POLICY + BILL_POLICY if bill_context is not None else POLICY)
+                      on_pause=on_pause, instructions=POLICY + BILL_POLICY if bill_context is not None else POLICY,
+                      topic_question=text, bill_only=bill_context is not None)
 
 
 async def continue_agent(pause: AgentPause, decision: GoalProposal, current_goal: GoalRequest | None,
@@ -131,17 +134,41 @@ async def continue_agent(pause: AgentPause, decision: GoalProposal, current_goal
 
 async def _run(history: list[dict], client: AsyncOpenAI, tools: McpAgentTools, config: AgentConfig, *,
                check_active: Callable[[], None] | None = None,
-               on_pause: Callable[[AgentPause], None] | None = None, instructions: str = POLICY) -> AgentResult:
+               on_pause: Callable[[AgentPause], None] | None = None, instructions: str = POLICY,
+               topic_question: str | None = None, bill_only: bool = False) -> AgentResult:
     model_trace = []
     calls = 0
 
     def result(status, *, answer='', approval=None, error=None):
         return AgentResult(status, answer, approval, error, calls, list(model_trace), tools.trace)
 
+    def trace(response):
+        usage = response.usage
+        model_trace.append({'response_id': response.id, 'model': response.model,
+                            'input_tokens': usage.input_tokens if usage else None,
+                            'output_tokens': usage.output_tokens if usage else None})
+
     try:
         async with asyncio.timeout(config.run_timeout_seconds):
+            if topic_question is not None:
+                if check_active is not None:
+                    check_active()
+                calls += 1  # Counts even failed/uncertain paid attempts, within the original budget.
+                async with asyncio.timeout(config.request_timeout_seconds):
+                    response = await request_topic_check(topic_question, client, config, bill_only=bill_only)
+                trace(response)
+                if check_active is not None:
+                    check_active()
+                try:
+                    allowed = topic_allowed(response)
+                except (ValueError, TypeError, RecursionError):
+                    return result('unavailable', error='topic_guard_unavailable')
+                if not allowed:
+                    return result('refused', answer=TOPIC_REDIRECT, error='unsupported_topic')
+            if calls >= config.max_model_calls:
+                return result('limit_reached', error='model_call_budget_exhausted')
             definitions = await tools.discover()
-            for _ in range(config.max_model_calls):
+            for _ in range(config.max_model_calls - calls):
                 if check_active is not None:
                     check_active()
                 if len(json.dumps(history, allow_nan=False).encode()) > 524288:
@@ -152,10 +179,9 @@ async def _run(history: list[dict], client: AsyncOpenAI, tools: McpAgentTools, c
                         model=config.model, instructions=instructions, input=history, tools=definitions,
                         store=False, include=['reasoning.encrypted_content'], parallel_tool_calls=False,
                         max_output_tokens=config.max_output_tokens)
-                usage = response.usage
-                model_trace.append({'response_id': response.id, 'model': response.model,
-                                    'input_tokens': usage.input_tokens if usage else None,
-                                    'output_tokens': usage.output_tokens if usage else None})
+                trace(response)
+                if check_active is not None:
+                    check_active()
                 if response.status != 'completed':
                     return result('unavailable', error='model_response_incomplete')
                 output = [item.model_dump(mode='json', exclude_none=True) for item in response.output]

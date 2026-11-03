@@ -7,7 +7,7 @@ to `main` (including merges), and manual dispatches from the Actions tab.
 | --- | --- |
 | Web checks | Frozen pnpm install, frontend tests, TypeScript, ESLint and production webpack build |
 | Python checks | CPU PyTorch and agent dependencies, dependency consistency and the full Python suite |
-| Cloud and Redis checks | Cloud dependencies without PyTorch, bill/MCP execution, provider and relay boundaries, and real Redis quota tests |
+| Cloud and Redis checks | Cloud dependencies without PyTorch, bill/MCP execution, topic admission and adversarial host contracts, provider/relay boundaries, and real Redis quota tests |
 | CI gate | Succeeds only when all three jobs succeed; failures, cancellations and skipped jobs fail the gate |
 
 Jobs use standard Ubuntu runners, bounded timeouts and read-only repository

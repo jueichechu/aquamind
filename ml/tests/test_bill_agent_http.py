@@ -14,7 +14,7 @@ from aquamind_ml.agent import AgentConfig, BILL_POLICY, POLICY
 from aquamind_ml.agent_http import AgentHost
 from aquamind_ml.api import create_app
 from aquamind_ml.sessions import DemoSessions
-from test_agent import call, message, response
+from test_agent import call, message, response, is_topic_request, topic_response
 
 
 class BillAgentHttpTests(unittest.IsolatedAsyncioTestCase):
@@ -22,10 +22,15 @@ class BillAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         env = patch.dict(os.environ, {'AQUAMIND_AGENT_ENABLED': '0', 'AQUAMIND_DETECTOR_PATH': ''})
         env.start(); self.addCleanup(env.stop)
         self.requests = []
+        self.topic_requests = []
         self.reply = lambda index: response([message('One unverified bill; more evidence is needed.')])
 
         async def handle(request):
-            self.requests.append(json.loads(request.content))
+            body = json.loads(request.content)
+            if is_topic_request(body):
+                self.topic_requests.append(body)
+                return httpx2.Response(200, json=topic_response('water_bill'))
+            self.requests.append(body)
             answer = self.reply(len(self.requests))
             if asyncio.iscoroutine(answer):
                 answer = await answer
@@ -59,7 +64,7 @@ class BillAgentHttpTests(unittest.IsolatedAsyncioTestCase):
             result = await self.post(headers)
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.json()['status'], 'answer')
-        self.assertEqual(result.json()['model_calls'], 1)
+        self.assertEqual(result.json()['model_calls'], 2)
         self.assertEqual(result.json()['tool_trace'], [])
         self.assertIsNone(result.json()['pending_approval'])
         self.assertEqual(result.headers['cache-control'], 'no-store')
