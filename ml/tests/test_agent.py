@@ -30,13 +30,24 @@ def message(text):
             'content': [{'type': 'output_text', 'text': text, 'annotations': []}]}
 
 
+def topic_response(intent='household_usage'):
+    return response([message(json.dumps({'intent': intent}))])
+
+
+def is_topic_request(request):
+    return request.get('text', {}).get('format', {}).get('name') == 'household_water_topic'
+
+
 class AgentTests(unittest.IsolatedAsyncioTestCase):
     async def run_script(self, replies, *, allowed=frozenset({'estimate_water_cost'}),
                          scopes=frozenset({'utility:read'}), config=None, store=None):
         requests = []
 
         async def handle(request):
-            requests.append(json.loads(request.content))
+            body = json.loads(request.content)
+            if is_topic_request(body):
+                return httpx2.Response(200, json=topic_response())
+            requests.append(body)
             reply = replies[min(len(requests) - 1, len(replies) - 1)]
             if callable(reply):
                 return await reply(request)
@@ -56,7 +67,7 @@ class AgentTests(unittest.IsolatedAsyncioTestCase):
         outcome, requests = await self.run_script([
             response([reasoning, call()]), response([message('Using the illustrative rate, $5.00.')])])
         self.assertEqual(outcome.status, 'answer')
-        self.assertEqual(outcome.model_calls, 2)
+        self.assertEqual(outcome.model_calls, 3)  # Relevance check plus two answering requests.
         self.assertEqual(len(outcome.tool_trace), 1)
         for request in requests:
             self.assertFalse(request['store'])
@@ -90,7 +101,7 @@ class AgentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_call_budget_and_unexpected_parallel_calls(self):
         outcome, requests = await self.run_script([response([call('call_one')]), response([call('call_two')])],
-                                                 config=AgentConfig(model='test-model', max_model_calls=2))
+                                                 config=AgentConfig(model='test-model', max_model_calls=3))
         self.assertEqual(outcome.status, 'limit_reached')
         self.assertEqual(outcome.error, 'model_call_budget_exhausted')
         self.assertEqual(len(requests), 2)

@@ -19,7 +19,7 @@ from aquamind_ml.api import create_app
 from aquamind_ml.sessions import DemoSessions
 from aquamind_ml.usage_budget import DailyStageBudget
 from aquamind_ml.demo_meter import DemoMeterStore, SCENARIOS
-from test_agent import call, message, response
+from test_agent import call, message, response, is_topic_request, topic_response
 
 
 class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
@@ -28,10 +28,15 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.env.start()
         self.addCleanup(self.env.stop)
         self.requests = []
+        self.topic_requests = []
         self.reply = lambda index: response([message('An illustrative estimate.')])
 
         async def handle(request):
-            self.requests.append(json.loads(request.content))
+            body = json.loads(request.content)
+            if is_topic_request(body):
+                self.topic_requests.append(body)
+                return httpx2.Response(200, json=topic_response())
+            self.requests.append(body)
             reply = self.reply(len(self.requests))
             if asyncio.iscoroutine(reply):
                 reply = await reply
@@ -84,7 +89,7 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status_code, 200)
         body = result.json()
         self.assertEqual(body['status'], 'answer')
-        self.assertEqual(body['model_calls'], 2)
+        self.assertEqual(body['model_calls'], 3)
         self.assertEqual(body['tool_trace'][0]['status'], 'success')
         self.assertEqual(body['request_id'], result.headers['x-request-id'])
         self.assertEqual(result.headers['cache-control'], 'no-store')
@@ -466,7 +471,7 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(replay['current_goal'], {'daily_gallons': 100} if expected == 'conflict' else None)
 
     async def test_continuation_shares_original_model_budget_and_does_not_undo_a_decision(self):
-        self.host.config = AgentConfig(model='test-model', max_model_calls=1)
+        self.host.config = AgentConfig(model='test-model', max_model_calls=2)
         token, headers = await self.session()
         pending = await self.goal_proposal(headers)
         self.sessions.approvals(token).decide(pending['approval_id'], 'approve')
@@ -477,7 +482,7 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.sessions.approvals(token).goal.daily_gallons, 150)
 
     async def test_continuation_cannot_propose_again_and_uses_remaining_call_budget(self):
-        self.host.config = AgentConfig(model='test-model', max_model_calls=2)
+        self.host.config = AgentConfig(model='test-model', max_model_calls=3)
         token, headers = await self.session()
         pending = await self.goal_proposal(headers)
         store = self.sessions.approvals(token)

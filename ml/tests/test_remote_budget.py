@@ -19,7 +19,7 @@ from aquamind_ml.agent_http import AgentHost
 from aquamind_ml.api import create_app
 from aquamind_ml.remote_budget import RESERVE_STAGE_LUA, UpstashStageBudget
 from aquamind_ml.sessions import DemoSessions
-from test_agent import message, response
+from test_agent import message, response, is_topic_request, topic_response
 
 
 class RemoteBudgetTests(unittest.IsolatedAsyncioTestCase):
@@ -32,7 +32,9 @@ class RemoteBudgetTests(unittest.IsolatedAsyncioTestCase):
 
         def provider(request):
             provider_calls.append(request)
-            return httpx2.Response(200, json=response([message('Synthetic test answer.')]))
+            reply = topic_response() if is_topic_request(json.loads(request.content)) else response([
+                message('Synthetic test answer.')])
+            return httpx2.Response(200, json=reply)
 
         with patch.dict(os.environ, {'AQUAMIND_PUBLIC_MODE': '0', 'AQUAMIND_AGENT_ENABLED': '0',
                                     'AQUAMIND_INFERENCE_ENABLED': '0', 'AQUAMIND_RELAY_REQUIRED': '0'}):
@@ -51,7 +53,9 @@ class RemoteBudgetTests(unittest.IsolatedAsyncioTestCase):
                     result = await client.post('/v1/agent/turn', json={'text': 'A fictional water question'},
                                                headers={'Authorization': 'Bearer ' + token})
                     self.assertEqual(result.status_code, expected)
-                self.assertEqual(len(provider_calls), 1)
+                    if expected == 200:
+                        self.assertEqual((result.json()['status'], result.json()['model_calls']), ('answer', 2))
+                self.assertEqual(len(provider_calls), 2)
                 self.assertEqual(len(ledger_calls), 2)
 
     def test_public_upstash_configuration_is_required_and_lifespan_owned(self):

@@ -514,7 +514,7 @@ Function calls and correlated results are replayed in memory until an answer, pe
 
 Requests use `store=False` and replay encrypted reasoning protocol items in memory, following the [Responses migration guide](https://developers.openai.com/api/docs/guides/migrate-to-responses). These items, prompts, arguments and raw provider errors are excluded from the public trace. Model trace metadata includes response ID, model and token counts; tool traces retain only execution metadata. `store=False` does not assert zero provider retention. The runtime policy requires evidence-grounded water guidance and disclosure of synthetic data and illustrative rates; policy text alone is not an evaluated reasoning-quality guarantee.
 
-Install `ml/requirements-agent.txt`. Configure `OPENAI_API_KEY` and `OPENAI_MODEL` in the ignored repository-root `.env.local`, keeping the secret out of chat and `.env.example`. The model must support Responses function calling. Check presence without printing values or making an external request:
+Install `ml/requirements-agent.txt`. Configure `OPENAI_API_KEY` and `OPENAI_MODEL` in the ignored repository-root `.env.local`, keeping the secret out of chat and `.env.example`. The model must support Responses function calling and strict JSON-schema structured outputs. Check presence without printing values or making an external request:
 
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m aquamind_ml.agent_cli --check-config
@@ -530,6 +530,52 @@ The CLI exposes only four read tools for synthetic weather and illustrative util
 
 Automated checks use the real SDK with a simulated HTTP transport and real in-process MCP sessions. They verify protocol replay, actual utility calculations, approval stopping, call limits, provider errors/timeouts and incomplete/refused responses. They do not establish live model behavior, answer quality, multimodal capabilities, agent benchmark scores or deployment readiness. OpenAI configuration is now available for explicit live smoke checks; database and hosting credentials are not needed for this increment.
 
+## Household-water topic admission
+
+Every new `run_agent` question, including direct Python/CLI calls and both HTTP
+question routes, first makes one tool-free relevance request to the configured
+OpenAI model. It classifies the question into household usage, water bills,
+conservation, leak investigation, water fixtures, irrigation/weather affecting
+water use, or temporary water goals. Unrelated tasks, mixed requests containing
+unrelated tasks, policy/role overrides and water-keyword camouflage are directed
+to the unsupported intent. Short bill questions can refer to the submitted bill;
+unclear requests otherwise receive the same redirect and can be rephrased.
+
+The check receives only the question and host-selected mode, with fixed
+instructions and a strict single-enum [structured output schema](https://developers.openai.com/api/docs/guides/structured-outputs).
+It receives no bill values, tool definitions/results, credentials or conversation
+history. The host independently validates completed output, rejecting duplicate
+keys, unknown intents, extra fields, refusals, tool calls and malformed/missing
+verdicts. A valid unsupported verdict returns HTTP 200 with the existing response
+shape, `status: refused`, `error: unsupported_topic`, a fixed water-focused
+redirect and no pending approval. An invalid check returns `unavailable` with
+`topic_guard_unavailable`; provider errors/timeouts retain existing safe outcomes.
+No answering request or MCP discovery/execution follows a denial or failed check.
+Classifier output is never replayed as instructions or shown as an answer.
+
+This check is a **paid model request**, including for off-topic questions. It has
+no tools, at most 512 output tokens (or the host's lower configured limit), no
+automatic retries and `store=False`. It shares the existing request and whole-run
+timeouts and counts toward `model_calls`, model metadata and the original total
+call budget. The six-call default therefore leaves at most five answering calls.
+A host limit of one permits only the check. HTTP session/process admission and
+durable daily-stage reservation occur before this request; refusals and failures
+consume their admitted stage. It is not a free local filter or a dollar cap.
+
+Approval continuation accepts no new question. It uses the host's checkpoint of
+an admitted turn and the trusted decision, keeps read-only tools and spends only
+the original remaining model calls. It does not repeat the relevance request.
+Session liveness is checked around the check and before answer release. Topic
+classification grants neither tool permissions nor approval authority.
+
+The classifier is probabilistic: it can reject legitimate requests or admit
+adversarial ones, and does not independently verify the final answer's relevance.
+Bill/tool evidence stays untrusted under the answering policy and existing
+schemas, scopes and human approval controls. Simulated-provider tests establish
+host enforcement and failure handling, not live classifier accuracy or immunity
+to prompt injection. Public AI stays disabled pending live guardrail evaluation
+and deployment readiness checks.
+
 ## Bill-only agent questions
 
 After calculating a bill at `/analyze`, users can opt in to share that bill and a question with OpenAI. The checkbox starts unchecked and resets when the bill is edited or cleared. Inputs are locked during an answer request so a reply cannot appear against an edited bill. Only the most recent answer and question stay in the mounted panel; new questions are independent, and reload clears the panel. Model output is displayed as escaped text, without HTML or automatic media/link rendering.
@@ -538,7 +584,7 @@ After calculating a bill at `/analyze`, users can opt in to share that bill and 
 
 The host supplies the normalized bill and example flag as a structured user message, separately from the fixed bill-only instructions and the user's question. Keeping data out of developer instructions follows the [OpenAI agent safety guidance](https://developers.openai.com/api/docs/guides/agent-builder-safety). Values remain unverified. Example entries are labeled as examples in the context; missing charges remain unknown. The bill policy asks for cautious explanations and additional evidence rather than inferring trends, leak timing, fixtures, tariffs or savings from one bill. This policy is guidance, not a measured guarantee of answer correctness.
 
-Bill turns receive no tools or scopes: they cannot retrieve demo meter/weather data, use illustrative utility rates, invoke either detector, or propose/apply goals. Hallucinated tool calls are denied and do not trigger a second provider request. Each bill question allows at most one model request with existing timeout/token limits, `store=False` and automatic retries disabled. [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data) govern provider retention; `store=False` is not a zero-retention assertion.
+Bill turns receive no tools or scopes: they cannot retrieve demo meter/weather data, use illustrative utility rates, invoke either detector, or propose/apply goals. Each bill question allows one relevance check plus at most one answering request, within the configured total call limit. Only the answering request receives bill evidence. Hallucinated tool calls are denied without another answering request. Existing timeout/token limits, `store=False` and automatic retries disabled still apply. [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data) govern provider retention; `store=False` is not a zero-retention assertion.
 
 The existing session/process concurrency and attempt budgets apply across bill and demo questions. A pending demo goal blocks a bill question on the same session without discarding its approval checkpoint. Bill questions create no continuation checkpoint or durable bill/conversation record. Session liveness is checked before provider work and before releasing the answer. Application logs and traces omit bill fields, prompts, raw provider errors and hidden protocol content. Revocation cannot undo an already-sent provider request.
 
