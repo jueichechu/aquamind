@@ -48,17 +48,52 @@ within provider allowances; it does not include OpenAI usage.
 8. If the first request reports unavailable during a cold start, allow startup
    and submit deliberately again. Never retry paid requests automatically.
 
-Automatic service deploys are off. Blueprint edits can still sync automatically;
-set **Blueprint → Settings → Auto Sync → No** if configuration must also be manual.
-See the [Blueprint reference](https://render.com/docs/blueprint-spec).
-GitHub Actions checks pull requests and pushes to main; it does not merge or
-deploy them. Require the **CI gate** status in repository branch protection and
-deploy a passing main commit deliberately. See [continuous integration](ci.md).
+Both service definitions use **autoDeployTrigger: checksPass**. GitHub Actions
+validates pull requests and pushes to main; Render waits for the linked branch's
+checks before deploying application updates. Require **CI gate** in branch
+protection. Existing deployments need the one-time setup below before this takes
+effect. See [continuous integration](ci.md).
 
 If the previous paid AquaMind services were already created, this new Blueprint
 does **not** stop or delete them. Verify the replacement, then check Billing and
 suspend or remove those old services separately, preserving needed data first.
 Leave unrelated projects alone.
+
+## Deploy application updates after CI
+
+For existing services, apply this configuration once:
+
+1. Keep **Blueprint → Settings → Auto Sync → No**. Review and merge the
+   configuration PR after CI passes, then wait for the main-branch CI run to pass.
+2. On the **existing** Blueprint, choose **Manual Sync**. Confirm the preview
+   updates only the intended **aqua** and **aquamind-api-free** services, both
+   **Free**, with no replacement, new resource, disk or plan upgrade.
+3. On each service's **Settings** page, confirm the connected GitHub repository
+   is **jueichechu/aquamind**, branch **main**, and **Auto-Deploy → After CI Checks
+   Pass**. Auto-deploys require a connected Git provider; a service created from
+   only a public repository URL needs that connection established first.
+4. Verify the first deploy and its commit on each service's **Deploys** page.
+   A Blueprint sync can deploy configuration changes; it is separate from the
+   service's automatic application-code deployment setting.
+
+After setup, merging an application-code PR triggers main CI, followed by Render
+builds/deploys when those checks pass. The existing CI gate fails if a required
+job fails, is cancelled or is skipped. Keep the YAML setting and Dashboard aligned;
+a conflicting Dashboard-only change is overwritten by the next Blueprint sync.
+
+With Blueprint Auto Sync off, later **render.yaml** infrastructure changes still
+need a reviewed manual sync after CI. Application-code updates need no manual
+deploy. This keeps automatic Blueprint configuration updates separate from the
+service CI gate. See [automatic deploys](https://render.com/docs/deploys#automatic-deploys),
+the [Blueprint field reference](https://render.com/docs/blueprint-spec#autodeploytrigger)
+and [Blueprint sync behavior](https://render.com/docs/infrastructure-as-code#disabling-automatic-sync).
+
+Wait for both services to report **Live** on the intended commit, then verify
+**/api/health**, manual bill calculation, comparison, session creation and
+revocation. The API's **/health** and frontend's **/** probes are liveness checks;
+they do not establish that every feature or provider integration works. There is
+no automatic hosted smoke-test workflow yet. AI activation and paid live checks
+remain subject to the configuration and verification steps below.
 
 ## Replace an existing frontend service
 
@@ -182,5 +217,6 @@ bypasses the durable-ledger requirement for public AI. No bills or files are sav
   automatically retry or clear the ledger.
 - **Memory failure:** inspect hosted metrics; never silently upgrade to paid.
   Revise the deployment scope or architecture if Free capacity is insufficient.
-- **Updates:** validate, push reviewed code to main, deploy each desired commit
-  manually and verify health and features again.
+- **Updates:** merge through CI and confirm automatic deploys finish on the
+  intended commit for both services. Sync reviewed Blueprint configuration
+  changes separately, then verify health and features again.
