@@ -540,6 +540,9 @@ water use, or temporary water goals. Unrelated tasks, mixed requests containing
 unrelated tasks, policy/role overrides and water-keyword camouflage are directed
 to the unsupported intent. Short bill questions can refer to the submitted bill;
 unclear requests otherwise receive the same redirect and can be rephrased.
+Generic academic exercises remain outside this scope even when framed as water
+benchmarks or research. Calculations that directly explain household water use,
+bill quantities, meter changes or conservation remain supported.
 
 The check receives only the question and host-selected mode, with fixed
 instructions and a strict single-enum [structured output schema](https://developers.openai.com/api/docs/guides/structured-outputs).
