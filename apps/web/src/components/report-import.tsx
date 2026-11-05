@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { checkReportSize, REPORT_ACCEPT, type ImportedBill } from "@/lib/bill-import";
 import type { DemoClient } from "@/app/demo/demo-client";
+import { useBillReadiness } from "./use-bill-readiness";
 
 export function ReportImport({ client, onImported, onSelectionChange, locked = false }: {
   client: DemoClient; onImported: (result: ImportedBill) => void; onSelectionChange: () => void; locked?: boolean;
@@ -15,7 +16,10 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
   const [share, setShare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const readiness = useBillReadiness();
   const working = useRef(false);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { if (error) errorBox.current?.focus(); }, [error]);
   function choose(value: File | null) {
     if (working.current || locked) return;
@@ -27,16 +31,24 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
     }
   }
   async function extract() {
-    if (working.current || locked || !file || !share) return;
+    if (working.current || locked || !file || !share || readiness.status !== "ready") return;
     working.current = true; setBusy(true); setError("");
+    let sent = false;
     try {
+      // A tab may have been idle since its initial check. Recheck before any
+      // session creation or report transmission; never repeat paid extraction.
+      await readiness.check();
+      if (!mounted.current) return;
+      sent = true;
       const result = await client.importBill(file, share);
+      if (!mounted.current) return;
       setFile(null); setShare(false);
       if (input.current) input.current.value = "";
       onImported(result);
     } catch (cause) {
+      if (!mounted.current) return;
       setError(cause instanceof Error ? cause.message : "The report could not be read. Enter its values manually.");
-      setShare(false);
+      if (sent) setShare(false);
     } finally { working.current = false; setBusy(false); }
   }
   return <div className="report-intake">
@@ -51,10 +63,16 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
         <p id="report-sharing" className="report-disclosure">An external AI service reads your report. Remove personal details first. <a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer">Data policy</a></p>
         <label className="report-share-label"><input type="checkbox" checked={share} disabled={busy} required aria-describedby="report-sharing"
           onChange={(event) => setShare(event.target.checked)} />Allow AI to read this report.</label>
-        <button className="desk-primary" disabled={!share || busy} aria-busy={busy}>{busy ? "Reading your report…" : "Read report"}</button>
+        <button className="desk-primary" disabled={!share || busy || readiness.status !== "ready"} aria-busy={busy || readiness.status === "starting"}>
+          {readiness.status === "starting" ? "Starting bill analysis…" : busy ? "Reading your report…" : "Read report"}</button>
         <button type="button" className="desk-text-button" disabled={busy} onClick={() => { choose(null); if (input.current) input.current.value = ""; }}>Remove report</button>
       </form>}
-    {busy && <p role="status" className="report-status">Reading once. You&apos;ll review the fields before calculating.</p>}
+    <p role="status" className="report-status">{readiness.status === "starting"
+      ? "Starting bill analysis… This may take a minute. You can choose your report while you wait."
+      : readiness.status === "unavailable" ? "Bill analysis could not start. Your report has not been sent."
+      : busy ? "Reading once. You’ll review the fields before calculating." : "Ready to read your bill."}</p>
+    {readiness.status === "unavailable" && <button type="button" className="desk-text-button" disabled={busy || locked}
+      onClick={() => { setError(""); void readiness.check().catch(() => {}); }}>Try again</button>}
     {error && <p ref={errorBox} tabIndex={-1} role="alert" className="desk-error">{error}</p>}
     {!busy && <Link href="/analyze" className="desk-underlined report-manual">Enter details instead</Link>}
     {file && <p className="report-format">PDF, PNG, JPEG or WebP. Up to 4 MiB.</p>}

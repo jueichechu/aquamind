@@ -2,6 +2,7 @@ import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
 
 // Only these application endpoints are exposed through the same-origin relay.
 const allowed = new Set([
+  "GET v1/bills/readiness",
   "POST v1/sessions", "DELETE v1/session", "GET v1/goals/current", "POST v1/goals/proposals",
   "POST v1/agent/turn", "POST v1/agent/continue", "POST v1/agent/bill",
   "POST v1/bills/normalize", "POST v1/bills/import", "POST v1/bills/compare",

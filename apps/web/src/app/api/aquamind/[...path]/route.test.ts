@@ -4,6 +4,24 @@ import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split("/") }) });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("approval relay", () => {
+  it("relays bill readiness without a session and keeps the method allowlist", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    vi.stubEnv("AQUAMIND_RELAY_REQUIRED", "1");
+    vi.stubEnv("AQUAMIND_RELAY_SECRET", "server-only-placeholder-".repeat(2));
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ status: "ready" }));
+    vi.stubGlobal("fetch", fetcher);
+    const result = await GET(new Request("http://localhost/api"), context("v1/bills/readiness"));
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ status: "ready" });
+    expect(result.headers.get("cache-control")).toBe("no-store");
+    expect(fetcher.mock.calls[0][0]).toBe("https://api.example/v1/bills/readiness");
+    expect(fetcher.mock.calls[0][1].method).toBe("GET");
+    expect(fetcher.mock.calls[0][1].headers.has("authorization")).toBe(false);
+    expect(fetcher.mock.calls[0][1].body).toBeUndefined();
+    expect((await POST(new Request("http://localhost/api", { method: "POST" }), context("v1/bills/readiness"))).status).toBe(404);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("supplies server relay credentials while ignoring browser-supplied credentials", async () => {
     const secret = "server-only-test-key-".repeat(2);
     vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
