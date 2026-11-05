@@ -6,8 +6,9 @@ relays requests to a Python bill/MCP/agent service with server authentication.
 The cloud service omits PyTorch; training and detector code remain available locally.
 The free deployment does not serve model weights or anomaly inference.
 
-Live OpenAI extraction and answers are separately billed by OpenAI. AI starts
-disabled so initial manual calculations need no external credentials.
+Live OpenAI extraction and answers are separately billed by OpenAI. AI activation
+is an explicit backend environment setting. Start with **AQUAMIND_AGENT_ENABLED=0**
+for manual calculations without external credentials.
 
 ## Free-tier limits
 
@@ -35,6 +36,8 @@ within provider allowances; it does not include OpenAI usage.
 3. Confirm the preview creates **aquamind-api-free** and **aqua**, both
    **Free** in **Oregon**, with no disk or paid database. Review updates carefully
    if those service names already exist. Other apps can stay in the workspace.
+   When prompted for **AQUAMIND_AGENT_ENABLED**, enter **0** for this initial
+   calculator-only setup. The application also defaults to disabled if unset.
 4. Select **Deploy Blueprint** and wait for both services to show Live. No OpenAI
    or Upstash credentials are required for this first manual-only deployment.
 5. Open the HTTPS URL on **aqua**. Render generates and shares a
@@ -153,9 +156,11 @@ AI-stage counter without relying on a temporary file or resetting it on app slee
    configured model, including unrelated/mixed requests, adversarial overrides
    and legitimate ambiguous water questions. Scripted tests do not measure live
    classification. Keep **AQUAMIND_AGENT_ENABLED=0** until these checks and quota
-   readiness are reviewed. Then change that flag in the Blueprint to **1**,
-   publish the reviewed configuration and sync deliberately.
-   A dashboard-only flag change would be overwritten on the next Blueprint sync.
+   readiness are reviewed. Then set **AQUAMIND_AGENT_ENABLED=1** on the backend
+   service's **Environment** page and deploy with the updated environment.
+   The Blueprint declares this flag with **sync: false**: an existing service's
+   value is preserved on later syncs. This does not change the relay, quota,
+   consent or approval controls. Set it back to **0** and deploy to disable AI.
 5. Verify health, then explicitly authorize a live test using a fictional report.
    Check consent, extracted fields, review and calculation. OpenAI bills this use;
    real extraction accuracy is separate from mocked integration tests.
