@@ -59,6 +59,32 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
         token = created.json()['session_token']
         return token, {'Authorization': 'Bearer ' + token}
 
+    async def test_bill_readiness_needs_no_session_or_paid_admission(self):
+        budget = Mock()
+        budget.reserve.side_effect = AssertionError('Readiness must not reserve paid usage')
+        self.host._daily_budget = budget
+        ready = await self.http.get('/v1/bills/readiness')
+        self.assertEqual(ready.status_code, 200)
+        self.assertEqual(ready.json(), {'status': 'ready'})
+        self.assertEqual(ready.headers['cache-control'], 'no-store')
+        self.assertEqual(self.host._total, 0)
+        self.assertEqual(self.requests, [])
+        self.assertEqual(self.topic_requests, [])
+        budget.reserve.assert_not_called()
+        self.app.state.agent_host = None
+        self.assertEqual((await self.http.get('/v1/bills/readiness')).status_code, 503)
+
+    async def test_bill_readiness_preserves_relay_and_public_admission(self):
+        from aquamind_ml.admission import PublicAdmission
+        self.app.state.relay_secret = b'test-placeholder'
+        self.app.state.public_admission = PublicAdmission(requests=1)
+        self.assertEqual((await self.http.get('/v1/bills/readiness')).status_code, 401)
+        headers = {'X-AquaMind-Relay-Key': 'test-placeholder'}
+        self.assertEqual((await self.http.get('/v1/bills/readiness', headers=headers)).status_code, 200)
+        denied = await self.http.get('/v1/bills/readiness', headers=headers)
+        self.assertEqual(denied.status_code, 429)
+        self.assertIn('retry-after', denied.headers)
+
     async def turn(self, headers, text='A private water question'):
         return await self.http.post('/v1/agent/turn', headers=headers, json={'text': text})
 

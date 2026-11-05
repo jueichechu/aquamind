@@ -261,6 +261,14 @@ def agent_router(sessions: DemoSessions) -> APIRouter:
     router = APIRouter()
     from .bill_import import BillImportRequest, BillImportResponse, IMPORT_BODY_LIMIT
 
+    @router.get('/v1/bills/readiness')
+    async def bill_readiness(request: Request):
+        # No session, document, quota reservation or provider request is needed.
+        # Relay authorization and public admission still apply in middleware.
+        if request.app.state.agent_host is None:
+            raise HTTPException(503, 'Bill analysis unavailable')
+        return {'status': 'ready'}
+
     async def body_for(request: Request, schema, limit):
         if request.headers.get('content-type', '').split(';')[0].strip().lower() != 'application/json':
             raise HTTPException(415, 'Expected application/json')
