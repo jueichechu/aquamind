@@ -23,7 +23,7 @@ services:
       - key: AQUAMIND_INFERENCE_ENABLED
         value: "0"
       - key: AQUAMIND_AGENT_ENABLED
-        value: "0"
+        sync: false
       - key: AQUAMIND_PUBLIC_MODE
         value: "1"
       - key: AQUAMIND_RELAY_REQUIRED
