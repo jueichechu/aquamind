@@ -48,8 +48,21 @@ within provider allowances; it does not include OpenAI usage.
 7. At **/analyze**, enter 8.5 CCF from June 1, 2026 to the exclusive end July 1.
    Expect 30 days and about 211.95 US gallons/day. At **/compare**, load examples,
    confirm the household assumption and expect 100 daily gallons and 0.00% change.
-8. If the first request reports unavailable during a cold start, allow startup
-   and submit deliberately again. Never retry paid requests automatically.
+8. With AI enabled, the homepage starts a bounded readiness check on arrival.
+   Visitors can select a report and give consent while the API wakes. Reading
+   stays disabled until ready, and submission rechecks readiness before creating
+   a session or sending the document. If startup remains unavailable, the file
+   stays selected; **Try again** checks readiness only. Never retry paid requests
+   automatically.
+
+`GET /api/aquamind/v1/bills/readiness` checks connectivity and whether the backend
+agent is configured, without a session, document, quota reservation or provider
+call. Relay authorization and public admission limits still apply. The homepage
+polls at least 10 seconds apart for at most two minutes, respects longer numeric
+`Retry-After` values, and stops after success or navigation. It does not run an
+idle keep-alive. Readiness does not guarantee remaining AI quota, provider health,
+or availability between the check and submission. Both Free web services can
+still sleep; the frontend itself may show Render's startup page before loading.
 
 Both service definitions use **autoDeployTrigger: checksPass**. GitHub Actions
 validates pull requests and pushes to main; Render waits for the linked branch's
@@ -213,7 +226,9 @@ bypasses the durable-ledger requirement for public AI. No bills or files are sav
 
 ## Troubleshooting
 
-- **Cold start:** allow the API to wake and resubmit manually.
+- **Cold start:** the homepage waits for bill readiness before sending a report.
+  If startup times out, use **Try again** or manual entry; other routes may still
+  need a deliberate resubmission after the API wakes.
 - **Raw API 401:** expected without the host key. Use the frontend. For relay
   failures, check that both services share the generated secret and required flag.
 - **Budget startup error:** verify Upstash URL/token and store type, keeping AI
