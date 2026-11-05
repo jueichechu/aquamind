@@ -19,7 +19,11 @@ No models or downloaded household datasets are published by this workflow.
 The Redis service is a disposable container belonging to the cloud job. It stores
 only test counters and is removed when the job ends. This is separate from the
 hosted Upstash database. CI does not merge pull requests, change repository rules,
-or deploy services. Render service auto-deploys remain disabled in the Blueprint.
+or call the Render API. The Blueprint sets both services to **checksPass** so
+Render deploys application changes after the linked main branch's checks pass.
+Existing services require a one-time Blueprint sync and confirmation of the
+connected GitHub repository and **After CI Checks Pass** setting. See the
+[deployment setup](deployment.md#deploy-application-updates-after-ci).
 
 ## Require CI before merging
 
@@ -41,9 +45,12 @@ enable branch protection or automatic merging. See GitHub's
 [branch protection guide](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule).
 
 Review all three job results on the pull request before merging. After merging,
-wait for the `main` run to pass, then deploy that commit deliberately and verify
-the hosted app following the [deployment guide](deployment.md). Automated checks
-do not replace browser review, hosted capacity checks or live provider verification.
+wait for the `main` run and both automatic Render deploys to finish, then verify
+the deployed commits and hosted app following the [deployment guide](deployment.md).
+Blueprint configuration changes still need a reviewed sync while Auto Sync is off.
+CI uses simulated paid providers; no automatic hosted smoke workflow is configured.
+These checks do not replace browser review, hosted capacity checks or live
+provider verification.
 
 ## Real Redis integration checks locally
 
