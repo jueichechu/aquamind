@@ -738,6 +738,15 @@ still use the separately reviewed fields through the normalization endpoint.
 The extraction schema requires every property and rejects extra properties, following
 the [structured-output contract](https://developers.openai.com/api/docs/guides/structured-outputs).
 Invalid evidence fails the extraction with a generic error and no automatic retry.
+The provider-only schema also requires a bounded purpose category for each charge.
+Only a separately printed water-service amount can fill water charge, and only a
+separately printed sewer-service amount can fill sewer charge. Plans, insurance,
+bundled fees/taxes totals, unrelated amounts and uncertain categories are suppressed
+server-side, with an unclear source hint and the existing review warning. The model
+must not reconstruct charges by summing tiers or subtracting fees. Explicit zero
+service charges remain valid. This additional classification is still an unverified
+model interpretation; a mistaken category can remain possible, so review is required.
+Categories are stripped before returning the unchanged public import response.
 The web decoder accepts older responses with no evidence, but validates and preserves
 the complete versioned object when present. Evidence is retained in memory alongside
 the import. The review form shows the suggested reading type and field source pages,
@@ -755,7 +764,7 @@ no invented page references. Manual bill entry has no import-specific hints.
 
 ### Synthetic bill-review fixtures
 
-`evals/fixtures/bill-import-review-v1.json` is a shared set of ten synthetic extraction
+`evals/fixtures/bill-import-review-v1.json` is a shared set of twelve synthetic extraction
 responses and fixed normalization expectations, consumed by Python and web tests.
 It covers all four supported usage units, monthly/quarterly/irregular periods,
 actual/estimated/mixed/unknown readings, missing dates, ambiguous units, unknown
@@ -763,6 +772,9 @@ versus zero charges, unsupported currency, combined services, and rejected non-w
 or multiple-bill documents. Unsupported charges and rejected-document evidence are
 checked after server-side suppression. Incomplete entries need explicit corrections
 before normalization; unrelated invoice charges never enter the water/sewer subtotal.
+The charge regressions include a bundled total with a sewer protection plan, and
+separate service charges with explicit zero. Provider-only classifications are not
+returned to the browser; its existing nullable fields and evidence remain compatible.
 
 The Python test uses mocked provider responses through the actual import and
 normalization endpoints. The web test uses the same responses through the client
