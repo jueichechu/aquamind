@@ -4,6 +4,61 @@ import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split("/") }) });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("approval relay", () => {
+  it.each([
+    [200, "text/html", "<html>private edge error</html>"],
+    [429, "text/plain", "private edge error"],
+    [503, "text/html", "<html>private startup page</html>"],
+    [200, "application/json", '{"status":"ok"}'],
+    [200, "application/json", '{"status":"ready","private":"data"}'],
+    [200, "text/plain", '{"status":"ready"}'],
+    [200, "application/json", '"ready"'],
+    [200, "application/json", 'not json'],
+    [204, "application/json", null],
+  ])("normalizes invalid readiness responses to unavailable (%s, %s)", async (status, type, body) => {
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    const fetcher = vi.fn().mockResolvedValue(new Response(body, { status, headers: { "Content-Type": type } }));
+    vi.stubGlobal("fetch", fetcher);
+    const result = await GET(new Request("http://localhost/api"), context("v1/bills/readiness"));
+    expect(result.status).toBe(503);
+    expect(await result.json()).toEqual({ detail: "Bill analysis unavailable" });
+    expect(result.headers.get("cache-control")).toBe("no-store");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds readiness response bytes and cancels an oversized stream", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    const cancelled = vi.fn();
+    const stream = new ReadableStream({ start(controller) {
+      controller.enqueue(new Uint8Array(1025));
+    }, cancel: cancelled });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(stream, { headers: { "Content-Type": "application/json" } })));
+    const result = await GET(new Request("http://localhost/api"), context("v1/bills/readiness"));
+    expect(result.status).toBe(503);
+    expect(await result.json()).toEqual({ detail: "Bill analysis unavailable" });
+    expect(cancelled).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([401, 404, 429, 503])("preserves valid readiness application errors (%s)", async (status) => {
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    const body = { detail: "Application unavailable", request_id: "12345678-abcd-1234-abcd-123456789abc" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body, { status })));
+    const result = await GET(new Request("http://localhost/api"), context("v1/bills/readiness"));
+    expect(result.status).toBe(status);
+    expect(await result.json()).toEqual(body);
+  });
+
+  it.each([[429, "30", "30"], [503, "60", "60"], [503, "private-host", null], [503, "1000000", null]])(
+    "keeps only bounded cooldown hints when normalizing an upstream readiness page (%s)", async (status, retry, expected) => {
+      vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("private edge page", {
+        status, headers: { "Retry-After": retry, "Content-Type": "text/html" },
+      })));
+      const result = await GET(new Request("http://localhost/api"), context("v1/bills/readiness"));
+      expect(result.status).toBe(503);
+      expect(result.headers.get("retry-after")).toBe(expected);
+      expect(await result.json()).toEqual({ detail: "Bill analysis unavailable" });
+    });
+
   it("relays bill readiness without a session and keeps the method allowlist", async () => {
     vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
     vi.stubEnv("AQUAMIND_RELAY_REQUIRED", "1");

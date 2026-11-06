@@ -15,6 +15,39 @@ const failure = (detail: string, status: number, extraHeaders = {}) =>
   Response.json({ detail }, { status, headers: { ...safeHeaders, ...extraHeaders } });
 let activePublicRequests = 0;
 
+async function readinessResponse(upstream: Response, headers: Record<string, string>) {
+  const unavailable = () => failure("Bill analysis unavailable", 503, headers);
+  if (upstream.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
+    void upstream.body?.cancel().catch(() => {});
+    return unavailable();
+  }
+  const reader = upstream.body?.getReader();
+  if (!reader) return unavailable();
+  try {
+    // Readiness has a tiny, public schema. Do not forward an edge error page or
+    // buffer an unbounded response while presenting it as application JSON.
+    let raw = "", size = 0;
+    const decoder = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 1024) return unavailable();
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+    const data = JSON.parse(raw);
+    const object = data !== null && typeof data === "object" && !Array.isArray(data);
+    const ready = object && upstream.status === 200 && data.status === "ready" && Object.keys(data).length === 1;
+    const error = object && upstream.status >= 400 && upstream.status <= 599 &&
+      typeof data.detail === "string" && data.detail.length <= 160 &&
+      Object.keys(data).every((key) => key === "detail" || key === "request_id") &&
+      (data.request_id === undefined || (typeof data.request_id === "string" && /^[0-9a-f-]{36}$/.test(data.request_id)));
+    return ready || error ? new Response(raw, { status: upstream.status, headers }) : unavailable();
+  } catch { return unavailable(); }
+  finally { void reader.cancel().catch(() => {}); reader.releaseLock(); }
+}
+
 async function boundedBody(request: Request, limit: number) {
   const reader = request.body?.getReader();
   if (!reader) return undefined;
@@ -77,7 +110,10 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
     });
     const responseHeaders: Record<string, string> = { "Content-Type": "application/json", ...safeHeaders };
     const retry = upstream.headers.get("retry-after");
-    if (upstream.status === 429 && retry && /^[1-9]\d{0,5}$/.test(retry)) responseHeaders["Retry-After"] = retry;
+    const readiness = route === "v1/bills/readiness";
+    if ((upstream.status === 429 || (readiness && upstream.status === 503)) &&
+        retry && /^[1-9]\d{0,5}$/.test(retry)) responseHeaders["Retry-After"] = retry;
+    if (readiness) return await readinessResponse(upstream, responseHeaders);
     return new Response(upstream.status === 204 ? null : await upstream.text(), {
       status: upstream.status,
       headers: responseHeaders,

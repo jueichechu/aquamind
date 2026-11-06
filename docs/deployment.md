@@ -60,7 +60,12 @@ agent is configured, without a session, document, quota reservation or provider
 call. Relay authorization and public admission limits still apply. The homepage
 polls at least 10 seconds apart for at most two minutes, respects longer numeric
 `Retry-After` values, and stops after success or navigation. It does not run an
-idle keep-alive. Readiness does not guarantee remaining AI quota, provider health,
+idle keep-alive. Numeric cooldown hints are honored on both 429 and 503.
+The readiness relay accepts only a bounded JSON readiness response or application
+error; upstream HTML, malformed or oversized responses become a sanitized 503.
+An upstream edge error is not evidence that the application's AI quota is spent.
+Valid application authorization and rate-limit errors retain their status.
+Readiness does not guarantee remaining AI quota, provider health,
 or availability between the check and submission. Both Free web services can
 still sleep; the frontend itself may show Render's startup page before loading.
 
@@ -229,6 +234,11 @@ bypasses the durable-ledger requirement for public AI. No bills or files are sav
 - **Cold start:** the homepage waits for bill readiness before sending a report.
   If startup times out, use **Try again** or manual entry; other routes may still
   need a deliberate resubmission after the API wakes.
+- **Readiness unavailable:** compare direct backend health, frontend health and
+  backend startup/request logs. A deployed version marked Live does not prove
+  current request readiness. Non-JSON upstream errors can occur before an API
+  request reaches the process; do not reset usage counters or change credentials
+  solely because a readiness probe failed. Startup can outlast the bounded wait.
 - **Raw API 401:** expected without the host key. Use the frontend. For relay
   failures, check that both services share the generated secret and required flag.
 - **Budget startup error:** verify Upstash URL/token and store type, keeping AI

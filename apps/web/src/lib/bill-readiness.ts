@@ -29,7 +29,7 @@ export async function waitForBillReadiness(signal: AbortSignal): Promise<void> {
       // Configuration/route failures cannot be solved by repeated checks.
       if ([401, 403, 404].includes(response.status)) break;
       const retry = response.headers.get("retry-after");
-      if (response.status === 429 && retry && /^[1-9]\d{0,5}$/.test(retry)) {
+      if ([429, 503].includes(response.status) && retry && /^[1-9]\d{0,5}$/.test(retry)) {
         delay = Math.max(delay, Number(retry) * 1000);
       }
     } catch {
