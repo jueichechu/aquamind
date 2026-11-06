@@ -178,6 +178,7 @@
       "review_edits": {},
       "normalized": {"billing_days": 31, "total_us_gallons": "528.344105", "us_gallons_per_day": "17.043358", "water_and_sewer_subtotal": null},
       "provider_output": {
+        "charge_categories": {"water_charge": "water_service", "sewer_charge": "sewer_service"},
         "fields": {"period_start": "2026-01-01", "period_end_exclusive": "2026-02-01", "usage": "2000", "usage_unit": "liters", "water_charge": "12", "sewer_charge": "14", "currency": null},
         "warnings": ["unsupported_currency"],
         "evidence": {
@@ -246,6 +247,7 @@
       "review_edits": {},
       "normalized": null,
       "provider_output": {
+        "charge_categories": {"water_charge": "water_service", "sewer_charge": "missing"},
         "fields": {"period_start": "2026-06-01", "period_end_exclusive": "2026-07-01", "usage": "8.5", "usage_unit": "ccf", "water_charge": "45.12", "sewer_charge": null, "currency": "USD"},
         "warnings": ["not_water_bill"],
         "evidence": {
@@ -289,6 +291,7 @@
       "review_edits": {},
       "normalized": null,
       "provider_output": {
+        "charge_categories": {"water_charge": "water_service", "sewer_charge": "missing"},
         "fields": {"period_start": "2026-06-01", "period_end_exclusive": "2026-07-01", "usage": "8.5", "usage_unit": "ccf", "water_charge": "45.12", "sewer_charge": null, "currency": "USD"},
         "warnings": ["multiple_bills"],
         "evidence": {
@@ -305,6 +308,177 @@
             "currency": {"kind": "printed", "page": 1}
           }
         }
+      }
+    },
+    {
+      "id": "bundled-water-total-and-sewer-protection-plan",
+      "description": "A fees-and-taxes total and sewer protection plan must not become utility service charges.",
+      "media_type": "image/webp",
+      "extraction": {
+        "fields": {
+          "period_start": "2024-07-24",
+          "period_end_exclusive": "2024-08-21",
+          "usage": "14",
+          "usage_unit": "ccf",
+          "water_charge": null,
+          "sewer_charge": null,
+          "currency": "USD"
+        },
+        "warnings": [
+          "unclear_document"
+        ],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "unknown",
+          "reading_type_page": null,
+          "fields": {
+            "period_start": {
+              "kind": "printed",
+              "page": 1
+            },
+            "period_end_exclusive": {
+              "kind": "derived",
+              "page": 1
+            },
+            "usage": {
+              "kind": "printed",
+              "page": 1
+            },
+            "usage_unit": {
+              "kind": "printed",
+              "page": 1
+            },
+            "water_charge": {
+              "kind": "unclear",
+              "page": 1
+            },
+            "sewer_charge": {
+              "kind": "unclear",
+              "page": 1
+            },
+            "currency": {
+              "kind": "printed",
+              "page": 1
+            }
+          }
+        }
+      },
+      "provider_output": {
+        "fields": {
+          "period_start": "2024-07-24",
+          "period_end_exclusive": "2024-08-21",
+          "usage": "14",
+          "usage_unit": "ccf",
+          "water_charge": "195.42",
+          "sewer_charge": "12.49",
+          "currency": "USD"
+        },
+        "warnings": [],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "unknown",
+          "reading_type_page": null,
+          "fields": {
+            "period_start": {
+              "kind": "printed",
+              "page": 1
+            },
+            "period_end_exclusive": {
+              "kind": "derived",
+              "page": 1
+            },
+            "usage": {
+              "kind": "printed",
+              "page": 1
+            },
+            "usage_unit": {
+              "kind": "printed",
+              "page": 1
+            },
+            "water_charge": {
+              "kind": "printed",
+              "page": 1
+            },
+            "sewer_charge": {
+              "kind": "printed",
+              "page": 1
+            },
+            "currency": {
+              "kind": "printed",
+              "page": 1
+            }
+          }
+        },
+        "charge_categories": {
+          "water_charge": "bundled_total",
+          "sewer_charge": "protection_plan"
+        }
+      },
+      "review_edits": {},
+      "normalized": {
+        "billing_days": 28,
+        "total_us_gallons": "10472.727273",
+        "us_gallons_per_day": "374.025974",
+        "water_and_sewer_subtotal": null
+      }
+    },
+    {
+      "id": "separate-service-charges-and-explicit-zero",
+      "description": "Separately printed service charges remain candidates, including explicit zero; unrelated charges are excluded.",
+      "media_type": "application/pdf",
+      "extraction": {
+        "fields": {
+          "period_start": "2026-06-01",
+          "period_end_exclusive": "2026-07-01",
+          "usage": "8.5",
+          "usage_unit": "ccf",
+          "water_charge": "45.12",
+          "sewer_charge": "0.00",
+          "currency": "USD"
+        },
+        "warnings": [],
+        "evidence": {
+          "schema_version": 1,
+          "reading_type": "actual",
+          "reading_type_page": 1,
+          "fields": {
+            "period_start": {
+              "kind": "printed",
+              "page": 1
+            },
+            "period_end_exclusive": {
+              "kind": "derived",
+              "page": 1
+            },
+            "usage": {
+              "kind": "printed",
+              "page": 1
+            },
+            "usage_unit": {
+              "kind": "printed",
+              "page": 1
+            },
+            "water_charge": {
+              "kind": "printed",
+              "page": 1
+            },
+            "sewer_charge": {
+              "kind": "printed",
+              "page": 1
+            },
+            "currency": {
+              "kind": "printed",
+              "page": 1
+            }
+          }
+        }
+      },
+      "review_edits": {},
+      "normalized": {
+        "billing_days": 30,
+        "total_us_gallons": "6358.441558",
+        "us_gallons_per_day": "211.948052",
+        "water_and_sewer_subtotal": "45.12"
       }
     }
   ]
