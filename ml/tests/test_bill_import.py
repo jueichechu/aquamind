@@ -14,7 +14,8 @@ from openai import AsyncOpenAI
 from aquamind_ml.agent import AgentConfig
 from aquamind_ml.agent_http import AgentHost
 from aquamind_ml.api import create_app
-from aquamind_ml.bill_import import IMPORT_BODY_LIMIT, MAX_DOCUMENT_BYTES, IMPORT_POLICY, ExtractedReport
+from aquamind_ml.bill_import import (IMPORT_BODY_LIMIT, MAX_DOCUMENT_BYTES, IMPORT_POLICY,
+                                   ExtractedReport, ProviderReport)
 from aquamind_ml.sessions import DemoSessions
 from test_agent import message, response
 
@@ -22,7 +23,9 @@ FIXTURES = Path(__file__).resolve().parents[2] / 'evals/fixtures/bill-import-rev
 
 
 def report_payload(fields, warnings=()):
-    return {'fields': fields, 'warnings': list(warnings), 'evidence': {
+    return {'fields': fields, 'warnings': list(warnings), 'charge_categories': {
+        name: category if fields.get(name) is not None else 'missing' for name, category in
+        (('water_charge', 'water_service'), ('sewer_charge', 'sewer_service'))}, 'evidence': {
         'schema_version': 1, 'reading_type': 'unknown', 'reading_type_page': None,
         'fields': {name: {'kind': 'printed' if value is not None else 'missing',
                           'page': 1 if value is not None else None} for name, value in fields.items()}}}
@@ -74,6 +77,9 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.json()['needs_review'])
         self.assertEqual(result.headers['cache-control'], 'no-store')
         self.assertEqual(result.json()['request_id'], result.headers['x-request-id'])
+        self.assertNotIn('charge_categories', result.json())
+        public = self.app.openapi()['components']['schemas']['BillImportResponse']['properties']
+        self.assertEqual(set(public), {'fields', 'warnings', 'evidence', 'source', 'needs_review', 'request_id'})
         request, = self.requests
         self.assertFalse(request['store'])
         self.assertEqual(request['tools'], [])
@@ -101,6 +107,66 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
             document = self.requests[-1]['input'][0]['content'][1]
             self.assertEqual(document['type'], 'input_image')
             self.assertEqual(document['detail'], 'high')
+
+    async def test_non_service_or_unclear_charges_are_suppressed_without_losing_usage(self):
+        for category in ['protection_plan', 'bundled_total', 'other', 'unknown', 'missing', 'water_service']:
+            with self.subTest(category=category):
+                self.payload = report_payload(self.fields | {'sewer_charge': '12.49'})
+                self.payload['charge_categories']['sewer_charge'] = category
+                result = await self.post()
+                self.assertEqual(result.status_code, 200)
+                value = result.json()
+                self.assertIsNone(value['fields']['sewer_charge'])
+                self.assertEqual(value['fields']['water_charge'], '45.12')
+                self.assertEqual(value['fields']['usage'], '8.5')
+                self.assertEqual(value['evidence']['fields']['sewer_charge'], {'kind': 'unclear', 'page': 1})
+                self.assertEqual(value['warnings'], ['unclear_document'])
+                self.assertNotIn('charge_categories', value)
+        self.payload = report_payload(self.fields)
+        self.payload['evidence']['fields']['water_charge'] = {'kind': 'unclear', 'page': 1}
+        self.assertIsNone((await self.post()).json()['fields']['water_charge'])
+
+    async def test_bundled_total_and_protection_plan_cannot_create_a_water_sewer_subtotal(self):
+        self.payload = report_payload(self.fields | {'water_charge': '195.42', 'sewer_charge': '12.49'})
+        self.payload['charge_categories'] = {'water_charge': 'bundled_total', 'sewer_charge': 'protection_plan'}
+        headers = await self.headers()
+        imported = await self.post(headers=headers)
+        self.assertEqual(imported.status_code, 200)
+        fields = imported.json()['fields']
+        self.assertIsNone(fields['water_charge'])
+        self.assertIsNone(fields['sewer_charge'])
+        normalized = await self.http.post('/v1/bills/normalize', headers=headers, json=fields)
+        self.assertEqual(normalized.status_code, 200)
+        self.assertIsNone(normalized.json()['water_and_sewer_subtotal'])
+        self.assertEqual(len(self.requests), 1)
+
+    async def test_real_service_charges_and_explicit_zero_are_preserved(self):
+        self.payload = report_payload(self.fields | {'sewer_charge': '0.00'})
+        result = await self.post()
+        self.assertEqual(result.json()['fields'], self.fields | {'sewer_charge': '0.00'})
+        self.assertEqual(result.json()['warnings'], [])
+
+    async def test_a_partial_meter_fee_cannot_stand_in_for_the_full_water_charge(self):
+        self.payload = report_payload(self.fields | {'water_charge': '29.09'})
+        self.payload['charge_categories']['water_charge'] = 'other'
+        result = await self.post()
+        self.assertEqual(result.status_code, 200)
+        self.assertIsNone(result.json()['fields']['water_charge'])
+        self.assertEqual(result.json()['fields']['usage'], '8.5')
+
+    async def test_charge_purpose_is_required_bounded_and_never_exposed(self):
+        for classification in [None, {}, {'water_charge': 'water_service', 'sewer_charge': 'private text'},
+                               {'water_charge': 'water_service', 'sewer_charge': 'missing', 'quote': 'private'}]:
+            self.payload = report_payload(self.fields)
+            if classification is None:
+                self.payload.pop('charge_categories')
+            else:
+                self.payload['charge_categories'] = classification
+            before = len(self.requests)
+            result = await self.post()
+            self.assertEqual(result.status_code, 502)
+            self.assertNotIn('private', result.text)
+            self.assertEqual(len(self.requests), before + 1)
 
     async def test_auth_consent_format_spoofing_and_unknown_fields_fail_before_provider(self):
         self.assertEqual((await self.post(headers={'Authorization': 'Bearer invalid'})).status_code, 401)
@@ -228,7 +294,7 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.post()).status_code, 502)
 
     def test_structured_output_schema_requires_every_property_and_forbids_extra_text(self):
-        schema = ExtractedReport.model_json_schema()
+        schema = ProviderReport.model_json_schema()
         def inspect(node):
             if isinstance(node, dict):
                 if node.get('type') == 'object':
@@ -266,7 +332,7 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(case=case['id']):
                 ExtractedReport.model_validate(case['extraction'])
                 if 'provider_output' in case:
-                    ExtractedReport.model_validate(case['provider_output'])
+                    ProviderReport.model_validate(case['provider_output'])
 
     async def test_shared_review_fixtures_cross_import_and_normalization_endpoints(self):
         # Signature probes exercise transport/validation, not real PDF/image decoding.
@@ -280,6 +346,8 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
                 body = {'media_type': case['media_type'], 'share_with_ai': True,
                         'data_base64': base64.b64encode(probes[case['media_type']]).decode()}
                 self.payload = case.get('provider_output', case['extraction'])
+                if 'charge_categories' not in self.payload:
+                    self.payload = self.payload | {'charge_categories': report_payload(self.payload['fields'])['charge_categories']}
                 before = len(self.requests)
                 with self.assertLogs('aquamind.api', level='INFO') as logs:
                     imported = await self.post(body, headers)
