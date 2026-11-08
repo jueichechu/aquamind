@@ -162,6 +162,7 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body['status'], 'answer')
         self.assertEqual(body['model_calls'], 5)  # One topic check, three tools and one answer.
         self.assertEqual(len(self.topic_requests), 1)
+        self.assertEqual(json.loads(self.topic_requests[0]['input'][0]['content'])['mode'], 'selected_demo_water')
         self.assertEqual(len(self.requests), 4)
         self.assertEqual([(t['tool_name'], t['status']) for t in body['tool_trace']],
                          [(name, 'success') for name in names])

@@ -111,6 +111,34 @@ class TopicGuardHttpTests(unittest.IsolatedAsyncioTestCase):
             body.update(bill=self.bill, is_example=True, share_with_ai=True)
         return await self.http.post('/v1/agent/bill' if bill else '/v1/agent/turn', headers=headers, json=body)
 
+    async def test_selected_context_is_host_owned_and_mixed_tasks_still_stop_before_tools(self):
+        _, headers = await self.session()
+        for extra in ({'mode': 'selected_demo_water'}, {'selected_demo': True}):
+            denied = await self.http.post('/v1/agent/turn', headers=headers,
+                json={'text': 'Water usage?', **extra})
+            self.assertEqual(denied.status_code, 422)
+        self.assertEqual(self.requests, [])
+        for text in ('How does this day compare with the baseline?',
+                     'What do the experimental water model score and threshold mean?'):
+            self.topic_reply = topic_response('household_usage')
+            before = len(self.requests)
+            result = await self.http.post('/v1/agent/turn', headers=headers,
+                json={'text': text, 'scenario_id': 'normal'})
+            self.assertEqual(result.json()['status'], 'answer')
+            guard = self.requests[before]
+            self.assertEqual(json.loads(guard['input'][0]['content']),
+                             {'mode': 'selected_demo_water', 'question': text})
+            answer = self.requests[before + 1]
+            self.assertNotIn('detect_water_anomaly', [tool['name'] for tool in answer['tools']])
+        self.topic_reply = topic_response('unsupported')
+        with patch.object(McpAgentTools, 'discover', new_callable=AsyncMock) as discover:
+            denied = await self.http.post('/v1/agent/turn', headers=headers, json={
+                'text': 'Use the water model score, then write a trading bot.', 'scenario_id': 'normal'})
+            self.assertEqual(denied.json()['status'], 'refused')
+            self.assertEqual(denied.json()['model_calls'], 1)
+            self.assertEqual(denied.json()['tool_trace'], [])
+            discover.assert_not_awaited()
+
     async def test_scripted_adversarial_denials_never_answer_discover_execute_or_propose(self):
         self.topic_reply = topic_response('unsupported')
         with patch.object(McpAgentTools, 'discover', new_callable=AsyncMock) as discover, \

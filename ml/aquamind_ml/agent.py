@@ -95,10 +95,13 @@ class AgentPause:
 async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config: AgentConfig, *,
                     check_active: Callable[[], None] | None = None,
                     on_pause: Callable[[AgentPause], None] | None = None,
-                    bill_context: NormalizedBill | None = None, is_example: bool = False) -> AgentResult:
+                    bill_context: NormalizedBill | None = None, is_example: bool = False,
+                    selected_demo: bool = False) -> AgentResult:
     """One text turn. Keep protocol/reasoning items in memory, outside public output."""
     if not isinstance(text, str) or not text.strip() or len(text.encode()) > 8192:
         raise ValueError('Expected 1–8192 bytes of user text')
+    if type(selected_demo) is not bool or (selected_demo and bill_context is not None):
+        raise ValueError('Expected one host-selected question context')
     history = []
     if bill_context is not None:
         if tools.allowed_tools or on_pause is not None:
@@ -110,7 +113,7 @@ async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config
     history.append({'role': 'user', 'content': text})
     return await _run(history, client, tools, config, check_active=check_active,
                       on_pause=on_pause, instructions=POLICY + BILL_POLICY if bill_context is not None else POLICY,
-                      topic_question=text, bill_only=bill_context is not None)
+                      topic_question=text, bill_only=bill_context is not None, selected_demo=selected_demo)
 
 
 async def continue_agent(pause: AgentPause, decision: GoalProposal, current_goal: GoalRequest | None,
@@ -135,7 +138,8 @@ async def continue_agent(pause: AgentPause, decision: GoalProposal, current_goal
 async def _run(history: list[dict], client: AsyncOpenAI, tools: McpAgentTools, config: AgentConfig, *,
                check_active: Callable[[], None] | None = None,
                on_pause: Callable[[AgentPause], None] | None = None, instructions: str = POLICY,
-               topic_question: str | None = None, bill_only: bool = False) -> AgentResult:
+               topic_question: str | None = None, bill_only: bool = False,
+               selected_demo: bool = False) -> AgentResult:
     model_trace = []
     calls = 0
 
@@ -155,7 +159,8 @@ async def _run(history: list[dict], client: AsyncOpenAI, tools: McpAgentTools, c
                     check_active()
                 calls += 1  # Counts even failed/uncertain paid attempts, within the original budget.
                 async with asyncio.timeout(config.request_timeout_seconds):
-                    response = await request_topic_check(topic_question, client, config, bill_only=bill_only)
+                    response = await request_topic_check(topic_question, client, config,
+                                                         bill_only=bill_only, selected_demo=selected_demo)
                 trace(response)
                 if check_active is not None:
                     check_active()

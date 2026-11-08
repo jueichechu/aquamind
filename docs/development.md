@@ -551,7 +551,10 @@ picks, travel forecasts or coding remain unsupported even alongside valid tool n
 The check receives only the question and host-selected mode, with fixed
 instructions and a strict single-enum [structured output schema](https://developers.openai.com/api/docs/guides/structured-outputs).
 It receives no bill values, tool definitions/results, credentials or conversation
-history. The host independently validates completed output, rejecting duplicate
+history. A selected synthetic demo supplies only the host-selected context mode,
+so short questions about its day, baseline or public anomaly score/threshold have
+a water subject. This context grants no tools or permissions, and unrelated tasks
+remain unsupported. The host independently validates completed output, rejecting duplicate
 keys, unknown intents, extra fields, refusals, tool calls and malformed/missing
 verdicts. A valid unsupported verdict returns HTTP 200 with the existing response
 shape, `status: refused`, `error: unsupported_topic`, a fixed water-focused
