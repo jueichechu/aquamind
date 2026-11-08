@@ -20,7 +20,9 @@ export async function waitForBillReadiness(signal: AbortSignal): Promise<void> {
     try {
       const response = await fetch("/api/aquamind/v1/bills/readiness", {
         method: "GET", credentials: "omit", cache: "no-store",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(12_000, deadline - Date.now()))]),
+        // A Free backend can take roughly a minute to wake. Keep one probe alive
+        // beyond the relay's 70-second cold-start allowance, within this window.
+        signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(75_000, deadline - Date.now()))]),
       });
       if (response.ok && (await response.json())?.status === "ready") {
         signal.throwIfAborted();

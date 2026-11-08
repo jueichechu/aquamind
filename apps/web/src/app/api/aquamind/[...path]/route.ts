@@ -97,6 +97,7 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
   const importing = route === "v1/bills/import";
   const comparing = route === "v1/bills/compare";
   const agent = newTurn || route === "v1/agent/continue" || importing;
+  const readiness = route === "v1/bills/readiness";
   try {
     const limit = importing ? IMPORT_BODY_LIMIT : newTurn ? 16384 : comparing ? 12 * 1024 : 1024;
     const body = request.method === "POST" ? await boundedBody(request, limit) : undefined;
@@ -106,11 +107,13 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
     if (auth) headers.set("Authorization", auth);
     const upstream = await fetch(`${base.replace(/\/$/, "")}/${route}`, {
       method: request.method, headers, body, cache: "no-store", redirect: "error",
-      signal: AbortSignal.timeout(agent ? 135_000 : 10_000),
+      // Only the read-only startup probe gets a cold-start allowance. Cancel it
+      // on navigation; paid requests keep their existing uncertain-outcome rules.
+      signal: readiness ? AbortSignal.any([request.signal, AbortSignal.timeout(70_000)]) :
+        AbortSignal.timeout(agent ? 135_000 : 10_000),
     });
     const responseHeaders: Record<string, string> = { "Content-Type": "application/json", ...safeHeaders };
     const retry = upstream.headers.get("retry-after");
-    const readiness = route === "v1/bills/readiness";
     if ((upstream.status === 429 || (readiness && upstream.status === 503)) &&
         retry && /^[1-9]\d{0,5}$/.test(retry)) responseHeaders["Retry-After"] = retry;
     if (readiness) return await readinessResponse(upstream, responseHeaders);

@@ -5,6 +5,40 @@ import { GET } from "../app/api/aquamind/[...path]/route";
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.useRealTimers(); });
 
 describe("bill startup readiness", () => {
+  it("keeps one cold-start request alive through a 45-second wake without repeating it", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    vi.stubEnv("AQUAMIND_RELAY_REQUIRED", "0");
+    vi.stubEnv("AQUAMIND_PUBLIC_MODE", "0");
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), ms);
+      return controller.signal;
+    });
+    const upstream = vi.fn().mockImplementation((_url, options) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve(Response.json({ status: "ready" })), 45_000);
+      options.signal.addEventListener("abort", () => {
+        clearTimeout(timer); reject(options.signal.reason);
+      }, { once: true });
+    }));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string, options: RequestInit) => {
+      if (url.startsWith("https://api.example/")) return upstream(url, options);
+      return GET(new Request("https://website.example" + url, options), {
+        params: Promise.resolve({ path: ["v1", "bills", "readiness"] }),
+      });
+    }));
+    try {
+      const wait = waitForBillReadiness(new AbortController().signal);
+      await vi.advanceTimersByTimeAsync(44_999);
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(upstream.mock.calls[0][1].signal.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await wait;
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([75_000, 70_000]);
+    } finally { timeout.mockRestore(); }
+  });
+
   it("waits through a cold start using only credential-free GETs, then stops", async () => {
     vi.useFakeTimers();
     const fetcher = vi.fn().mockResolvedValueOnce(Response.json({}, { status: 503 }))
@@ -23,6 +57,36 @@ describe("bill startup readiness", () => {
       expect(options.body).toBeUndefined();
       expect(options.headers).toBeUndefined();
     }
+  });
+
+  it("bounds stalled cold-start requests by the original two-minute window", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    vi.stubEnv("AQUAMIND_RELAY_REQUIRED", "0");
+    vi.stubEnv("AQUAMIND_PUBLIC_MODE", "0");
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), ms);
+      return controller.signal;
+    });
+    const upstream = vi.fn().mockImplementation((_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+    }));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string, options: RequestInit) => {
+      if (url.startsWith("https://api.example/")) return upstream(url, options);
+      return GET(new Request("https://website.example" + url, options), {
+        params: Promise.resolve({ path: ["v1", "bills", "readiness"] }),
+      });
+    }));
+    try {
+      const failure = expect(waitForBillReadiness(new AbortController().signal)).rejects.toThrow(BILL_STARTUP_UNAVAILABLE);
+      await vi.advanceTimersByTimeAsync(120_000);
+      await failure;
+      expect(upstream).toHaveBeenCalledTimes(2);
+      expect(upstream.mock.calls.every(([, options]) => options.signal.aborted)).toBe(true);
+      await vi.advanceTimersByTimeAsync(180_000);
+      expect(upstream).toHaveBeenCalledTimes(2);
+    } finally { timeout.mockRestore(); }
   });
 
   it.each([429, 503])("honors a throttled or unavailable probe's Retry-After (%s)", async (status) => {
