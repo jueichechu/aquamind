@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
-# Free-compute staging. Read docs/deployment.md for limits and optional AI setup.
+# Free-compute staging. Read docs/deployment.md for limits and AI setup.
 services:
   - type: web
     name: aquamind-api-free
@@ -8,7 +8,10 @@ services:
     plan: free
     branch: main
     autoDeployTrigger: checksPass
-    buildCommand: python -m pip install -r ml/requirements-cloud.txt && python -m pip check
+    buildCommand: >-
+      python -m pip install --index-url https://download.pytorch.org/whl/cpu -r ml/requirements.txt
+      && python -m pip install -r ml/requirements-cloud.txt && python -m pip check
+      && PYTHONPATH=ml python -m aquamind_ml.model_release --output ml/artifacts/served-detector-v1
     startCommand: >-
       python -m uvicorn aquamind_ml.api:app --host 0.0.0.0 --port "$PORT" --workers 1
       --no-proxy-headers --no-access-log
@@ -21,7 +24,9 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: AQUAMIND_INFERENCE_ENABLED
-        value: "0"
+        value: "1"
+      - key: AQUAMIND_DETECTOR_PATH
+        value: ml/artifacts/served-detector-v1
       - key: AQUAMIND_AGENT_ENABLED
         sync: false
       - key: AQUAMIND_PUBLIC_MODE
@@ -46,7 +51,7 @@ services:
       corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build --webpack
     startCommand: >-
       AQUAMIND_API_URL="https://${AQUAMIND_API_HOSTNAME}"
-      pnpm --filter web start --hostname 0.0.0.0 --port "$PORT"
+      node apps/web/node_modules/next/dist/bin/next start apps/web --hostname 0.0.0.0 --port "$PORT"
     healthCheckPath: /
     envVars:
       - key: NODE_VERSION

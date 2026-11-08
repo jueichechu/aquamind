@@ -3,8 +3,9 @@
 The root [render.yaml](../render.yaml) targets **two Render Free web services**.
 There is no paid private service, persistent disk or managed database. Next.js
 relays requests to a Python bill/MCP/agent service with server authentication.
-The cloud service omits PyTorch; training and detector code remain available locally.
-The free deployment does not serve model weights or anomaly inference.
+The Python build installs CPU-only PyTorch and a checksum-pinned frozen synthetic
+detector from a release asset. The experimental model is available to the selected
+demo's anomaly tool; the dashboard's generated scenario flags remain rule-defined.
 
 Live OpenAI extraction and answers are separately billed by OpenAI. AI activation
 is an explicit backend environment setting. Start with **AQUAMIND_AGENT_ENABLED=0**
@@ -13,7 +14,9 @@ for manual calculations without external credentials.
 ## Free-tier limits
 
 - Render Free services have 512 MB RAM, sleep after 15 minutes without traffic,
-  and can take about a minute to wake. Hosted capacity still needs verification.
+  and can take about a minute to wake. Model loading adds startup work. An isolated
+  Linux smoke test covered the model and read-only tools within this memory limit;
+  hosted startup, memory and load must still be checked after activation.
 - The workspace shares **750 Free running hours/month** across these two services
   and any existing Free apps. Two continuously awake services exceed that allowance.
   Spun-down services do not consume running hours.
@@ -225,10 +228,33 @@ stage/session, two/host, eight stages/session and 100/process. Overload returns
 pass through without automatic retries. Limits are shared across visitors and do
 not guarantee fairness or replace edge DDoS controls. Health consumes no AI quota.
 
-**AQUAMIND_INFERENCE_ENABLED=0** avoids PyTorch in the cloud; /ready and anomaly
-prediction remain unavailable. Full local inference defaults to enabled and uses
-ml/requirements-agent.txt. Serving a detector later needs the full dependencies,
-a verified frozen artifact and measured capacity. Frozen sources are unchanged.
+The Blueprint enables inference with **AQUAMIND_INFERENCE_ENABLED=1** and
+**AQUAMIND_DETECTOR_PATH=ml/artifacts/served-detector-v1**. Its build runs
+`python -m aquamind_ml.model_release` to install the release pinned in
+[model-release-v1.json](../ml/model-release-v1.json). The archive, manifest,
+weights and frozen runtime sources are verified before installation; the model
+is neither trained nor downloaded at startup. A failed verification fails the
+build. Existing valid artifacts are verified and reused rather than overwritten.
+Generated model weights stay outside Git history.
+
+Applying this change to an existing deployment needs a Blueprint sync. With
+Auto Sync off, review and apply it manually as described above. With Auto Sync on
+and the initial Blueprint already approved, merging the configuration can apply
+it automatically; inspect the current setting and intended resource changes first.
+Service code auto-deploy and Blueprint Auto Sync are separate settings. Keep the
+OpenAI, Upstash and relay values already configured.
+Verify backend **/ready** reports the pinned model version after deployment and
+test a selected demo anomaly question. Confirm that its evidence remains synthetic
+and that scores are not presented as probabilities or fixture diagnoses. Preserve
+the shared request/session/AI quotas. Do not upgrade Free compute automatically.
+Use Render memory metrics and cold-start checks before claiming hosted capacity;
+an isolated container test is not a load test or a hosting availability guarantee.
+
+The frontend start command invokes the installed Next.js binary directly. This
+avoids downloading a package manager on each wake. Its build still uses the locked
+pnpm dependencies. **AQUAMIND_INFERENCE_ENABLED=0** remains supported for a service
+using only the lightweight requirements; in that mode omit the detector path.
+Frozen runtime sources are unchanged. Local full inference uses ml/requirements-agent.txt.
 The SQLite quota option remains supported with **AQUAMIND_USAGE_STORE=sqlite** and
 an absolute **AQUAMIND_USAGE_DB** path on persistent storage. Free hosting never
 bypasses the durable-ledger requirement for public AI. No bills or files are saved.
