@@ -237,9 +237,12 @@ is neither trained nor downloaded at startup. A failed verification fails the
 build. Existing valid artifacts are verified and reused rather than overwritten.
 Generated model weights stay outside Git history.
 
-Applying this change to an existing deployment needs the reviewed Blueprint sync
-described above; a code merge alone does not change the existing build command or
-environment settings. Keep the OpenAI, Upstash and relay values already configured.
+Applying this change to an existing deployment needs a Blueprint sync. With
+Auto Sync off, review and apply it manually as described above. With Auto Sync on
+and the initial Blueprint already approved, merging the configuration can apply
+it automatically; inspect the current setting and intended resource changes first.
+Service code auto-deploy and Blueprint Auto Sync are separate settings. Keep the
+OpenAI, Upstash and relay values already configured.
 Verify backend **/ready** reports the pinned model version after deployment and
 test a selected demo anomaly question. Confirm that its evidence remains synthetic
 and that scores are not presented as probabilities or fixture diagnoses. Preserve
