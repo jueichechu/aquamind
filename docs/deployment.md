@@ -61,6 +61,10 @@ call. Relay authorization and public admission limits still apply. The homepage
 polls at least 10 seconds apart for at most two minutes, respects longer numeric
 `Retry-After` values, and stops after success or navigation. It does not run an
 idle keep-alive. Numeric cooldown hints are honored on both 429 and 503.
+Each read-only readiness relay request allows up to 70 seconds for a cold start;
+the browser allows up to 75 seconds, still within the two-minute total window.
+Leaving the page cancels the probe. Session, calculation and paid-request deadlines
+are unchanged; no bill is sent while waiting and readiness never uploads it automatically.
 The readiness relay accepts only a bounded JSON readiness response or application
 error; upstream HTML, malformed or oversized responses become a sanitized 503.
 An upstream edge error is not evidence that the application's AI quota is spent.

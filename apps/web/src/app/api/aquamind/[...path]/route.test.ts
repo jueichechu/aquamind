@@ -77,6 +77,21 @@ describe("approval relay", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("cancels a cold-start readiness request when its visitor leaves", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    const controller = new AbortController();
+    const fetcher = vi.fn().mockImplementation((_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+    }));
+    vi.stubGlobal("fetch", fetcher);
+    const pending = GET(new Request("https://website.example/api", { signal: controller.signal }),
+      context("v1/bills/readiness"));
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    controller.abort();
+    expect((await pending).status).toBe(503);
+    expect(fetcher.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
   it("supplies server relay credentials while ignoring browser-supplied credentials", async () => {
     const secret = "server-only-test-key-".repeat(2);
     vi.stubEnv("AQUAMIND_API_URL", "https://api.example");

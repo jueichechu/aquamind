@@ -543,6 +543,10 @@ unclear requests otherwise receive the same redirect and can be rephrased.
 Generic academic exercises remain outside this scope even when framed as water
 benchmarks or research. Calculations that directly explain household water use,
 bill quantities, meter changes or conservation remain supported.
+Combined questions about a selected synthetic household's meter, weather and
+illustrative water rate are supported; the classifier chooses the main intent
+when several supported water purposes apply. Unrelated additions such as stock
+picks, travel forecasts or coding remain unsupported even alongside valid tool names.
 
 The check receives only the question and host-selected mode, with fixed
 instructions and a strict single-enum [structured output schema](https://developers.openai.com/api/docs/guides/structured-outputs).

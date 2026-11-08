@@ -149,6 +149,31 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.sessions.approvals(token).goal.daily_gallons, 150)
         self.assertEqual(len(self.requests), 2)
 
+    async def test_combined_demo_sources_fit_original_budget_without_expanding_permissions(self):
+        _, headers = await self.session()
+        names = ['get_meter_summary', 'get_weather_context', 'get_utility_rate']
+        self.reply = lambda index: response([call('combined_' + str(index), names[index - 1], '{}')]) \
+            if index <= 3 else response([message('Synthetic household and weather; illustrative water rate.')])
+        result = await self.http.post('/v1/agent/turn', headers=headers, json={
+            'text': 'Compare this synthetic household meter, rain and illustrative water rate without changing goals.',
+            'scenario_id': 'irrigation-after-rain'})
+        body = result.json()
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(body['status'], 'answer')
+        self.assertEqual(body['model_calls'], 5)  # One topic check, three tools and one answer.
+        self.assertEqual(len(self.topic_requests), 1)
+        self.assertEqual(len(self.requests), 4)
+        self.assertEqual([(t['tool_name'], t['status']) for t in body['tool_trace']],
+                         [(name, 'success') for name in names])
+        self.assertIsNone(body['pending_approval'])
+        self.assertEqual((await self.http.get('/v1/goals/current', headers=headers)).json(), {'goal': None})
+        evidence = [json.loads(r['input'][-1]['output'])['result'] for r in self.requests[1:]]
+        for item in evidence[:2]:
+            self.assertEqual(item['source'], 'synthetic')
+            self.assertEqual(item['scenario_id'], 'irrigation-after-rain')
+        self.assertNotIn('detect_water_anomaly', [tool['name'] for tool in self.requests[0]['tools']])
+        self.assertNotIn('approve_goal', [tool['name'] for tool in self.requests[0]['tools']])
+
     async def test_selected_scenarios_supply_matching_summary_series_and_weather(self):
         meter = DemoMeterStore()
         for scenario in sorted(SCENARIOS):
