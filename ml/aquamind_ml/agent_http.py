@@ -181,7 +181,8 @@ class AgentHost:
             server, allowed = self._server(store, scenario_id, allow_goals=True)
             async with Client(server) as mcp:
                 outcome = await run_agent(text, self.client, McpAgentTools(mcp, allowed), self.config,
-                                          check_active=check_active, on_pause=pauses.append)
+                                          check_active=check_active, on_pause=pauses.append,
+                                          selected_demo=scenario_id is not None)
             check_active()
             if outcome.status == 'approval_required' and pauses:
                 self._continuations[store] = _Continuation(

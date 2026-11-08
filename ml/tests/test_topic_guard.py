@@ -17,7 +17,7 @@ from test_agent import call, is_topic_request, message, response, topic_response
 
 class TopicGuardTests(unittest.IsolatedAsyncioTestCase):
     async def run_script(self, replies, *, text='Why does the toilet tank keep refilling?',
-                         bill=False, config=None, check_active=None):
+                         bill=False, config=None, check_active=None, selected_demo=False):
         requests, pauses = [], []
 
         async def handle(request):
@@ -35,7 +35,8 @@ class TopicGuardTests(unittest.IsolatedAsyncioTestCase):
         async with AsyncOpenAI(api_key='test-only-placeholder',
             http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle))) as client:
             outcome = await run_agent(text, client, tools, config or AgentConfig(model='test-model'),
-                bill_context=evidence, check_active=check_active, on_pause=None if bill else pauses.append)
+                bill_context=evidence, check_active=check_active, on_pause=None if bill else pauses.append,
+                selected_demo=selected_demo)
         return outcome, requests, tools, pauses
 
     async def test_denial_returns_only_host_redirect_before_discovery_or_answer(self):
@@ -86,6 +87,27 @@ class TopicGuardTests(unittest.IsolatedAsyncioTestCase):
         for private in ('2026-06-01', '45.12', '6358.441558', 'bill_evidence'):
             self.assertNotIn(private, json.dumps(requests[0]))
         self.assertIn('bill_evidence', requests[1]['input'][0]['content'])
+
+    async def test_selected_demo_context_is_isolated_and_does_not_waive_admission(self):
+        for intent in ('household_usage', 'unsupported'):
+            replies = [topic_response(intent)]
+            if intent != 'unsupported':
+                replies.append(response([message('A model score is not a leak probability.')]))
+            outcome, requests, tools, _ = await self.run_script(replies,
+                text='What do this water day\'s score and threshold mean?', selected_demo=True)
+            self.assertEqual(json.loads(requests[0]['input'][0]['content']), {
+                'mode': 'selected_demo_water', 'question': "What do this water day's score and threshold mean?"})
+            if intent == 'unsupported':
+                self.assertEqual(outcome.status, 'refused')
+                tools.discover.assert_not_awaited()
+            else:
+                self.assertEqual(outcome.status, 'answer')
+                self.assertNotIn('selected_demo_water', json.dumps(requests[1]))
+
+    async def test_conflicting_or_invalid_host_context_is_rejected_before_requests(self):
+        for kwargs in ({'bill': True, 'selected_demo': True}, {'selected_demo': 'true'}, {'selected_demo': 1}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                await self.run_script([], **kwargs)
 
     async def test_invalid_refused_incomplete_or_tool_outputs_fail_closed(self):
         refused = message('')
