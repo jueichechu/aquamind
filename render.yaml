@@ -1,5 +1,6 @@
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
-# Free-compute staging. Read docs/deployment.md for limits and AI setup.
+# Free-compute staging. The website dispatches to its API in process within one service.
+# Retain the former API as a configuration source and migration fallback.
 services:
   - type: web
     name: aquamind-api-free
@@ -7,7 +8,7 @@ services:
     region: oregon
     plan: free
     branch: main
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: 'off'
     buildCommand: >-
       python -m pip install --index-url https://download.pytorch.org/whl/cpu -r ml/requirements.txt
       && python -m pip install -r ml/requirements-cloud.txt && python -m pip check
@@ -29,6 +30,14 @@ services:
         value: ml/artifacts/served-detector-v1
       - key: AQUAMIND_AGENT_ENABLED
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
       - key: AQUAMIND_PUBLIC_MODE
         value: "1"
       - key: AQUAMIND_RELAY_REQUIRED
@@ -42,20 +51,15 @@ services:
 
   - type: web
     name: aqua
-    runtime: node
+    runtime: docker
     region: oregon
     plan: free
     branch: main
     autoDeployTrigger: checksPass
-    buildCommand: >-
-      corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build --webpack
-    startCommand: >-
-      AQUAMIND_API_URL="https://${AQUAMIND_API_HOSTNAME}"
-      node apps/web/node_modules/next/dist/bin/next start apps/web --hostname 0.0.0.0 --port "$PORT"
-    healthCheckPath: /
+    dockerfilePath: ./services/combined/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
     envVars:
-      - key: NODE_VERSION
-        value: "24.21.0"
       - key: NODE_ENV
         value: production
       - key: NEXT_TELEMETRY_DISABLED
@@ -69,8 +73,39 @@ services:
           type: web
           name: aquamind-api-free
           envVarKey: AQUAMIND_RELAY_SECRET
-      - key: AQUAMIND_API_HOSTNAME
+      - key: AQUAMIND_INFERENCE_ENABLED
+        value: "1"
+      - key: AQUAMIND_DETECTOR_PATH
+        value: ml/artifacts/served-detector-v1
+      - key: AQUAMIND_USAGE_STORE
+        value: upstash
+      - key: AQUAMIND_AGENT_ENABLED
         fromService:
           type: web
           name: aquamind-api-free
-          envVarKey: RENDER_EXTERNAL_HOSTNAME
+          envVarKey: AQUAMIND_AGENT_ENABLED
+      - key: AQUAMIND_AI_DAILY_STAGE_LIMIT
+        fromService:
+          type: web
+          name: aquamind-api-free
+          envVarKey: AQUAMIND_AI_DAILY_STAGE_LIMIT
+      - key: OPENAI_API_KEY
+        fromService:
+          type: web
+          name: aquamind-api-free
+          envVarKey: OPENAI_API_KEY
+      - key: OPENAI_MODEL
+        fromService:
+          type: web
+          name: aquamind-api-free
+          envVarKey: OPENAI_MODEL
+      - key: UPSTASH_REDIS_REST_URL
+        fromService:
+          type: web
+          name: aquamind-api-free
+          envVarKey: UPSTASH_REDIS_REST_URL
+      - key: UPSTASH_REDIS_REST_TOKEN
+        fromService:
+          type: web
+          name: aquamind-api-free
+          envVarKey: UPSTASH_REDIS_REST_TOKEN

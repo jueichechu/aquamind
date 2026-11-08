@@ -1,282 +1,215 @@
 # Deployment
 
-The root [render.yaml](../render.yaml) targets **two Render Free web services**.
-There is no paid private service, persistent disk or managed database. Next.js
-relays requests to a Python bill/MCP/agent service with server authentication.
-The Python build installs CPU-only PyTorch and a checksum-pinned frozen synthetic
-detector from a release asset. The experimental model is available to the selected
-demo's anomaly tool; the dashboard's generated scenario flags remain rule-defined.
+The root [render.yaml](../render.yaml) serves the exported Next.js website and its
+Python API from one process in the existing **aqua** Render Free web service.
+Node builds the HTML, CSS and JavaScript during deployment; no Node server runs
+in the final image. The Python runtime includes FastAPI, MCP, CPU-only PyTorch and
+the pinned experimental synthetic detector. Browser requests retain the existing
+same-origin API routes. The [hosting adapter](../ml/aquamind_ml/web.py) dispatches
+allowlisted API requests in process; no second server or remote wake-up is needed.
 
-Live OpenAI extraction and answers are separately billed by OpenAI. AI activation
-is an explicit backend environment setting. Start with **AQUAMIND_AGENT_ENABLED=0**
-for manual calculations without external credentials.
+The former **aquamind-api-free** service is retained during migration as a fallback
+and server-side configuration source. It has automatic application deploys disabled.
+The website does not call or wake that remote service. Keeping its definition avoids
+silently deleting or replacing infrastructure; its stored environment values remain
+available to Blueprint references even while its process sleeps. Do not delete it
+while those references exist. No paid service, disk or managed database is added.
+
+## Startup and readiness
+
+Uvicorn completes the API lifespan before opening its public listener. The hosting
+adapter verifies the exported pages, process health, detector readiness when
+inference is enabled, and bill readiness when AI is enabled before startup yields.
+These checks do not create sessions, reserve quota, upload a document or call
+OpenAI. An unavailable enabled feature fails startup rather than exposing the page.
+
+The container runs as a non-root user with read-only model files. Only one Python
+worker serves the exported files and API. There is no package-manager download,
+model download or training on wake. The entrypoint passes SIGTERM directly to
+Uvicorn for graceful shutdown. The Render health check remains **/api/health**.
+
+After inactivity, Render can show its own loading screen before the application
+appears. Once the application is served, the local backend has completed the
+startup checks. This does not test OpenAI/Upstash availability or remaining quota.
+Provider outages and later restarts still require the existing error handling.
+
+The homepage continues to check bill readiness before reading a report. Visitors
+must select a file and give sharing consent. Submission rechecks readiness before
+creating a session or uploading. Waiting never uploads automatically; an unavailable
+service leaves the file selected and offers a deliberate readiness retry. Existing
+70-second relay, 75-second browser and two-minute total readiness deadlines remain.
+These bounded, read-only checks are not an idle keep-alive. Paid requests and writes
+are never automatically retried after uncertain outcomes.
 
 ## Free-tier limits
 
-- Render Free services have 512 MB RAM, sleep after 15 minutes without traffic,
-  and can take about a minute to wake. Model loading adds startup work. An isolated
-  Linux smoke test covered the model and read-only tools within this memory limit;
-  hosted startup, memory and load must still be checked after activation.
-- The workspace shares **750 Free running hours/month** across these two services
-  and any existing Free apps. Two continuously awake services exceed that allowance.
-  Spun-down services do not consume running hours.
-- Build minutes and bandwidth have included limits. Usage overages can incur
-  charges when a payment method is present. For strict zero-hosting charges,
-  consider a separate Hobby workspace without a payment method and verify Billing
-  settings. Do not upgrade compute or enable paid add-ons.
+- Render Free web services have 512 MB RAM, sleep after 15 minutes without inbound
+  traffic, and can take about a minute to wake. Model loading adds startup work.
+  A local bounded container check is not a hosted availability or load guarantee.
+- The workspace shares **750 Free running hours/month** across all Free services.
+  The combined website consumes one running service's hours. The migration fallback
+  and unrelated apps consume additional hours whenever awake.
+- Build minutes and bandwidth have included limits. Overages can incur charges
+  when a payment method is present. Verify Billing and spend settings; do not
+  upgrade compute or enable paid add-ons automatically.
 - Free compute is suitable for hobby/staging use, without always-on availability.
+  Live extraction and answers are separately billed by OpenAI.
 
-See [Render Free limits](https://render.com/docs/free) and
-[compute plans](https://render.com/docs/compute-plans). Free hosting means staying
-within provider allowances; it does not include OpenAI usage.
+See [Render Free limits](https://render.com/docs/free),
+[Docker deployment](https://render.com/docs/docker) and
+[health checks](https://render.com/docs/health-checks).
 
-## Initial manual-only deployment
+## Migrate the existing deployment
 
-1. Connect the repository to the intended Render workspace.
-2. After the configuration is merged, choose **New → Blueprint**, repository
-   **jueichechu/aquamind**, branch **main**, path **render.yaml**, and a new Blueprint
-   name such as **aquamind-free**. Both builds run from the repository root.
-3. Confirm the preview creates **aquamind-api-free** and **aqua**, both
-   **Free** in **Oregon**, with no disk or paid database. Review updates carefully
-   if those service names already exist. Other apps can stay in the workspace.
-   When prompted for **AQUAMIND_AGENT_ENABLED**, enter **0** for this initial
-   calculator-only setup. The application also defaults to disabled if unset.
-4. Select **Deploy Blueprint** and wait for both services to show Live. No OpenAI
-   or Upstash credentials are required for this first manual-only deployment.
-5. Open the HTTPS URL on **aqua**. Render generates and shares a
-   server-only relay secret automatically; do not put it in browser settings/code.
-6. Open **/api/health**: once the API is awake, expect HTTP 200 with status ok.
-   The web service's Render probe checks **/** for frontend liveness; /api/health
-   checks API connectivity separately and can return 503 during an API cold start.
-7. At **/analyze**, enter 8.5 CCF from June 1, 2026 to the exclusive end July 1.
-   Expect 30 days and about 211.95 US gallons/day. At **/compare**, load examples,
-   confirm the household assumption and expect 100 daily gallons and 0.00% change.
-8. With AI enabled, the homepage starts a bounded readiness check on arrival.
-   Visitors can select a report and give consent while the API wakes. Reading
-   stays disabled until ready, and submission rechecks readiness before creating
-   a session or sending the document. If startup remains unavailable, the file
-   stays selected; **Try again** checks readiness only. Never retry paid requests
-   automatically.
+1. Inspect the existing Blueprint, resource IDs, Auto Sync setting and live versions.
+   The change should update **aqua** from Node to Docker on **Free**, preserving its
+   existing website URL, and disable automatic application deploys on the old API.
+   It should not create, replace or remove a service, disk, database or paid plan.
+   Render supports [changing runtimes](https://render.com/docs/native-runtimes#changing-a-services-runtime)
+   on an existing web service.
+2. Review and merge the configuration PR after CI passes. With Auto Sync enabled
+   and the initial Blueprint already approved, Render applies configuration changes
+   automatically. With Auto Sync disabled, review and apply a manual sync. Keep the
+   existing intended setting; application-code auto-deploy and Blueprint Auto Sync
+   are separate controls.
+3. The combined service takes its existing AI-enabled flag, model name, OpenAI key,
+   Upstash URL/token, relay secret and daily stage cap from **aquamind-api-free**
+   through server-only **fromService** references. No credential value belongs in
+   Git, browser code, build arguments, chat or logs. Existing source values are
+   preserved; **sync: false** does not overwrite them on an existing service.
+4. Wait for the actual **aqua** Docker deploy to be **Live** on the intended commit.
+   A successful sync or deploy trigger alone is insufficient. Check memory, restart
+   events and startup logs, then verify health, bill readiness, pages, manual bill
+   calculations, comparison, session isolation and revocation.
+5. Verify actual idle shutdown and a fresh wake before signing off on startup.
+   Deliberately test live extraction using a fictional report and verify the review
+   gate. Live provider calls cost money; do not retry an uncertain request.
+6. Keep the old API available as a migration fallback until the combined deployment
+   is verified. Later retirement requires moving the referenced settings to the
+   combined service or a shared environment group, removing those references and
+   separately reviewing suspension/removal. Removing a Blueprint definition alone
+   does not delete a deployed service.
 
-`GET /api/aquamind/v1/bills/readiness` checks connectivity and whether the backend
-agent is configured, without a session, document, quota reservation or provider
-call. Relay authorization and public admission limits still apply. The homepage
-polls at least 10 seconds apart for at most two minutes, respects longer numeric
-`Retry-After` values, and stops after success or navigation. It does not run an
-idle keep-alive. Numeric cooldown hints are honored on both 429 and 503.
-Each read-only readiness relay request allows up to 70 seconds for a cold start;
-the browser allows up to 75 seconds, still within the two-minute total window.
-Leaving the page cancels the probe. Session, calculation and paid-request deadlines
-are unchanged; no bill is sent while waiting and readiness never uploads it automatically.
-The readiness relay accepts only a bounded JSON readiness response or application
-error; upstream HTML, malformed or oversized responses become a sanitized 503.
-An upstream edge error is not evidence that the application's AI quota is spent.
-Valid application authorization and rate-limit errors retain their status.
-Readiness does not guarantee remaining AI quota, provider health,
-or availability between the check and submission. Both Free web services can
-still sleep; the frontend itself may show Render's startup page before loading.
-
-Both service definitions use **autoDeployTrigger: checksPass**. GitHub Actions
-validates pull requests and pushes to main; Render waits for the linked branch's
-checks before deploying application updates. Require **CI gate** in branch
-protection. Existing deployments need the one-time setup below before this takes
-effect. See [continuous integration](ci.md).
-
-If the previous paid AquaMind services were already created, this new Blueprint
-does **not** stop or delete them. Verify the replacement, then check Billing and
-suspend or remove those old services separately, preserving needed data first.
-Leave unrelated projects alone.
+For a new deployment, create the Blueprint with AI initially disabled and provide
+its source configuration when prompted. Use blank provider values only while AI
+is disabled. The built model supports manual calculations and the synthetic demo;
+OpenAI and Upstash are necessary for public AI activation.
 
 ## Deploy application updates after CI
 
-For existing services, apply this configuration once:
+The combined service uses **autoDeployTrigger: checksPass**. GitHub Actions checks
+PRs and pushes to **main**. Require **CI gate** in branch protection and confirm
+**Auto-Deploy → After CI Checks Pass** on the existing service. Merging application
+code then triggers CI followed by deployment; no manual deploy is normally needed.
+See [continuous integration](ci.md).
 
-1. Keep **Blueprint → Settings → Auto Sync → No**. Review and merge the
-   configuration PR after CI passes, then wait for the main-branch CI run to pass.
-2. On the **existing** Blueprint, choose **Manual Sync**. Confirm the preview
-   updates only the intended **aqua** and **aquamind-api-free** services, both
-   **Free**, with no replacement, new resource, disk or plan upgrade.
-3. On each service's **Settings** page, confirm the connected GitHub repository
-   is **jueichechu/aquamind**, branch **main**, and **Auto-Deploy → After CI Checks
-   Pass**. Auto-deploys require a connected Git provider; a service created from
-   only a public repository URL needs that connection established first.
-4. Verify the first deploy and its commit on each service's **Deploys** page.
-   A Blueprint sync can deploy configuration changes; it is separate from the
-   service's automatic application-code deployment setting.
-
-After setup, merging an application-code PR triggers main CI, followed by Render
-builds/deploys when those checks pass. The existing CI gate fails if a required
-job fails, is cancelled or is skipped. Keep the YAML setting and Dashboard aligned;
-a conflicting Dashboard-only change is overwritten by the next Blueprint sync.
-
-With Blueprint Auto Sync off, later **render.yaml** infrastructure changes still
-need a reviewed manual sync after CI. Application-code updates need no manual
-deploy. This keeps automatic Blueprint configuration updates separate from the
-service CI gate. See [automatic deploys](https://render.com/docs/deploys#automatic-deploys),
-the [Blueprint field reference](https://render.com/docs/blueprint-spec#autodeploytrigger)
-and [Blueprint sync behavior](https://render.com/docs/infrastructure-as-code#disabling-automatic-sync).
-
-Wait for both services to report **Live** on the intended commit, then verify
-**/api/health**, manual bill calculation, comparison, session creation and
-revocation. The API's **/health** and frontend's **/** probes are liveness checks;
-they do not establish that every feature or provider integration works. There is
-no automatic hosted smoke-test workflow yet. AI activation and paid live checks
-remain subject to the configuration and verification steps below.
-
-## Replace an existing frontend service
-
-The frontend service is named **aqua**; **aquamind-api-free** remains the
-Python backend. The name requests a cleaner generated address but does not
-guarantee **aqua.onrender.com**. Use the exact URL Render assigns. See Render's
-[subdomain change request](https://feedback.render.com/features/p/ability-to-change-onrendercom-sub-domain).
-
-For an existing deployment using **aquamind-web-free**:
-
-1. Set the existing Blueprint's **Auto Sync** to **No** before merging a service
-   replacement. Inspect the target workspace first. A service named **aqua**
-   might already exist; verify its service ID, repository, runtime and ownership
-   before proceeding. A Blueprint can update an existing same-name service.
-   Do not overwrite another project's service or assume a suspended URL is free.
-2. Keep the working frontend and **aquamind-api-free** running. Review and merge
-   the new configuration through CI, then manually sync the **existing** Blueprint.
-   Expect the frontend replacement on **Free**, with the backend and its existing
-   relay secret preserved. Do not create a second copy of the whole Blueprint.
-3. Review the assigned URL. If Render adds a suffix or the desired name is taken,
-   stop the cutover and keep the original working site. Deleting the original
-   frontend does not free a different service's subdomain.
-4. Once the replacement is Live, verify **/api/health**, manual bill analysis and
-   comparison at its actual HTTPS URL. The generated relay references connect
-   it to the existing backend; do not copy credentials into browser code.
-5. Only after successful verification, retire **aquamind-web-free**. Removing its
-   definition does not delete the deployed service. Confirm it is no longer
-   managed by the Blueprint before deletion, or a later sync can recreate it.
-   Both frontends consume shared Free running hours while they coexist.
-
-See [Blueprint resource lifecycle](https://render.com/docs/infrastructure-as-code#deleting-resources).
-Recreating a service is a deployment operation; changing its display name alone
-does not establish a new public address. No custom-domain purchase is required
-to try a new generated address.
+Blueprint Auto Sync can apply infrastructure edits separately from the service CI
+gate. Inspect the resource diff before merging configuration. A failed build keeps
+the prior working deployment; still inspect the actual live commit after any failure.
+The migration fallback deliberately uses **autoDeployTrigger: off**. Its Blueprint
+configuration can still trigger a deploy when changed. No periodic wake-up job or
+automatic paid provider smoke test is configured.
 
 ## Enable OpenAI with a free durable quota store
 
-Render Free services have no persistent disk. Upstash Redis can hold the durable
-AI-stage counter without relying on a temporary file or resetting it on app sleep.
+Render Free has no persistent disk. Upstash Redis holds the durable AI-stage counter
+without resetting it when the application sleeps or redeploys.
 
-1. At [Upstash](https://console.upstash.com/), create a Redis database on **Free**.
-   Published allowances are 250 MB and 500K commands/month; verify current limits
-   and availability in your account. Keep **eviction disabled** and paid upgrades
-   off. See [pricing](https://upstash.com/pricing/redis),
+1. Create an Upstash Redis database on **Free**, verify its current allowances,
+   keep eviction disabled and paid upgrades off. See [pricing](https://upstash.com/pricing/redis),
    [durability](https://upstash.com/docs/redis/features/durability) and
    [eviction](https://upstash.com/docs/redis/features/eviction).
-2. Under **aquamind-api-free → Environment**, set **UPSTASH_REDIS_REST_URL** and
-   **UPSTASH_REDIS_REST_TOKEN** from that database. Use its normal HTTPS REST URL
-   ending in .upstash.io and the **read/write** REST token, not the read-only token.
-   Never put credentials in URLs, Git or chat.
-3. On that same API service, set **OPENAI_API_KEY** and **OPENAI_MODEL** using the
-   existing project key and a Responses-compatible model with document support,
-   function calling and strict JSON-schema structured outputs.
-4. Verify public mode, relay authorization, **AQUAMIND_USAGE_STORE=upstash** and
-   the daily stage cap (template: 20). Before public activation, evaluate the
-   [topic boundary](development.md#household-water-topic-admission) with the actual
-   configured model, including unrelated/mixed requests, adversarial overrides
-   and legitimate ambiguous water questions. Scripted tests do not measure live
-   classification. Keep **AQUAMIND_AGENT_ENABLED=0** until these checks and quota
-   readiness are reviewed. Then set **AQUAMIND_AGENT_ENABLED=1** on the backend
-   service's **Environment** page and deploy with the updated environment.
-   The Blueprint declares this flag with **sync: false**: an existing service's
-   value is preserved on later syncs. This does not change the relay, quota,
-   consent or approval controls. Set it back to **0** and deploy to disable AI.
-5. Verify health, then explicitly authorize a live test using a fictional report.
-   Check consent, extracted fields, review and calculation. OpenAI bills this use;
-   real extraction accuracy is separate from mocked integration tests.
+2. On the configuration-source API service, set **UPSTASH_REDIS_REST_URL** to its
+   official HTTPS REST URL and **UPSTASH_REDIS_REST_TOKEN** to the read/write REST
+   token. Set **OPENAI_API_KEY** and **OPENAI_MODEL** to the existing project key
+   and a Responses-compatible model supporting documents, tools and structured output.
+3. Preserve public mode, relay authorization, **AQUAMIND_USAGE_STORE=upstash** and
+   the daily stage cap. Keep AI disabled until the [topic boundary](development.md#household-water-topic-admission)
+   and quota configuration are reviewed with the intended model. Then set
+   **AQUAMIND_AGENT_ENABLED=1** on the source service.
+4. Blueprint **fromService** values refresh on sync, not immediately when the source
+   value changes. Sync the reviewed Blueprint and verify the combined service's new
+   deploy. Setting the source flag back to **0** and syncing disables public AI.
+   Preserve the intended Auto Sync setting; no secrets need to enter agent context.
 
-Only a UTC day number and attempted-stage count are stored in one Redis hash,
-**aquamind:paid-stages:v1**. No reports, prompts, bill values, session tokens or
-OpenAI credentials go to Upstash. A server-side Lua operation reserves a stage
-before provider work; failures/cancellation are not refunded. Redis errors,
-quota exhaustion, malformed responses and uncertain network outcomes stop model
-work without retry or fallback. Keep eviction disabled and never delete or restore
-the ledger to reset quota. Instances using this database/key share the cap.
-A stage can include multiple bounded model calls: this is **not a dollar cap**.
-New questions include a paid, tool-free topic check, even when refused; bill
-questions allow that check and one answering request. Classification failures
-stop answering/tool work without fallback or retry. Topic admission does not
-establish visitor identity or stop one visitor exhausting shared capacity.
+Only a UTC day number and attempted-stage count are stored in the single Redis hash
+**aquamind:paid-stages:v1**. Reports, prompts, bill values, session tokens and OpenAI
+keys are not stored there. Instances sharing this database/key share the cap.
+Reservation happens before provider work; failures and cancellation are not refunded.
+Do not clear or restore the ledger to reset quota. Redis errors, quota exhaustion
+and uncertain outcomes stop model work without retry or fallback.
 
-Tests need no live Upstash/OpenAI calls. Actual provider connectivity, credentials
-and Free plan settings must be verified after deployment.
+One stage can contain several bounded model calls, so the stage cap is not a dollar
+cap. Questions include a paid, tool-free topic check; bill questions allow that
+check and one answer. Readiness checks do not spend AI quota. Topic admission is
+not visitor authentication or protection against one visitor exhausting shared quota.
 
 ## Runtime and request boundaries
 
-Keep one API instance/worker. Sessions, goals and approval checkpoints disappear
-when the API sleeps, restarts or redeploys; reload to start a new session. Durable
-AI quota survives these events in Upstash.
+Use one API worker. Sessions, temporary goals and approval checkpoints disappear
+when the combined service sleeps, restarts or redeploys; reload to create a new
+session. The durable AI quota remains in Upstash. No bill history or files are saved.
 
-Both services are public because Free private services are unavailable. Every API
-/v1 route requires a host relay secret plus the existing session bearer credential
-where applicable. Next.js supplies its own secret and ignores browser-supplied
-relay headers. Health and contract metadata remain public. The browser continues
-to use the same-origin relay; no browser-to-API CORS or credentials are introduced.
-Both network hops use HTTPS. Relay authentication does not replace consent or
-human approval before state changes.
+The public listener is the Python hosting adapter. It preserves the Next.js relay's
+endpoint/method allowlist, host-only relay secret, session bearer forwarding,
+actual-byte body limits, concurrency cap, sanitized failures and no-retry behavior.
+Browser-supplied relay keys, cookies and forwarded identity headers are ignored.
+Every internal API **/v1/** route retains its own relay/session authorization and
+public admission limits. Raw API, inference and documentation routes are not mounted
+publicly. Browser traffic uses HTTPS; the internal ASGI dispatch never opens a
+network connection. Consent, review and human approval remain required.
 
-Public mode keeps eight active requests per layer, actual-byte caps and a 15-second
-body deadline. Rolling 60-second API limits are 60 requests, six new sessions and
-six combined AI/import requests. Existing host/session limits remain: one active
-stage/session, two/host, eight stages/session and 100/process. Overload returns
-429, incomplete bodies 408 and oversized requests 413. Numeric Retry-After hints
-pass through without automatic retries. Limits are shared across visitors and do
-not guarantee fairness or replace edge DDoS controls. Health consumes no AI quota.
+Known page routes and navigation payloads use **Cache-Control: no-store**, so a fresh
+navigation reaches the ready process. Hashed **/_next/static/** assets can be cached
+immutably. The **/analyze?example=1** link is interpreted in the browser and retains
+its existing fictional example values. Local Next.js development keeps its original
+server routes; only the container's build-stage copy omits them for static export.
 
-The Blueprint enables inference with **AQUAMIND_INFERENCE_ENABLED=1** and
-**AQUAMIND_DETECTOR_PATH=ml/artifacts/served-detector-v1**. Its build runs
-`python -m aquamind_ml.model_release` to install the release pinned in
-[model-release-v1.json](../ml/model-release-v1.json). The archive, manifest,
-weights and frozen runtime sources are verified before installation; the model
-is neither trained nor downloaded at startup. A failed verification fails the
-build. Existing valid artifacts are verified and reused rather than overwritten.
-Generated model weights stay outside Git history.
+Public mode preserves eight active requests per layer, actual-byte limits and a
+15-second body deadline. Rolling 60-second API limits remain 60 requests, six new
+sessions and six combined AI/import requests. Existing stage limits remain one
+active stage/session, two/host, eight stages/session and 100/process. Overload
+returns 429, incomplete bodies 408 and oversized bodies 413. These limits do not
+guarantee fairness, unlimited free capacity or protection from every traffic spike.
 
-Applying this change to an existing deployment needs a Blueprint sync. With
-Auto Sync off, review and apply it manually as described above. With Auto Sync on
-and the initial Blueprint already approved, merging the configuration can apply
-it automatically; inspect the current setting and intended resource changes first.
-Service code auto-deploy and Blueprint Auto Sync are separate settings. Keep the
-OpenAI, Upstash and relay values already configured.
-Verify backend **/ready** reports the pinned model version after deployment and
-test a selected demo anomaly question. Confirm that its evidence remains synthetic
-and that scores are not presented as probabilities or fixture diagnoses. Preserve
-the shared request/session/AI quotas. Do not upgrade Free compute automatically.
-Use Render memory metrics and cold-start checks before claiming hosted capacity;
-an isolated container test is not a load test or a hosting availability guarantee.
+The Docker build installs the release pinned in [model-release-v1.json](../ml/model-release-v1.json).
+Archive, manifest, weights and frozen runtime checksums are verified. A mismatch
+fails the build. Weights are neither trained nor downloaded at startup and remain
+outside Git history. The model is experimental and synthetic-trained; scores are
+not leak probabilities or fixture diagnoses. Dashboard scenario highlights remain
+rule-defined. The AMPds2 experiment is separate and unchanged.
 
-The frontend start command invokes the installed Next.js binary directly. This
-avoids downloading a package manager on each wake. Its build still uses the locked
-pnpm dependencies. **AQUAMIND_INFERENCE_ENABLED=0** remains supported for a service
-using only the lightweight requirements; in that mode omit the detector path.
-Frozen runtime sources are unchanged. Local full inference uses ml/requirements-agent.txt.
-The SQLite quota option remains supported with **AQUAMIND_USAGE_STORE=sqlite** and
-an absolute **AQUAMIND_USAGE_DB** path on persistent storage. Free hosting never
-bypasses the durable-ledger requirement for public AI. No bills or files are saved.
+**AQUAMIND_INFERENCE_ENABLED=0** remains supported by the Python host when the
+detector path is omitted. The SQLite ledger option remains available for local or
+persistent-storage deployments; it is never a fallback for public AI on Free.
+Local two-terminal development continues to work as documented in the README.
+
+## Local container verification
+
+Run from the repository root:
+
+```sh
+docker build --platform linux/amd64 -t aquamind-combined -f services/combined/Dockerfile .
+```
+
+The build downloads the public checksum-pinned detector and installs locked frontend
+and pinned direct Python dependencies. It needs no private credentials. Supply
+server credentials only at runtime. Validate startup, feature behavior and whole
+container memory under the intended resource limits before changing hosted compute.
 
 ## Troubleshooting
 
-- **Cold start:** the homepage waits for bill readiness before sending a report.
-  If startup times out, use **Try again** or manual entry; other routes may still
-  need a deliberate resubmission after the API wakes.
-- **Readiness unavailable:** compare direct backend health, frontend health and
-  backend startup/request logs. A deployed version marked Live does not prove
-  current request readiness. Non-JSON upstream errors can occur before an API
-  request reaches the process; do not reset usage counters or change credentials
-  solely because a readiness probe failed. Startup can outlast the bounded wait.
-- **Raw API 401:** expected without the host key. Use the frontend. For relay
-  failures, check that both services share the generated secret and required flag.
-- **Budget startup error:** verify Upstash URL/token and store type, keeping AI
-  off until valid. Do not use a temporary SQLite file as a fallback.
-- **Budget 503:** check provider availability/limits and eviction settings. Do not
-  automatically retry or clear the ledger.
-- **Memory failure:** inspect hosted metrics; never silently upgrade to paid.
-  Revise the deployment scope or architecture if Free capacity is insufficient.
-- **Updates:** merge through CI and confirm automatic deploys finish on the
-  intended commit for both services. Sync reviewed Blueprint configuration
-  changes separately, then verify health and features again.
+- **Startup never finishes:** inspect backend startup events. Missing
+  model or enabled-AI configuration intentionally prevents the website from opening.
+  Do not bypass the readiness gate or upgrade compute automatically.
+- **Page open, later request fails:** the service may have restarted, a provider may
+  be unavailable, or an existing quota may be exhausted. Use the displayed error;
+  never automatically resubmit an uncertain paid request.
+- **Raw API unavailable:** expected; raw API routes are not mounted publicly. Use the
+  existing same-origin routes. The old API is not a dependency of website requests.
+- **Budget errors:** verify the source settings and sync/deploy, Upstash availability,
+  quota and eviction policy. Never use temporary SQLite or reset the ledger.
+- **Memory failure:** inspect whole-service metrics and restart/OOM events. Revise
+  architecture or scope if Free capacity is insufficient; do not silently upgrade.
+- **Updates:** confirm CI and the actual combined service deploy finish successfully
+  on the intended commit. Configuration references refresh only on Blueprint sync.
