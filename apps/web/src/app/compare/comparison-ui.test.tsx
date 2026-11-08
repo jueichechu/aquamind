@@ -58,12 +58,12 @@ it("preserves unknown versus zero charges and qualifies examples and rounded-zer
   expect(comparisonNumber("138546071294399900.00", true)).toBe("138,546,071,294,399,900.00");
 });
 
-it("connects the comparison route from the existing analysis screen", async () => {
+it("connects the comparison route from the existing analysis screen", () => {
   const compare = renderToStaticMarkup(<ComparePage />);
   expect(compare).toContain("Compare your water bills");
   expect(compare).toContain('href="/analyze"');
   expect(compare).toContain("water-desk");
-  const analyze = renderToStaticMarkup(await AnalyzePage({ searchParams: Promise.resolve({}) }));
+  const analyze = renderToStaticMarkup(<AnalyzePage />);
   expect(analyze).toContain('href="/compare"');
   expect(analyze).toContain('href="/demo"');
   expect(analyze).toContain("Understand one water bill");

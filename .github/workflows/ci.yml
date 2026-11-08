@@ -106,12 +106,38 @@ jobs:
           python -m unittest -v test_lightweight_api test_remote_budget
           test_relay_authorization test_redis_budget_integration
           test_topic_guard test_topic_guard_http
-          test_model_release
+          test_model_release test_web
+
+  combined:
+    name: Combined service checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the single-service runtime without credentials
+        run: docker build --platform linux/amd64 -t aquamind-combined -f services/combined/Dockerfile .
+      - name: Verify startup and HTTP contracts within Free runtime limits
+        run: |
+          set -eu
+          trap 'docker logs aquamind-combined-test; docker rm -f aquamind-combined-test' EXIT
+          docker run -d --name aquamind-combined-test --platform linux/amd64 \
+            --memory 512m --memory-swap 512m --cpus 0.1 --network none \
+            -e AQUAMIND_AGENT_ENABLED=1 -e AQUAMIND_INFERENCE_ENABLED=1 \
+            -e AQUAMIND_PUBLIC_MODE=1 -e AQUAMIND_RELAY_REQUIRED=1 \
+            -e AQUAMIND_RELAY_SECRET=capacity-placeholder-relay-key-123456789 \
+            -e AQUAMIND_USAGE_STORE=upstash \
+            -e UPSTASH_REDIS_REST_URL=https://capacity.upstash.io \
+            -e UPSTASH_REDIS_REST_TOKEN=capacity-placeholder-token \
+            -e OPENAI_API_KEY=capacity-placeholder-key -e OPENAI_MODEL=gpt-5.4-mini \
+            -e PORT=10000 aquamind-combined
+          docker exec -i aquamind-combined-test python - < services/combined/smoke.py
 
   ci:
     name: CI gate
     if: ${{ always() }}
-    needs: [web, python, cloud]
+    needs: [web, python, cloud, combined]
     runs-on: ubuntu-24.04
     timeout-minutes: 1
     steps:
@@ -120,7 +146,9 @@ jobs:
           WEB_RESULT: ${{ needs.web.result }}
           PYTHON_RESULT: ${{ needs.python.result }}
           CLOUD_RESULT: ${{ needs.cloud.result }}
+          COMBINED_RESULT: ${{ needs.combined.result }}
         run: |
           test "$WEB_RESULT" = success
           test "$PYTHON_RESULT" = success
           test "$CLOUD_RESULT" = success
+          test "$COMBINED_RESULT" = success

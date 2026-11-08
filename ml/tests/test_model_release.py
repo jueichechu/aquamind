@@ -28,8 +28,7 @@ class ModelReleaseTests(unittest.TestCase):
             if extra:
                 archive.writestr(*extra)
         raw = stream.getvalue()
-        release = {'schema_version': 1, 'url': 'https://github.com/jueichechu/aquamind/releases/download/'
-                   'detector-v1-synthetic/detector-v1-synthetic.zip',
+        release = {'schema_version': 1, 'url': 'https://api.github.com/repos/jueichechu/aquamind/releases/assets/723284055',
                    'archive_sha256': sha256(raw).hexdigest(),
                    'manifest_sha256': sha256(files['detector.json']).hexdigest(),
                    'weights_sha256': sha256(weights).hexdigest()}
@@ -49,6 +48,9 @@ class ModelReleaseTests(unittest.TestCase):
             install_release(output, release=release, opener=opener)
             self.assertEqual({p.name: p.read_bytes() for p in output.iterdir()}, files)
             opener.assert_called_once()
+            request = opener.call_args.args[0]
+            self.assertEqual(request.get_header('Accept'), 'application/octet-stream')
+            self.assertFalse(request.has_header('Authorization'))
             self.assertEqual(opener.call_args.kwargs, {'timeout': 30})
             response.read.assert_called_once_with(MAX_ARCHIVE_BYTES + 1)
             install_release(output, release=release, opener=opener)
@@ -102,6 +104,16 @@ class ModelReleaseTests(unittest.TestCase):
                 install_release(output, release=release, opener=opener)
             opener.assert_called_once()
             self.assertFalse(output.exists())
+
+    def test_only_the_exact_public_asset_endpoint_is_accepted(self):
+        _, release, _ = self.fixture()
+        for url in ('https://untrusted.invalid/model', release['url'] + '?token=private',
+                    release['url'] + '0', release['url'].replace('https:', 'http:')):
+            opener = Mock()
+            with tempfile.TemporaryDirectory() as directory, self.subTest(url=url):
+                with self.assertRaises(ValueError):
+                    install_release(Path(directory) / 'detector', release=release | {'url': url}, opener=opener)
+                opener.assert_not_called()
 
 
 if __name__ == '__main__':

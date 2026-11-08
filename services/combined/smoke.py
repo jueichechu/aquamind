@@ -1,0 +1,68 @@
+"""Offline HTTP smoke for the built container; synthetic inputs, no paid calls.
+
+Run via docker exec while the container has --network none, --memory 512m and
+--memory-swap 512m. Runtime placeholder configuration must match the CI example.
+"""
+import concurrent.futures
+import json
+from pathlib import Path
+import time
+import urllib.error
+import urllib.request
+
+WEB='http://127.0.0.1:10000'
+KEY='capacity-placeholder-relay-key-123456789'
+checks={}
+started=time.monotonic()
+
+def request(path,body=None,token=None,base=WEB,relay=False):
+    headers={'Content-Type':'application/json'}
+    if token:headers['Authorization']='Bearer '+token
+    if relay:headers['X-AquaMind-Relay-Key']=KEY
+    encoded=None if body is None else json.dumps(body).encode()
+    req=urllib.request.Request(base+path,data=encoded,headers=headers)
+    try:
+        with urllib.request.urlopen(req,timeout=20) as response:return response.status,response.read()
+    except urllib.error.HTTPError as error:return error.code,error.read()
+
+def get_json(*args,**kwargs):
+    status,raw=request(*args,**kwargs)
+    return status,json.loads(raw)
+
+while time.monotonic()-started<360:
+    try:
+        status,html=request('/')
+        if status==200:break
+    except (OSError,urllib.error.URLError):pass
+    time.sleep(.5)
+else:raise AssertionError('Website did not become ready')
+checks['first_page_followed_by_ready_api']=get_json('/api/aquamind/v1/bills/readiness')==(200,{'status':'ready'})
+checks['health_after_gated_startup']=get_json('/api/health')==(200,{'status':'ok'})
+page_ready_seconds=round(time.monotonic()-started,3)
+for path in ('/analyze','/compare','/demo'):
+    checks['page'+path]=request(path)[0]==200
+checks['health']=get_json('/api/health')==(200,{'status':'ok'})
+checks['relay_allowlist']=request('/api/aquamind/ready')[0]==404
+checks['raw_api_not_exposed']=request('/v1/sessions')[0]==404
+checks['session_required']=request('/api/aquamind/v1/bills/normalize',{})[0]==401
+status,session=get_json('/api/aquamind/v1/sessions',{})
+checks['session_created']=status==201
+token=session['session_token']
+bill={'period_start':'2026-06-01','period_end_exclusive':'2026-07-01','usage':'8.5','usage_unit':'ccf'}
+def normalize(index):
+    status,result=get_json('/api/aquamind/v1/bills/normalize',bill,token)
+    return status==200 and result['us_gallons_per_day']=='211.948052'
+with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+    checks['eight_bill_calculations']=all(pool.map(normalize,range(8)))
+checks['consent_required']=request('/api/aquamind/v1/bills/import',{'share_with_ai':False,'media_type':'image/png','data_base64':'AA=='},token)[0]==422
+# Exercise the existing maximum body size without admitting any provider work.
+checks['maximum_upload_body_consent_required']=request('/api/aquamind/v1/bills/import',
+    {'share_with_ai':False,'media_type':'image/png','data_base64':'A'*(4*((4*1024*1024+2)//3))},token)[0]==422
+checks['raw_inference_not_exposed']=request('/api/aquamind/v1/anomaly/predict',{})[0]==404
+checks['no_goal_changed']=get_json('/api/aquamind/v1/goals/current',token=token)==(200,{'goal':None})
+req=urllib.request.Request(WEB+'/api/aquamind/v1/session',method='DELETE',headers={'Authorization':'Bearer '+token})
+with urllib.request.urlopen(req,timeout=20) as response:checks['session_revoked']=response.status==204
+cgroup=Path('/sys/fs/cgroup')
+report={'passed':all(checks.values()),'checks':checks,'page_ready_seconds':page_ready_seconds,'memory_peak_bytes':int((cgroup/'memory.peak').read_text()),'memory_max_bytes':int((cgroup/'memory.max').read_text()),'cpu_max':(cgroup/'cpu.max').read_text().strip(),'paid_calls':0,'network':'none','limitations':['Bounded local Linux smoke, not a hosted cold-wake or load/latency guarantee.','No real provider call or visual browser acceptance.']}
+print(json.dumps(report),flush=True)
+if not report['passed']:raise SystemExit(1)

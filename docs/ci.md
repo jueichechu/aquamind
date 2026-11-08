@@ -8,7 +8,8 @@ to `main` (including merges), and manual dispatches from the Actions tab.
 | Web checks | Frozen pnpm install, frontend tests, TypeScript, ESLint and production webpack build |
 | Python checks | CPU PyTorch and agent dependencies, dependency consistency and the full Python suite |
 | Cloud and Redis checks | Cloud dependencies without PyTorch, bill/MCP execution, topic admission and adversarial host contracts, provider/relay boundaries, and real Redis quota tests |
-| CI gate | Succeeds only when all three jobs succeed; failures, cancellations and skipped jobs fail the gate |
+| Combined service checks | Build the deployment image; check readiness, pages, session/relay/consent boundaries, maximum upload body and model-gated startup offline within 512 MB and limited CPU |
+| CI gate | Succeeds only when all four jobs succeed; failures, cancellations and skipped jobs fail the gate |
 
 Jobs use standard Ubuntu runners, bounded timeouts and read-only repository
 permissions. Actions are pinned to commit SHAs. New runs cancel older runs for
@@ -19,8 +20,9 @@ No models or downloaded household datasets are published by this workflow.
 The Redis service is a disposable container belonging to the cloud job. It stores
 only test counters and is removed when the job ends. This is separate from the
 hosted Upstash database. CI does not merge pull requests, change repository rules,
-or call the Render API. The Blueprint sets both services to **checksPass** so
+or call the Render API. The Blueprint sets the combined website service to **checksPass** so
 Render deploys application changes after the linked main branch's checks pass.
+The former API is retained as a migration fallback with automatic deploys off.
 Existing services require a one-time Blueprint sync and confirmation of the
 connected GitHub repository and **After CI Checks Pass** setting. See the
 [deployment setup](deployment.md#deploy-application-updates-after-ci).
@@ -44,7 +46,7 @@ approving review from another person. Enabling this workflow does not itself
 enable branch protection or automatic merging. See GitHub's
 [branch protection guide](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule).
 
-Review all three job results on the pull request before merging. After merging,
+Review all four job results on the pull request before merging. After merging,
 wait for the `main` run and both automatic Render deploys to finish, then verify
 the deployed commits and hosted app following the [deployment guide](deployment.md).
 Blueprint configuration changes still need a reviewed sync while Auto Sync is off.
