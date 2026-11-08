@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "url": "https://github.com/jueichechu/aquamind/releases/download/detector-v1-synthetic/detector-v1-synthetic.zip",
+  "url": "https://api.github.com/repos/jueichechu/aquamind/releases/assets/723284055",
   "archive_sha256": "486517c43911572dfc80aae9734e1d988315ec4a7caa3603e8cc541b84927fe7",
   "manifest_sha256": "69f56d5eb7184a9cd3e9e8e4a5e2e94d387c38c1161fa4f43a1ec230b6e1b526",
   "weights_sha256": "90727cc54eb5c2c3a700ad7d869936f25c8a6f5b23ad0987a229454eca7d32fb",

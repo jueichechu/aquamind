@@ -53,13 +53,13 @@ def archive_files(raw, release):
 def install_release(output: Path, *, release=None, opener=urlopen):
     release = json.loads(RELEASE_PATH.read_text()) if release is None else release
     if (release['schema_version'] != 1 or
-            release['url'] != 'https://github.com/jueichechu/aquamind/releases/download/'
-                              'detector-v1-synthetic/detector-v1-synthetic.zip'):
+            release['url'] != 'https://api.github.com/repos/jueichechu/aquamind/releases/assets/723284055'):
         raise ValueError('Unsupported detector release')
     if output.exists():
         validate_files({name: (output / name).read_bytes() for name in FILES}, release)
         return  # Verified build cache only; never overwrite a frozen artifact.
-    request = Request(release['url'], headers={'User-Agent': 'AquaMind-model-build/1'})
+    request = Request(release['url'], headers={
+        'User-Agent': 'AquaMind-model-build/1', 'Accept': 'application/octet-stream'})
     # One download attempt, bounded in bytes and socket timeout. No credentials.
     with opener(request, timeout=30) as response:
         if not response.geturl().startswith('https://'):
