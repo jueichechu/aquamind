@@ -5,7 +5,7 @@ to `main` (including merges), and manual dispatches from the Actions tab.
 
 | Check | Validation |
 | --- | --- |
-| Web checks | Frozen pnpm install, frontend tests, TypeScript, ESLint and production webpack build |
+| Web checks | Frozen pnpm install, frontend unit and DOM interaction tests, TypeScript, ESLint and production webpack build |
 | Python checks | CPU PyTorch and agent dependencies, dependency consistency and the full Python suite |
 | Cloud and Redis checks | Cloud dependencies without PyTorch, bill/MCP execution, topic admission and adversarial host contracts, provider/relay boundaries, and real Redis quota tests |
 | Combined service checks | Build the deployment image; check readiness, pages, session/relay/consent boundaries, maximum upload body and model-gated startup offline within 512 MB and limited CPU |
