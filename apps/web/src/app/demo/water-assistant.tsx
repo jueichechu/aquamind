@@ -42,8 +42,10 @@ export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
   const [error, setError] = useState("");
   const busyRef = useRef(false);
   const log = useRef<HTMLDivElement>(null);
+  const errorBox = useRef<HTMLParagraphElement>(null);
   const pending = proposal?.status === "approval_required";
 
+  useEffect(() => { if (error) errorBox.current?.focus(); }, [error]);
   useEffect(() => {
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
   }, [messages]);
@@ -163,7 +165,8 @@ export function WaterAssistant({ scenarioId }: { scenarioId: ScenarioId }) {
     <p role="status" aria-live="polite" aria-atomic="true" className="mt-3 text-sm text-ink-secondary">
       {busy ? "Waiting for AquaMind…" : pending ? "Review the pending proposal before sending another question." : proposal ? proposalText[proposal.status] : ""}
     </p>
-    {error && <p role="alert" className="mt-3 text-sm text-warning">{error}</p>}
+    {error && <p ref={errorBox} tabIndex={-1} role="alert"
+      className="mt-3 text-sm text-warning focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-warning">{error}</p>}
     <p className="mt-4 text-xs leading-5 text-muted">Session lasts up to one hour. Reloading starts fresh; goals and questions are not saved permanently.</p>
   </section>;
 }
