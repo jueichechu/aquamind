@@ -157,7 +157,16 @@ class ChargeCategories(BaseModel):
     sewer_charge: ChargeCategory
 
 
-class ProviderReport(ExtractedReport):
+class ProviderBillFields(ExtractedBillFields):
+    # Preserve the printed scale internally instead of forcing a supported unit.
+    usage_unit: Literal['us_gallons', 'ccf', 'cubic_meters', 'liters', 'kgal'] | None
+
+
+class ProviderCandidates(ExtractedReport):
+    fields: ProviderBillFields
+
+
+class ProviderReport(ProviderCandidates):
     # Provider-only assessment; the public import response stays unchanged.
     charge_categories: ChargeCategories
     consumption_basis: Literal['current_bill', 'chart_only', 'meter_readings', 'unclear', 'missing']
@@ -180,8 +189,8 @@ class ProviderReport(ExtractedReport):
         candidate = {**value, 'fields': {**fields, 'currency': None},
                      'evidence': {**evidence, 'fields': dict(sources)}}
         # Check the entire remaining report before discarding optional prices.
-        ExtractedReport.model_validate({key: candidate[key] for key in ExtractedReport.model_fields
-                                        if key in candidate})
+        ProviderCandidates.model_validate({key: candidate[key] for key in ExtractedReport.model_fields
+                                           if key in candidate})
         for name in ('water_charge', 'sewer_charge'):
             candidate['fields'][name] = None
             candidate['evidence']['fields'][name] = {'kind': 'missing', 'page': None}
@@ -205,6 +214,9 @@ meter_readings. Use unclear or missing when a current total cannot be identified
 leave usage and usage_unit null rather than guess a quantity or assume CCF.
 Usage units must be explicitly identifiable: CCF means 100 cubic feet; gallons without
 evidence that they are US liquid gallons are ambiguous. Do not guess or convert units.
+Use the provider-only unit kgal for KGAL, Kgal, thousands of gallons or 1,000-gallon
+units. Preserve that printed scale even when US liquid gallons are defined nearby.
+For example, 5 KGAL is usage "5" and usage_unit "kgal", NEVER "us_gallons".
 Dates use YYYY-MM-DD. period_end_exclusive is the first day AFTER the billed period:
 add one day only when the document clearly gives an inclusive end. If ambiguous, null.
 Preserve missing charges as null, not zero. Extract water and sewer charges separately;
@@ -245,9 +257,10 @@ solely because one water statement has several sections, dates or usage-history 
 For genuinely multiple bills or a document that is not a water bill, return all fields
 null and the appropriate warning. Flag unreadable data, missing dates/usage or
 ambiguous units. HCF explicitly defined as 100 cubic feet is the same unit as CCF;
-use ccf. A quantity in thousands of gallons (Kgal) or another scaled/unsupported unit
-must not be relabeled as unscaled gallons. Leave usage_unit null and flag ambiguous_unit
-unless an unscaled supported quantity is also explicitly printed. Do not convert it.
+use ccf. A quantity in thousands of gallons (Kgal) must use kgal and flag ambiguous_unit;
+the server will withhold it for manual conversion. For other unsupported scales,
+leave usage_unit null and flag ambiguous_unit. Only use a supported unscaled unit
+when its unscaled quantity is explicitly printed too. Never convert it yourself.
 For each field, return its source kind and 1-based uploaded document page, never a
 quotation. Count PDF pages from the start of this upload, not a printed page number.
 Use printed for a directly stated value, derived ONLY for a clearly inclusive billing
@@ -269,6 +282,11 @@ async def extract_report(client, config, body: BillImportRequest) -> ExtractedRe
     document = ({'type': 'input_file', 'filename': 'water-report.pdf', 'file_data': uri}
                 if body.media_type == 'application/pdf' else
                 {'type': 'input_image', 'image_url': uri, 'detail': 'high'})
+    # This model defaults to no reasoning. Bill sections and unit scales need
+    # deliberation, within the SAME output-token and timeout budgets. Do not send
+    # a model-specific parameter to other configured models.
+    options = ({'reasoning': {'effort': 'low'}} if config.model == 'gpt-5.4-mini' or
+               config.model.startswith('gpt-5.4-mini-') else {})
     # Override SDK retries even when a caller supplied its own client. An uncertain
     # paid extraction is never automatically repeated. No Files API object is made.
     async with asyncio.timeout(config.request_timeout_seconds):
@@ -278,12 +296,20 @@ async def extract_report(client, config, body: BillImportRequest) -> ExtractedRe
             input=[{'role': 'user', 'content': [
                 {'type': 'input_text', 'text': 'Extract the water bill fields for review.'}, document]}],
             text={'format': {'type': 'json_schema', 'name': 'water_bill_import',
-                             'strict': True, 'schema': ProviderReport.model_json_schema()}})
+                             'strict': True, 'schema': ProviderReport.model_json_schema()}}, **options)
     if response.status != 'completed' or len(response.output_text.encode()) > 8192:
         raise HTTPException(502, 'Report could not be read; enter its values manually')
     try:
         provider = ProviderReport.model_validate(json.loads(response.output_text,
             parse_constant=_invalid_constant, object_pairs_hook=_unique_object))
+        if provider.fields.usage_unit == 'kgal':
+            # Kgal is provider-only. Never expose 5 Kgal as a usable 5 gallons,
+            # including when the provider forgets the uncertainty warning.
+            provider.fields.usage = provider.fields.usage_unit = None
+            for name in ('usage', 'usage_unit'):
+                source = getattr(provider.evidence.fields, name)
+                setattr(provider.evidence.fields, name, FieldSource(kind='unclear', page=source.page))
+            provider.warnings = list(dict.fromkeys([*provider.warnings, 'ambiguous_unit']))
         result = ExtractedReport.model_validate(provider.model_dump(exclude={'charge_categories', 'consumption_basis'}))
         if body.media_type != 'application/pdf':
             pages = [result.evidence.reading_type_page, *(source.page for source in
@@ -323,4 +349,13 @@ async def extract_report(client, config, body: BillImportRequest) -> ExtractedRe
         result.fields.water_charge = result.fields.sewer_charge = None
         result.evidence.fields.water_charge = FieldSource(kind='missing', page=None)
         result.evidence.fields.sewer_charge = FieldSource(kind='missing', page=None)
+    if not any((result.fields.period_start, result.fields.period_end_exclusive, result.fields.usage)):
+        # Without a water period or quantity, optional amounts lack enough bill
+        # context. Prefer manual entry over surfacing a possibly unrelated total.
+        for name in ('water_charge', 'sewer_charge'):
+            if getattr(result.fields, name) is not None:
+                setattr(result.fields, name, None)
+                source = getattr(result.evidence.fields, name)
+                setattr(result.evidence.fields, name, FieldSource(kind='unclear', page=source.page))
+                result.warnings = list(dict.fromkeys([*result.warnings, 'unclear_document']))
     return result

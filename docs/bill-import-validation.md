@@ -13,6 +13,9 @@ remain unchanged.
 - HCF explicitly defined as 100 cubic feet maps to CCF. Scaled gallons such as
   Kgal must not be relabeled as unscaled gallons. Unsupported units remain blank
   for manual correction, with a warning to check quantity and unit together.
+  The provider schema accepts `kgal` internally so the model can preserve that
+  printed scale. The server withholds its quantity and unit even if the model
+  omits the warning. The public API unit choices do not change.
 - Chart heights and meter register differences are not exact billed consumption.
   A provider-only consumption assessment suppresses these candidates; it is not
   evidence that the model's interpretation is correct.
@@ -20,9 +23,17 @@ remain unchanged.
   service charge. If USD has a missing source, discard currency and both prices
   while retaining an otherwise valid report. Do not invent source evidence.
   Other malformed values, sources, extra fields and invalid pages still fail
-  validation. Public response validation remains strict.
+  validation. If neither a water period nor consumption can be identified,
+  optional prices are also withheld for manual entry. Public response validation
+  remains strict.
 - No automatic paid retries, additional tools or provider storage are enabled.
   Session checks, explicit consent, request limits and human review still apply.
+- Bill extraction with `gpt-5.4-mini` and its dated snapshots requests low reasoning
+  instead of the model's default of none. Other configured models retain their
+  defaults. The existing timeout and output-token cap remain unchanged; reasoning
+  counts toward that cap and API usage, and incomplete responses still fail closed.
+  See the official [model documentation](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
+  and [reasoning budget guidance](https://developers.openai.com/api/docs/guides/reasoning).
 
 ## Reproduce the checks
 
@@ -89,6 +100,19 @@ holdout or a representative accuracy estimate. One final call per layout does
 not measure repeatability. The extraction source SHA-256 for that run was
 `8809f522362932b2efc3247d2bddcc132a41758d42cc61f18977862a6417bdf4`.
 Provider output can vary, and strict validation can still reject a response.
+Indeed, a subsequent hosted check of the same fictional Kgal PDF returned
+5 US gallons with no uncertainty warning. This was retained as a failure and
+motivated the provider-only `kgal` option and warning-independent server guard.
+The preceding seven-case result describes its stated source revision; it did not
+establish repeatability or eliminate unit-reading mistakes. The model must still
+identify the printed unit correctly, and reviewers must check it against the bill.
+With low reasoning enabled, two further trials of the reported bill recovered its
+current period and consumption, and the scaled-unit and separate-statement checks
+passed. The Arizona example correctly withheld dates and consumption but misread
+an optional charge digit. That failure was retained; optional prices are now also
+withheld when both the water period and consumption are absent. Regression tests
+cover that abstention without another paid retry. These observations do not prove
+that low reasoning eliminates extraction mistakes.
 Blurred images, unusual units, unsupported currencies, missing periods and
 unfamiliar utility layouts may require manual entry. These checks do not establish
 support for every U.S. bill, reliable OCR of every scan, or automatic Kgal conversion.
