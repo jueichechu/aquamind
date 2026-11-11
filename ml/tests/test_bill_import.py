@@ -23,7 +23,7 @@ FIXTURES = Path(__file__).resolve().parents[2] / 'evals/fixtures/bill-import-rev
 
 
 def report_payload(fields, warnings=()):
-    return {'fields': fields, 'warnings': list(warnings), 'charge_categories': {
+    return {'fields': fields, 'warnings': list(warnings), 'consumption_basis': 'current_bill', 'charge_categories': {
         name: category if fields.get(name) is not None else 'missing' for name, category in
         (('water_charge', 'water_service'), ('sewer_charge', 'sewer_service'))}, 'evidence': {
         'schema_version': 1, 'reading_type': 'unknown', 'reading_type_page': None,
@@ -78,6 +78,7 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.headers['cache-control'], 'no-store')
         self.assertEqual(result.json()['request_id'], result.headers['x-request-id'])
         self.assertNotIn('charge_categories', result.json())
+        self.assertNotIn('consumption_basis', result.json())
         public = self.app.openapi()['components']['schemas']['BillImportResponse']['properties']
         self.assertEqual(set(public), {'fields', 'warnings', 'evidence', 'source', 'needs_review', 'request_id'})
         request, = self.requests
@@ -284,6 +285,71 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
                             'data_base64': base64.b64encode(b'\x89PNG\r\n\x1a\nbytes').decode()}
         self.assertEqual((await self.post(image)).status_code, 502)
 
+    async def test_uncertain_unit_cannot_autofill_a_different_scale_of_usage(self):
+        for kind, warnings in [('printed', ['ambiguous_unit']), ('unclear', []),
+                               ('unclear', ['ambiguous_unit'])]:
+            self.payload = report_payload(self.fields | {'usage': '5', 'usage_unit': 'us_gallons'}, warnings)
+            self.payload['evidence']['fields']['usage_unit'] = {'kind': kind, 'page': 1}
+            result = await self.post()
+            self.assertEqual(result.status_code, 200)
+            for field in ('usage', 'usage_unit'):
+                self.assertIsNone(result.json()['fields'][field])
+                self.assertEqual(result.json()['evidence']['fields'][field], {'kind': 'unclear', 'page': 1})
+            self.assertIn('ambiguous_unit', result.json()['warnings'])
+            self.assertEqual(result.json()['fields']['period_start'], self.fields['period_start'])
+            self.assertEqual(result.json()['fields']['water_charge'], self.fields['water_charge'])
+            self.assertTrue(result.json()['needs_review'])
+
+    async def test_unlocated_currency_discards_prices_but_preserves_supported_usage(self):
+        self.payload = report_payload(self.fields)
+        self.payload['evidence']['fields']['currency'] = {'kind': 'missing', 'page': None}
+        result = await self.post()
+        self.assertEqual(result.status_code, 200)
+        output = result.json()
+        for name in ('currency', 'water_charge', 'sewer_charge'):
+            self.assertIsNone(output['fields'][name])
+            self.assertEqual(output['evidence']['fields'][name], {'kind': 'missing', 'page': None})
+        self.assertEqual(output['fields']['usage'], self.fields['usage'])
+        self.assertEqual(output['fields']['period_start'], self.fields['period_start'])
+        self.assertIn('unsupported_currency', output['warnings'])
+        self.assertTrue(output['needs_review'])
+        self.assertEqual(len(self.requests), 1)
+
+    async def test_currency_abstention_does_not_hide_other_malformed_fields_or_sources(self):
+        for field, value in [('water_charge', '-1'), ('usage', 'private upstream text')]:
+            self.payload = report_payload(self.fields | {field: value})
+            self.payload['evidence']['fields']['currency'] = {'kind': 'missing', 'page': None}
+            self.assertEqual((await self.post()).status_code, 502)
+        self.payload = report_payload(self.fields)
+        self.payload['evidence']['fields']['currency'] = {'kind': 'missing', 'page': None}
+        self.payload['evidence']['fields']['usage'] = {'kind': 'missing', 'page': None}
+        self.assertEqual((await self.post()).status_code, 502)
+        # The public response contract continues to reject the original mismatch.
+        with self.assertRaises(ValueError):
+            ExtractedReport.model_validate({key: self.payload[key] for key in ExtractedReport.model_fields})
+
+    async def test_chart_and_meter_register_candidates_are_withheld_without_losing_bill_dates(self):
+        for basis in ['chart_only', 'meter_readings', 'unclear', 'missing']:
+            self.payload = report_payload(self.fields)
+            self.payload['consumption_basis'] = basis
+            result = await self.post()
+            self.assertEqual(result.status_code, 200)
+            self.assertIsNone(result.json()['fields']['usage'])
+            self.assertIsNone(result.json()['fields']['usage_unit'])
+            self.assertEqual(result.json()['fields']['period_start'], self.fields['period_start'])
+            self.assertIn('missing_usage', result.json()['warnings'])
+
+    async def test_missing_or_invalid_consumption_assessments_fail_closed(self):
+        for basis in [None, True, 'verified', 'private upstream text']:
+            self.payload = report_payload(self.fields)
+            if basis is None:
+                self.payload.pop('consumption_basis')
+            else:
+                self.payload['consumption_basis'] = basis
+            result = await self.post()
+            self.assertEqual(result.status_code, 502)
+            self.assertNotIn('private', result.text)
+
     async def test_evidence_version_is_strict_and_missing_provider_evidence_is_rejected(self):
         for version in [True, 1.0, '1', 2]:
             self.payload = report_payload(self.fields)
@@ -348,6 +414,7 @@ class BillImportTests(unittest.IsolatedAsyncioTestCase):
                 self.payload = case.get('provider_output', case['extraction'])
                 if 'charge_categories' not in self.payload:
                     self.payload = self.payload | {'charge_categories': report_payload(self.payload['fields'])['charge_categories']}
+                self.payload['consumption_basis'] = 'current_bill'
                 before = len(self.requests)
                 with self.assertLogs('aquamind.api', level='INFO') as logs:
                     imported = await self.post(body, headers)
