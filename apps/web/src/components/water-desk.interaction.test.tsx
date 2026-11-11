@@ -28,7 +28,8 @@ function deferred<T>() {
 
 type Call = { path: string; options: RequestInit };
 let calls: Call[], root: Root, container: HTMLDivElement;
-let readiness: () => Promise<Response>, extraction: () => Promise<Response>;
+let readiness: () => Promise<Response>, extraction: () => Promise<Response>, questionReply: () => Promise<Response>;
+const answered = () => ({ status: "answer", answer: "A bounded fictional bill-only answer.", pending_approval: null, tool_trace: [] });
 
 const count = (suffix: string) => calls.filter(({ path }) => path.endsWith(suffix)).length;
 const posts = () => calls.filter(({ options }) => options.method === "POST");
@@ -74,6 +75,7 @@ beforeEach(() => {
   calls = [];
   readiness = async () => Response.json({ status: "ready" });
   extraction = async () => Response.json(imported());
+  questionReply = async () => Response.json(answered());
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
     const path = String(url); calls.push({ path, options });
@@ -81,6 +83,7 @@ beforeEach(() => {
     if (path === "/api/aquamind/v1/sessions") return Response.json({ session_token: token });
     if (path === "/api/aquamind/v1/bills/import") return extraction();
     if (path === "/api/aquamind/v1/bills/normalize") return Response.json(calculated());
+    if (path === "/api/aquamind/v1/agent/bill") return questionReply();
     throw new Error(`Unexpected test request: ${path}`);
   }));
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
@@ -161,12 +164,18 @@ describe("start-page bill interactions", () => {
     expect(count("/bills/import")).toBe(1);
   });
 
-  it("keeps a failed upload selected, clears consent and never automatically retries extraction", async () => {
+  it.each(["network", "401", "429", "503", "413", "422", "malformed"])("retains the report and clears consent after %s without replaying extraction", async (failure) => {
     const paid = deferred<Response>(); extraction = () => paid.promise;
     await mount(); await choose(); await click(consent()); await click(button("Read report"));
     await settle(() => expect(count("/bills/import")).toBe(1));
-    await act(async () => paid.reject(new Error("private provider information")));
-    await settle(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain("not be retried automatically"));
+    await act(async () => {
+      if (failure === "network") paid.reject(new Error("private provider information"));
+      else paid.resolve(Response.json({ detail: "private provider information" },
+        failure === "malformed" ? undefined : { status: Number(failure) }));
+    });
+    await settle(() => expect(container.querySelector('[role="alert"]')?.textContent).toBeTruthy());
+    expect(document.activeElement).toBe(container.querySelector('[role="alert"]'));
+    expect(container.querySelector("#review-heading")).toBeNull();
     expect(container.textContent).not.toContain("private provider information");
     expect(container.querySelector('[role="progressbar"]')).toBeNull();
     expect(container.querySelector(".report-consent")?.getAttribute("aria-busy")).toBe("false");
@@ -181,6 +190,66 @@ describe("start-page bill interactions", () => {
     expect(container.textContent).not.toContain("fictional-private-name.webp");
     expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(button("Choose a report").disabled).toBe(false);
+  });
+
+  it("requires fresh consent and an explicit submit to recover an import after session expiry", async () => {
+    extraction = async () => Response.json({ detail: "private provider information" }, { status: 401 });
+    await mount(); await choose(); await click(consent()); await click(button("Read report"));
+    await settle(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain("session expired"));
+    expect(count("/sessions")).toBe(1); expect(count("/bills/import")).toBe(1);
+    extraction = async () => Response.json(imported());
+    await click(consent());
+    expect(count("/bills/import")).toBe(1);
+    await click(button("Read report"));
+    await settle(() => expect(container.querySelector("#review-heading")).not.toBeNull());
+    expect(count("/sessions")).toBe(2); expect(count("/bills/import")).toBe(2);
+    expect(review().checked).toBe(false);
+  });
+
+  it.each(["network", "401", "429", "503", "malformed", "refused", "unconfirmed"])("preserves the calculation and recovers explicitly after a %s bill question", async (failure) => {
+    const pending = deferred<Response>(); questionReply = () => pending.promise;
+    await mount(); await choose(); await click(consent()); await click(button("Read report"));
+    await settle(() => expect(container.querySelector("#review-heading")).not.toBeNull());
+    await click(review()); await click(button("Calculate bill usage"));
+    await settle(() => expect(container.querySelector("#bill-question")).not.toBeNull());
+    const question = container.querySelector<HTMLTextAreaElement>("#bill-question")!;
+    const share = input('form[aria-labelledby="bill-assistant-heading"] input[type="checkbox"]');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(question, "What does this daily average mean?");
+      question.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(button("Ask with this bill").disabled).toBe(true);
+    await click(share);
+    const submit = button("Ask with this bill");
+    await act(async () => { submit.click(); submit.click(); });
+    expect(count("/agent/bill")).toBe(1);
+    expect(input("#bill-usage").matches(":disabled")).toBe(true);
+    expect(input('input[type="file"]').disabled).toBe(true);
+    expect(question.disabled).toBe(true);
+    await act(async () => {
+      if (failure === "network") pending.reject(new Error("private provider information"));
+      else if (failure === "malformed") pending.resolve(Response.json({ ...answered(), answer: "" }));
+      else if (failure === "refused" || failure === "unconfirmed") pending.resolve(Response.json({ ...answered(), status: failure, answer: "" }));
+      else pending.resolve(Response.json({ detail: "private provider information" }, { status: Number(failure) }));
+    });
+    const error = container.querySelector('[role="alert"]');
+    expect(error?.textContent).toBeTruthy(); expect(document.activeElement).toBe(error);
+    expect(container.textContent).not.toContain("private provider information");
+    expect(container.querySelector('[aria-label="Bill-only answer"]')).toBeNull();
+    expect(container.querySelector('[data-testid="bill-daily-usage"]')?.textContent).toBe("211.948052");
+    expect(question.value).toBe("What does this daily average mean?");
+    expect(input("#bill-usage").matches(":disabled")).toBe(false);
+    expect(input('input[type="file"]').disabled).toBe(false);
+    await act(async () => {});
+    expect(count("/agent/bill")).toBe(1);
+    questionReply = async () => Response.json(answered());
+    if (!share.checked) await click(share);
+    await click(button("Ask with this bill"));
+    expect(count("/agent/bill")).toBe(2);
+    expect(count("/sessions")).toBe(failure === "401" ? 2 : 1);
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Bill-only answer"]')?.textContent).toContain(answered().answer);
+    expect(question.value).toBe("");
   });
 
   it("rechecks readiness before transmission and retries only that check after startup fails", async () => {
