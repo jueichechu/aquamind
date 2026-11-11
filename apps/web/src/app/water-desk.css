@@ -376,6 +376,40 @@ html:has(.water-desk) {
   font-size: 14px;
   line-height: 1.6;
 }
+.report-feedback-loading {
+  text-align: left;
+}
+.report-status-title {
+  font-weight: 600;
+}
+.report-status-detail {
+  display: block;
+  color: var(--color-ink-secondary);
+}
+.report-progress {
+  height: 4px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--color-rule);
+}
+.report-progress > span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--color-terracotta);
+  animation: report-reading 1.8s ease-in-out infinite;
+}
+@keyframes report-reading {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .report-progress > span {
+    animation: none;
+    transform: translateX(75%);
+  }
+}
 .desk-error {
   padding: 12px;
   margin-top: 16px;

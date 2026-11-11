@@ -45,6 +45,14 @@ function input(selector: string) {
 }
 const consent = () => input('.report-share-label input[type="checkbox"]');
 const review = () => input('.desk-review input[type="checkbox"][required]');
+function progress(title: string) {
+  const indicator = container.querySelector('[role="progressbar"]');
+  expect(indicator).not.toBeNull();
+  expect(indicator?.hasAttribute("aria-valuenow")).toBe(false); // No invented percentage.
+  const label = container.querySelector(`#${indicator?.getAttribute("aria-labelledby")}`);
+  expect(label?.textContent).toBe(title);
+  expect(label?.closest('[role="status"]')?.getAttribute("aria-atomic")).toBe("true");
+}
 async function click(element: HTMLElement) { await act(async () => element.click()); }
 async function settle(assertion: () => void) {
   await vi.waitFor(async () => { await act(async () => {}); assertion(); });
@@ -93,16 +101,21 @@ describe("start-page bill interactions", () => {
     const reading = await choose();
     await click(consent());
     expect(button("Starting bill analysis…").disabled).toBe(true);
+    progress("Starting bill analysis…");
     expect(reading).not.toHaveBeenCalled(); expect(posts()).toHaveLength(0);
 
     readiness = async () => Response.json({ status: "ready" });
     await act(async () => starting.resolve(Response.json({ status: "ready" })));
     expect(button("Read report").disabled).toBe(false);
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
     expect(posts()).toHaveLength(0); // Becoming ready never submits the file.
     const submit = button("Read report");
     await act(async () => { submit.click(); submit.click(); });
     await settle(() => expect(count("/bills/import")).toBe(1));
     const pending = button("Reading your report…");
+    progress("Reading your report…");
+    expect(container.querySelector(".report-consent")?.getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector("#report-progress-detail")?.textContent).toContain("You’ll review the details");
     expect(pending.disabled).toBe(true); await click(pending);
     expect(count("/bills/import")).toBe(1);
     const sent = calls.find(({ path }) => path.endsWith("/bills/import"))!;
@@ -116,6 +129,7 @@ describe("start-page bill interactions", () => {
     await act(async () => paid.resolve(Response.json(imported())));
     await settle(() => expect(container.querySelector("#review-heading")).not.toBeNull());
     expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
     expect(document.activeElement?.id).toBe("review-heading");
     expect(input("#bill-usage").value).toBe("8.5");
     expect(review().checked).toBe(false);
@@ -154,6 +168,9 @@ describe("start-page bill interactions", () => {
     await act(async () => paid.reject(new Error("private provider information")));
     await settle(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain("not be retried automatically"));
     expect(container.textContent).not.toContain("private provider information");
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
+    expect(container.querySelector(".report-consent")?.getAttribute("aria-busy")).toBe("false");
+    expect(container.querySelector('[role="status"]')?.textContent).not.toContain("Ready to read");
     expect(container.textContent).toContain("fictional-private-name.webp");
     expect(consent().checked).toBe(false);
     expect(button("Read report").disabled).toBe(true);
@@ -168,9 +185,14 @@ describe("start-page bill interactions", () => {
 
   it("rechecks readiness before transmission and retries only that check after startup fails", async () => {
     await mount(); const reading = await choose(); await click(consent());
-    readiness = async () => Response.json({ detail: "Unavailable" }, { status: 401 });
+    const preflight = deferred<Response>(); readiness = () => preflight.promise;
     await click(button("Read report"));
+    progress("Starting bill analysis…");
+    expect(container.querySelector("#report-progress-detail")?.textContent).toContain("not been sent yet");
+    expect(posts()).toHaveLength(0); expect(reading).not.toHaveBeenCalled();
+    await act(async () => preflight.resolve(Response.json({ detail: "Unavailable" }, { status: 401 })));
     await settle(() => expect(button("Try again")).toBeDefined());
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
     expect(posts()).toHaveLength(0); expect(reading).not.toHaveBeenCalled();
     expect(container.textContent).toContain("fictional-private-name.webp");
     readiness = async () => Response.json({ status: "ready" });
