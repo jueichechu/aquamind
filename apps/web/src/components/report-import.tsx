@@ -17,6 +17,15 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const readiness = useBillReadiness();
+  const loading = busy || readiness.status === "starting";
+  const statusTitle = readiness.status === "starting" ? "Starting bill analysis…"
+    : readiness.status === "unavailable" ? "Bill analysis could not start."
+    : busy ? "Reading your report…" : error ? "" : "Ready to read your bill.";
+  const statusDetail = readiness.status === "starting"
+    ? busy ? "Your report has not been sent yet. Keep this page open."
+      : "This may take a minute. You can choose your report while you wait."
+    : readiness.status === "unavailable" ? "Your report has not been sent."
+    : busy ? "Keep this page open. You’ll review the details before calculating." : "";
   const working = useRef(false);
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -58,7 +67,8 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
       className="sr-only" tabIndex={-1} disabled={busy || locked}
       onChange={(event) => choose(event.target.files?.[0] ?? null)} />
     {!file ? <button type="button" className="desk-primary report-choose" disabled={locked} onClick={() => input.current?.click()}>Choose a report</button> :
-      <form onSubmit={(event) => { event.preventDefault(); void extract(); }} className="report-consent">
+      <form onSubmit={(event) => { event.preventDefault(); void extract(); }} className="report-consent"
+        aria-busy={busy} aria-describedby={loading ? "report-progress-detail" : undefined}>
         <p className="report-filename">{file.name}</p>
         <p id="report-sharing" className="report-disclosure">An external AI service reads your report. Remove personal details first. <a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer">Data policy</a></p>
         <label className="report-share-label"><input type="checkbox" checked={share} disabled={busy} required aria-describedby="report-sharing"
@@ -67,10 +77,16 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
           {readiness.status === "starting" ? "Starting bill analysis…" : busy ? "Reading your report…" : "Read report"}</button>
         <button type="button" className="desk-text-button" disabled={busy} onClick={() => { choose(null); if (input.current) input.current.value = ""; }}>Remove report</button>
       </form>}
-    <p role="status" className="report-status">{readiness.status === "starting"
-      ? "Starting bill analysis… This may take a minute. You can choose your report while you wait."
-      : readiness.status === "unavailable" ? "Bill analysis could not start. Your report has not been sent."
-      : busy ? "Reading once. You’ll review the fields before calculating." : "Ready to read your bill."}</p>
+    <div className={`report-feedback${loading ? " report-feedback-loading" : ""}`}>
+      <p role="status" aria-atomic="true" className="report-status">
+        <span id="report-progress-title" className={loading ? "report-status-title" : undefined}>{statusTitle}</span>
+        <span id="report-progress-detail" className="report-status-detail">{statusDetail}</span>
+      </p>
+      {loading && <div role="progressbar" aria-labelledby="report-progress-title"
+        aria-describedby="report-progress-detail" className="report-progress">
+        <span aria-hidden="true" />
+      </div>}
+    </div>
     {readiness.status === "unavailable" && <button type="button" className="desk-text-button" disabled={busy || locked}
       onClick={() => { setError(""); void readiness.check().catch(() => {}); }}>Try again</button>}
     {error && <p ref={errorBox} tabIndex={-1} role="alert" className="desk-error">{error}</p>}
