@@ -6,7 +6,7 @@ export const REPORT_ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/p
 export const IMPORT_WARNINGS = {
   missing_dates: "Check the billing dates; some were missing or unclear.",
   missing_usage: "Check the total water usage; it was missing or unclear.",
-  ambiguous_unit: "Choose the exact usage unit printed on your bill.",
+  ambiguous_unit: "The usage unit is unclear or unsupported. Check both quantity and unit; scaled units such as thousands of gallons need conversion before manual entry.",
   unsupported_currency: "Only USD charges are supported. Other or unclear charges were left blank.",
   multiple_bills: "This file appears to contain several bills. Select one bill or enter its values manually.",
   not_water_bill: "A water bill could not be identified. Choose a water bill or enter its values manually.",

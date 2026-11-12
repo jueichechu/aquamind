@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "scope": "Development extraction checks, not a representative US accuracy benchmark. Public samples are not redistributed. Synthetic layouts contain no household identifiers.",
+  "cases": [
+    {
+      "id": "layout-1",
+      "name": "one multi-page combined-services statement",
+      "synthetic": true,
+      "file": "combined-services.pdf",
+      "media_type": "application/pdf",
+      "pages": [
+        [
+          "FICTIONAL UTILITY STATEMENT - NOT CUSTOMER DATA",
+          "Current water service: July 1, 2026 through July 31, 2026 inclusive",
+          "Current WATER consumption: 8,500 US liquid gallons",
+          "Water reading type: ACTUAL",
+          "Water service subtotal: USD 45.12",
+          "Sewer service subtotal: USD 17.25",
+          "Electricity charges: USD 120.00",
+          "Prior balance: USD 70.00",
+          "Total invoice balance: USD 252.37",
+          "Optional pipe protection coverage: August 1-31, 2026, USD 7.99",
+          "Water consumption last month: 7,000 US gallons",
+          "Water consumption July 2025: 10,000 US gallons",
+          "Continued water statement details on the next page."
+        ],
+        [
+          "CONTINUED - SAME FICTIONAL STATEMENT",
+          "Water service July 1-31, 2026: 8,500 US liquid gallons",
+          "Water service subtotal USD 45.12; Sewer service subtotal USD 17.25",
+          "Electricity period June 28-July 28, 2026",
+          "Payment coupon - total amount due USD 252.37"
+        ]
+      ],
+      "expected": {
+        "period_start": [
+          "2026-07-01"
+        ],
+        "period_end_exclusive": [
+          "2026-08-01"
+        ],
+        "usage": [
+          "8500"
+        ],
+        "usage_unit": [
+          "us_gallons"
+        ],
+        "water_charge": [
+          "45.12"
+        ],
+        "sewer_charge": [
+          "17.25"
+        ],
+        "currency": [
+          "USD"
+        ]
+      },
+      "excluded_warnings": [
+        "multiple_bills",
+        "not_water_bill"
+      ],
+      "reading_type": "actual"
+    },
+    {
+      "id": "layout-2",
+      "name": "quarterly HCF statement with history",
+      "synthetic": true,
+      "file": "quarterly-hcf.jpg",
+      "media_type": "image/jpeg",
+      "pages": [
+        [
+          "FICTIONAL HOUSEHOLD WATER BILL",
+          "Water service April 1, 2026 through June 30, 2026 inclusive",
+          "Billed current WATER consumption: 12 HCF",
+          "HCF = 100 cubic feet of water",
+          "Actual meter reading",
+          "Total water service: USD 72.00",
+          "Total sewer service: USD 42.00",
+          "Prior account balance: USD 55.00",
+          "Amount due: USD 169.00",
+          "Previous year comparison: April-June 2025, 18 HCF",
+          "Next scheduled meter reading: October 1, 2026"
+        ]
+      ],
+      "expected": {
+        "period_start": [
+          "2026-04-01"
+        ],
+        "period_end_exclusive": [
+          "2026-07-01"
+        ],
+        "usage": [
+          "12"
+        ],
+        "usage_unit": [
+          "ccf"
+        ],
+        "water_charge": [
+          "72",
+          "72.00"
+        ],
+        "sewer_charge": [
+          "42",
+          "42.00"
+        ],
+        "currency": [
+          "USD"
+        ]
+      },
+      "excluded_warnings": [
+        "multiple_bills",
+        "not_water_bill"
+      ],
+      "reading_type": "actual",
+      "reference": "https://www.nyc.gov/html/dep/html/water_rates/index.shtml"
+    },
+    {
+      "id": "layout-3",
+      "name": "scaled gallons require review",
+      "synthetic": true,
+      "file": "scaled-gallons.pdf",
+      "media_type": "application/pdf",
+      "pages": [
+        [
+          "FICTIONAL WATER UTILITY BILL",
+          "Water service September 1-30, 2026 inclusive",
+          "Billed water consumption: 5 KGAL",
+          "1 KGAL is 1,000 US liquid gallons",
+          "Actual reading",
+          "Water service subtotal: USD 30.00",
+          "Sewer service subtotal: USD 20.00",
+          "Invoice amount due: USD 50.00"
+        ]
+      ],
+      "expected": {
+        "period_start": [
+          "2026-09-01"
+        ],
+        "period_end_exclusive": [
+          "2026-10-01"
+        ],
+        "usage": [
+          null,
+          "5"
+        ],
+        "usage_unit": [
+          null
+        ],
+        "water_charge": [
+          "30",
+          "30.00"
+        ],
+        "sewer_charge": [
+          "20",
+          "20.00"
+        ],
+        "currency": [
+          "USD"
+        ]
+      },
+      "required_warnings": [
+        "ambiguous_unit"
+      ],
+      "excluded_warnings": [
+        "multiple_bills"
+      ],
+      "reference": "https://www.austintexas.gov/sites/default/files/files/Water/CostServStudy/finalreportvol1.pdf"
+    },
+    {
+      "id": "layout-4",
+      "name": "two genuinely separate water bills",
+      "synthetic": true,
+      "file": "two-statements.pdf",
+      "media_type": "application/pdf",
+      "pages": [
+        [
+          "FICTIONAL WATER BILL - STATEMENT 1",
+          "Water service June 1-30, 2026 inclusive",
+          "Water used: 1,000 US liquid gallons",
+          "Total water service: USD 20.00",
+          "Total sewer service: USD 10.00"
+        ],
+        [
+          "FICTIONAL WATER BILL - STATEMENT 2",
+          "Water service July 1-31, 2026 inclusive",
+          "Water used: 2,000 US liquid gallons",
+          "Total water service: USD 30.00",
+          "Total sewer service: USD 15.00"
+        ]
+      ],
+      "all_fields_null": true,
+      "required_warnings": [
+        "multiple_bills"
+      ]
+    },
+    {
+      "id": "layout-5",
+      "name": "non-water utility document",
+      "synthetic": true,
+      "file": "electricity.png",
+      "media_type": "image/png",
+      "pages": [
+        [
+          "FICTIONAL ELECTRICITY BILL",
+          "Electric service January 1-31, 2026",
+          "Electric energy consumption: 600 kWh",
+          "Total electricity service: USD 45.00",
+          "This statement provides no water service or water consumption."
+        ]
+      ],
+      "all_fields_null": true,
+      "required_warnings": [
+        "not_water_bill"
+      ]
+    },
+    {
+      "id": "layout-6",
+      "name": "Bellevue public sample - scoped services and payment coupon",
+      "synthetic": false,
+      "file": "bellevue-original.png",
+      "media_type": "image/png",
+      "reference": "https://bellevuewa.gov/city-government/departments/utilities/pay-your-utility-bill/understanding-your-utility-bill",
+      "download": "https://bellevuewa.gov/sites/default/files/inline-images/2025-03/address-1%29.png",
+      "expected": {
+        "period_start": [
+          "2024-06-25"
+        ],
+        "period_end_exclusive": [
+          "2024-08-16"
+        ],
+        "usage": [
+          "17"
+        ],
+        "usage_unit": [
+          "ccf"
+        ],
+        "water_charge": [
+          null,
+          "165.73"
+        ],
+        "sewer_charge": [
+          null,
+          "157.27"
+        ],
+        "currency": [
+          "USD"
+        ]
+      },
+      "excluded_warnings": [
+        "multiple_bills",
+        "not_water_bill"
+      ],
+      "note": "Optional charges may be withheld under the conservative tax/fee policy; they must not become the invoice-wide 386.56."
+    },
+    {
+      "id": "layout-7",
+      "name": "EPCOR Arizona illustrative sample - absent dates and scaled history chart",
+      "synthetic": false,
+      "file": "arizona-public-sample.webp",
+      "media_type": "image/webp",
+      "reference": "https://www.epcor.com/us/en/az/account/billing/understand-your-bill.html",
+      "download": "https://s7d1.scene7.com/is/image/EPCORUTILITIESINC/arizona-sample-water-bill-epcor?dpr=off&fmt=webp&qlt=85&ts=1757967116477",
+      "expected": {
+        "period_start": [
+          null
+        ],
+        "period_end_exclusive": [
+          null
+        ],
+        "usage": [
+          null
+        ],
+        "usage_unit": [
+          null
+        ],
+        "water_charge": [
+          null,
+          "60.41"
+        ],
+        "sewer_charge": [
+          null
+        ],
+        "currency": [
+          null,
+          "USD"
+        ]
+      },
+      "excluded_warnings": [
+        "multiple_bills",
+        "not_water_bill"
+      ],
+      "note": "Illustrative Month Day labels are not billing dates; unlabeled bar heights are not exact billed consumption. Safe blanks are expected."
+    }
+  ]
+}
