@@ -4,6 +4,46 @@ import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split("/") }) });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("approval relay", () => {
+  it("relays bounded meter imports and session-local reads/clears with the existing credentials", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    vi.stubEnv("AQUAMIND_RELAY_REQUIRED", "1");
+    const secret = "server-only-meter-placeholder-".repeat(2);
+    vi.stubEnv("AQUAMIND_RELAY_SECRET", secret);
+    const fetcher = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ context: { origin: "user_provided" } })));
+    vi.stubGlobal("fetch", fetcher);
+    const body = JSON.stringify({ csv_text: "x".repeat(2048) });
+    const result = await POST(new Request("http://localhost/api", { method: "POST", body,
+      headers: { Authorization: "Bearer visitor-session", "X-AquaMind-Relay-Key": "forged", Cookie: "private=value" },
+    }), context("v1/meters/import"));
+    expect(result.status).toBe(200);
+    expect(result.headers.get("cache-control")).toBe("no-store");
+    expect(fetcher.mock.calls[0][0]).toBe("https://api.example/v1/meters/import");
+    expect(fetcher.mock.calls[0][1].body).toBe(body);
+    expect(fetcher.mock.calls[0][1].headers.get("authorization")).toBe("Bearer visitor-session");
+    expect(fetcher.mock.calls[0][1].headers.get("x-aquamind-relay-key")).toBe(secret);
+    expect(fetcher.mock.calls[0][1].headers.has("cookie")).toBe(false);
+    expect((await GET(new Request("http://localhost/api"), context("v1/meters/current"))).status).toBe(200);
+    fetcher.mockResolvedValue(new Response(null, { status: 204 }));
+    expect((await DELETE(new Request("http://localhost/api", { method: "DELETE" }), context("v1/meters/current"))).status).toBe(204);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect((await POST(new Request("http://localhost/api", { method: "POST" }), context("v1/meters/current"))).status).toBe(404);
+    expect((await GET(new Request("http://localhost/api"), context("v1/meters/import"))).status).toBe(404);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it("bounds actual meter import bytes before forwarding", async () => {
+    vi.stubEnv("AQUAMIND_API_URL", "https://api.example");
+    const fetcher = vi.fn().mockResolvedValue(Response.json({}));
+    vi.stubGlobal("fetch", fetcher);
+    const limit = 96 * 1024;
+    const request = (body: string) => new Request("http://localhost/api", {
+      method: "POST", body, headers: { "Content-Length": "1" },
+    });
+    expect((await POST(request(" ".repeat(limit)), context("v1/meters/import"))).status).toBe(200);
+    expect((await POST(request(" ".repeat(limit - 1) + "é"), context("v1/meters/import"))).status).toBe(413);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     [200, "text/html", "<html>private edge error</html>"],
     [429, "text/plain", "private edge error"],

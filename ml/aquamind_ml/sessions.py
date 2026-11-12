@@ -10,11 +10,13 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 from .approvals import GoalApprovals, GoalProposal, GoalRequest
+from .meter_session import SessionMeters
 
 
 @dataclass(frozen=True)
 class _Session:
     approvals: GoalApprovals
+    meters: SessionMeters
     deadline: float
 
 
@@ -30,29 +32,48 @@ class DemoSessions:
             for session in self._sessions.values():
                 if session.deadline <= now:
                     session.approvals.invalidate()
+                    session.meters.invalidate()
             self._sessions = {key: value for key, value in self._sessions.items() if value.deadline > now}
             if len(self._sessions) >= 100:
                 raise ValueError("Session capacity reached")
             token = token_urlsafe(32)
-            self._sessions[token] = _Session(GoalApprovals(clock=self._clock, session_deadline=now + 3600), now + 3600)
+            self._sessions[token] = _Session(
+                GoalApprovals(clock=self._clock, session_deadline=now + 3600),
+                SessionMeters(clock=self._clock, session_deadline=now + 3600), now + 3600)
             return token
 
-    def approvals(self, token: str) -> GoalApprovals:
-        """Trusted host binds this store to its MCP server; never give tools the token."""
+    def _active(self, token: str) -> _Session:
         with self._lock:
             session = self._sessions.get(token)
             if session is None or self._clock() >= session.deadline:
                 if session is not None:
                     session.approvals.invalidate()
+                    session.meters.invalidate()
                 self._sessions.pop(token, None)
                 raise LookupError("Session unavailable")
-            return session.approvals
+            return session
+
+    def approvals(self, token: str) -> GoalApprovals:
+        """Trusted host binds this store to its MCP server; never give tools the token."""
+        return self._active(token).approvals
+
+    def meters(self, token: str) -> SessionMeters:
+        """Resolve uploads only through an active authenticated host session."""
+        return self._active(token).meters
 
     def revoke(self, token: str) -> None:
         with self._lock:
             session = self._sessions.pop(token, None)
             if session is not None:
                 session.approvals.invalidate()
+                session.meters.invalidate()
+
+    def close(self) -> None:
+        with self._lock:
+            for session in self._sessions.values():
+                session.approvals.invalidate()
+                session.meters.invalidate()
+            self._sessions.clear()
 
 
 class SessionResponse(BaseModel):

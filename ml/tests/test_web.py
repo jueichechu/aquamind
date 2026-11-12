@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 import httpx
 
 from aquamind_ml.web import create_web_app, readiness_response
+from aquamind_ml.meter_import import METER_BODY_LIMIT
+from test_meter_import import meter_body
 
 
 ENV = {'AQUAMIND_INFERENCE_ENABLED': '0', 'AQUAMIND_DETECTOR_PATH': '',
@@ -33,6 +35,25 @@ def site():
 
 
 class WebsiteTests(unittest.TestCase):
+    def test_opt_in_meter_import_through_actual_same_origin_relay(self):
+        with site() as root, patch.dict(os.environ, ENV | {'AQUAMIND_METER_IMPORT_ENABLED': '1'}), TestClient(create_web_app(root)) as client:
+            path = PREFIX + 'v1/meters/'
+            self.assertEqual(client.post(path + 'import', json=meter_body()).status_code, 401)
+            token = client.post(PREFIX + 'v1/sessions', json={}).json()['session_token']
+            headers = {'Authorization': 'Bearer ' + token, 'X-AquaMind-Relay-Key': 'forged-browser-key'}
+            response = client.post(path + 'import', json=meter_body(count=672), headers=headers)
+            self.assertEqual(response.status_code, 201)
+            self.assertEqual(response.json()['context']['reading_count'], 672)
+            self.assertEqual(response.headers['cache-control'], 'no-store')
+            self.assertEqual(client.get(path + 'current', headers=headers).json(), response.json())
+            self.assertEqual(client.get(path + 'import', headers=headers).status_code, 404)
+            self.assertEqual(client.post(path + 'current', headers=headers).status_code, 404)
+            self.assertEqual(client.post(path + 'import', content='x' * (METER_BODY_LIMIT + 1),
+                headers=headers | {'Content-Length': '1'}).status_code, 413)
+            self.assertEqual(client.delete(path + 'current', headers=headers).status_code, 204)
+            self.assertIsNone(client.get(path + 'current', headers=headers).json())
+            self.assertEqual(client.delete(PREFIX + 'v1/session', headers=headers).status_code, 204)
+
     def test_pages_assets_and_raw_api_isolation(self):
         with site() as root, patch.dict(os.environ, ENV), TestClient(create_web_app(root)) as client:
             for path, expected in (('/', 'index'), ('/analyze', 'analyze'),
