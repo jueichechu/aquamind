@@ -4,6 +4,7 @@ Run via docker exec while the container has --network none, --memory 512m and
 --memory-swap 512m. Runtime placeholder configuration must match the CI example.
 """
 import concurrent.futures
+from datetime import UTC, datetime, timedelta
 import json
 from pathlib import Path
 import time
@@ -11,6 +12,7 @@ import urllib.error
 import urllib.request
 
 from aquamind_ml.evidence import BillEvidenceContext
+from aquamind_ml.meter_import import METER_BODY_LIMIT
 
 WEB='http://127.0.0.1:10000'
 KEY='capacity-placeholder-relay-key-123456789'
@@ -67,8 +69,22 @@ checks['maximum_upload_body_consent_required']=request('/api/aquamind/v1/bills/i
     {'share_with_ai':False,'media_type':'image/png','data_base64':'A'*(4*((4*1024*1024+2)//3))},token)[0]==422
 checks['raw_inference_not_exposed']=request('/api/aquamind/v1/anomaly/predict',{})[0]==404
 checks['no_goal_changed']=get_json('/api/aquamind/v1/goals/current',token=token)==(200,{'goal':None})
+meter_csv='interval_start,volume\n'+''.join(
+    f'{(datetime(2026,6,1,tzinfo=UTC)+timedelta(minutes=15*i)).isoformat()},15\n' for i in range(672))
+meter={'csv_text':meter_csv,
+    'volume_unit':'us_gallons','interval_minutes':15,'timezone':'UTC',
+    'reading_type':'actual','consent_to_process':True}
+checks['meter_consent_required']=request('/api/aquamind/v1/meters/import',
+    meter|{'consent_to_process':False},token)[0]==422
+status,imported=get_json('/api/aquamind/v1/meters/import',meter,token)
+checks['meter_imported']=status==201 and imported['total_us_gallons']=='10080.000000' and imported['context']['reading_count']==672 and imported['context']['origin']=='user_provided'
+checks['meter_selected_within_session']=get_json('/api/aquamind/v1/meters/current',token=token)==(200,imported)
+checks['meter_body_bounded']=request('/api/aquamind/v1/meters/import',
+    meter|{'csv_text':'x'*METER_BODY_LIMIT},token)[0]==413
+checks['meter_raw_route_not_exposed']=request('/v1/meters/current',token=token)[0]==404
 req=urllib.request.Request(WEB+'/api/aquamind/v1/session',method='DELETE',headers={'Authorization':'Bearer '+token})
 with urllib.request.urlopen(req,timeout=20) as response:checks['session_revoked']=response.status==204
+checks['revoked_meter_unavailable']=request('/api/aquamind/v1/meters/current',token=token)[0]==401
 cgroup=Path('/sys/fs/cgroup')
 report={'passed':all(checks.values()),'checks':checks,'page_ready_seconds':page_ready_seconds,'memory_peak_bytes':int((cgroup/'memory.peak').read_text()),'memory_max_bytes':int((cgroup/'memory.max').read_text()),'cpu_max':(cgroup/'cpu.max').read_text().strip(),'paid_calls':0,'network':'none','limitations':['Bounded local Linux smoke, not a hosted cold-wake or load/latency guarantee.','No real provider call or visual browser acceptance.']}
 print(json.dumps(report),flush=True)

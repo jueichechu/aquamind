@@ -3,8 +3,9 @@
 The backend [evidence types](../ml/aquamind_ml/evidence.py) provide a bounded,
 read-only compatibility contract for bill facts, meter-window metadata and a
 reviewed voice query. This foundation has no HTTP endpoint, storage or provider
-calls. Existing website routes and API contracts are unchanged. It does not enable
-voice recording, real-meter import or a combined multimodal assistant.
+calls. Existing website routes and API contracts are unchanged. A separate,
+opt-in [meter import API](meter-import.md) now binds parsed CSV data to host-owned
+session references. There is no upload UI, voice recording or combined assistant yet.
 
 ## Validation and association
 
@@ -34,7 +35,7 @@ consent, approve a goal, or establish suitability for model inference. The froze
 detector still has its separate input/alignment and training-domain restrictions.
 
 Matching supplied IDs is not authentication or proof of household ownership. A
-future API must resolve references from the authenticated session and construct
+host API must resolve references from the authenticated session and construct
 trusted provenance before using this contract. Meter ingestion must verify the
 actual sequence, checksum and gaps; matching count/duration metadata alone does
 not prove that readings are contiguous. No media or arbitrary file paths belong

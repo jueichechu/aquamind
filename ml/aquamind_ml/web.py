@@ -17,6 +17,7 @@ from starlette.staticfiles import StaticFiles
 
 from .api import create_app
 from .bill_import import IMPORT_BODY_LIMIT
+from .meter_import import METER_BODY_LIMIT
 
 
 SAFE_HEADERS = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'}
@@ -25,6 +26,7 @@ ALLOWED = frozenset({
     ('GET', 'v1/goals/current'), ('POST', 'v1/goals/proposals'),
     ('POST', 'v1/agent/turn'), ('POST', 'v1/agent/continue'), ('POST', 'v1/agent/bill'),
     ('POST', 'v1/bills/normalize'), ('POST', 'v1/bills/import'), ('POST', 'v1/bills/compare'),
+    ('POST', 'v1/meters/import'), ('GET', 'v1/meters/current'), ('DELETE', 'v1/meters/current'),
 })
 PAGES = {'': 'index.html', 'analyze': 'analyze.html', 'compare': 'compare.html', 'demo': 'demo.html'}
 BODY_SECONDS = 15
@@ -142,7 +144,8 @@ def create_web_app(static_dir=None, *, api=None):
         try:
             if not allowed(request.method, path):
                 return failure('Unknown endpoint', 404)
-            limit = IMPORT_BODY_LIMIT if importing else 16384 if new_turn else 12 * 1024 if path == 'v1/bills/compare' else 1024
+            limit = (IMPORT_BODY_LIMIT if importing else METER_BODY_LIMIT if path == 'v1/meters/import'
+                else 16384 if new_turn else 12 * 1024 if path == 'v1/bills/compare' else 1024)
             body = bytearray()
             if request.method == 'POST':
                 try:

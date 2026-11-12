@@ -68,6 +68,10 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
 
     @asynccontextmanager
     async def lifespan(app):
+        meter_mode = os.environ.get('AQUAMIND_METER_IMPORT_ENABLED', '0')
+        if meter_mode not in {'0', '1'}:
+            raise ValueError('AQUAMIND_METER_IMPORT_ENABLED must be 0 or 1')
+        app.state.meter_import_enabled = meter_mode == '1'
         public_mode = os.environ.get('AQUAMIND_PUBLIC_MODE', '0')
         if public_mode not in {'0', '1'}:
             raise ValueError('AQUAMIND_PUBLIC_MODE must be 0 or 1')
@@ -141,6 +145,7 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
                                                  'error_type': type(error).__name__}))
                 yield
         finally:
+            app.state.sessions.close()
             app.state.agent_host = None
             app.state.detector = None
             if torch is not None:
@@ -150,6 +155,8 @@ def create_app(detector_path: Path | None = None, *, sessions: DemoSessions | No
     app.state.sessions = sessions if sessions is not None else DemoSessions()
     app.include_router(approval_router(app.state.sessions))
     app.include_router(bill_router(app.state.sessions))
+    from .meter_http import meter_router
+    app.include_router(meter_router(app.state.sessions))
     from .agent_http import agent_router
     app.include_router(agent_router(app.state.sessions))
     app.add_middleware(PublicAdmissionMiddleware)

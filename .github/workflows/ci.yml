@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'codex/**']
   push:
     branches: [main]
   workflow_dispatch:
@@ -131,6 +131,7 @@ jobs:
             -e UPSTASH_REDIS_REST_URL=https://capacity.upstash.io \
             -e UPSTASH_REDIS_REST_TOKEN=capacity-placeholder-token \
             -e OPENAI_API_KEY=capacity-placeholder-key -e OPENAI_MODEL=gpt-5.4-mini \
+            -e AQUAMIND_METER_IMPORT_ENABLED=1 \
             -e PORT=10000 aquamind-combined
           docker exec -i aquamind-combined-test python - < services/combined/smoke.py
 

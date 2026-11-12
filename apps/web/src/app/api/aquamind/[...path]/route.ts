@@ -6,6 +6,7 @@ const allowed = new Set([
   "POST v1/sessions", "DELETE v1/session", "GET v1/goals/current", "POST v1/goals/proposals",
   "POST v1/agent/turn", "POST v1/agent/continue", "POST v1/agent/bill",
   "POST v1/bills/normalize", "POST v1/bills/import", "POST v1/bills/compare",
+  "POST v1/meters/import", "GET v1/meters/current", "DELETE v1/meters/current",
 ]);
 
 class RequestTooLarge extends Error {}
@@ -95,11 +96,12 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
   if (!base) return failure("Demo backend unavailable", 503);
   const newTurn = route === "v1/agent/turn" || route === "v1/agent/bill";
   const importing = route === "v1/bills/import";
+  const meterImporting = route === "v1/meters/import";
   const comparing = route === "v1/bills/compare";
   const agent = newTurn || route === "v1/agent/continue" || importing;
   const readiness = route === "v1/bills/readiness";
   try {
-    const limit = importing ? IMPORT_BODY_LIMIT : newTurn ? 16384 : comparing ? 12 * 1024 : 1024;
+    const limit = importing ? IMPORT_BODY_LIMIT : meterImporting ? 96 * 1024 : newTurn ? 16384 : comparing ? 12 * 1024 : 1024;
     const body = request.method === "POST" ? await boundedBody(request, limit) : undefined;
     const headers = new Headers({ "Content-Type": "application/json" });
     if (relayKey) headers.set("X-AquaMind-Relay-Key", relayKey);
