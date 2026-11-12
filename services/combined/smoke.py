@@ -10,6 +10,8 @@ import time
 import urllib.error
 import urllib.request
 
+from aquamind_ml.evidence import BillEvidenceContext
+
 WEB='http://127.0.0.1:10000'
 KEY='capacity-placeholder-relay-key-123456789'
 checks={}
@@ -39,6 +41,11 @@ else:raise AssertionError('Website did not become ready')
 checks['first_page_followed_by_ready_api']=get_json('/api/aquamind/v1/bills/readiness')==(200,{'status':'ready'})
 checks['health_after_gated_startup']=get_json('/api/health')==(200,{'status':'ok'})
 page_ready_seconds=round(time.monotonic()-started,3)
+evidence_bill=BillEvidenceContext(evidence_id='bill_capacity',household_id='house_capacity',
+    origin='synthetic',input_method='manual_entry',reviewed=True,timezone='America/Los_Angeles',
+    bill={'period_start':'2026-03-08','period_end_exclusive':'2026-03-09',
+          'usage':'0','usage_unit':'us_gallons'})
+checks['evidence_contract_timezone_available']=evidence_bill.timezone=='America/Los_Angeles'
 for path in ('/analyze','/compare','/demo'):
     checks['page'+path]=request(path)[0]==200
 checks['health']=get_json('/api/health')==(200,{'status':'ok'})
