@@ -1,10 +1,37 @@
 # Session meter import API
 
-This backend-only capability is disabled by default. Set
+The `/meter` workspace imports and reviews interval volumes. The Python feature
+is disabled by default outside configured deployments. Set
 `AQUAMIND_METER_IMPORT_ENABLED=1` in the Python service environment to exercise it.
-There is no website upload control or agent/MCP integration yet. Existing bill
-analysis and the synthetic demo retain their current behavior. No new credentials,
-storage service, provider calls or detector changes are required.
+The combined-service Blueprint enables it for `aqua` when that configuration is
+synced and deployed. No setting changes on other services are required. Existing
+bill analysis and the synthetic demo retain their behavior. No new credentials,
+storage service, provider calls or detector changes are required. Agent reasoning
+over imported readings is a separate integration, not enabled by this workspace.
+
+## Website workflow
+
+Open `/meter` directly or choose **Meter readings** from `/analyze`. Select a CSV,
+choose its volume unit, cadence, IANA timezone and reading type, then explicitly
+consent to processing the entire file on the application server. Selecting a file
+alone performs no upload. Personal columns must be removed before selection.
+
+Review the returned period, count, original unit, reading type and converted total.
+The review checkbox is a local acknowledgement for this selection; it does not
+verify the values, authorize AI sharing or approve a goal. Replacing, editing or
+clearing resets review and processing consent. It is not a server-side approval
+record and must not be treated as one by a future agent workflow.
+
+Invalid replacements preserve the previously confirmed selection. An interrupted
+or malformed response hides stale results and offers an explicit read-back or
+clear action. There is no automatic upload or clear retry. If read-back is busy,
+the selection remains unconfirmed. Session expiry requires a fresh import and
+consent; it never silently replays the file into another session.
+
+Use **Clear selected readings** when finished. Closing the workspace attempts to
+revoke its session once; network failures can prevent immediate cleanup, in which
+case normal expiry applies. Credentials and data are never put in cookies, URLs or
+browser storage. Reloading does not restore uploads or review state.
 
 ## Input and semantics
 
@@ -71,6 +98,26 @@ Supplied household IDs, origin flags, checksums and filesystem paths are rejecte
 Matching CSV checksums across sessions confer no access to either dataset.
 This binds evidence to a session, not independently proven household ownership.
 
+## Scoped MCP read tools
+
+The host can call `create_imported_meter_server(store, evidence_id, scopes)` from
+`aquamind_ml.meter_mcp`, using the repository resolved through an active session.
+Only `meter:read` is accepted. The server exposes `get_meter_summary` and
+`get_meter_series`, with no tool arguments for changing selection. Each call
+atomically checks the session and the original selected reference. Replacement,
+clear, revocation and expiry make the old server fail rather than follow new data.
+
+Series include up to 672 `interval_volumes_us_gallons`, rounded to six decimals.
+These are converted interval volumes, not GPM or cumulative registers;
+`context.volume_unit` still identifies the original CSV unit. Totals use the
+unrounded normalized values, so rounded individual values need not sum exactly
+to the displayed total. The existing bounded agent-tool adapter can discover and
+execute these two tools, but the current text and bill-only assistants do not
+bind this server or transmit imported readings to a provider.
+
+No weather, utility, detector, goal proposal or approval tool is registered on the
+imported-data server. The existing synthetic MCP server and tools are unchanged.
+
 ## Transport, privacy and limitations
 
 Both application relays expose only the three method/path pairs above at
@@ -99,6 +146,10 @@ pnpm test
 
 Tests cover conversions, offsets/DST, gaps/duplicates/order, limits, session
 isolation, expiry/revocation during body streaming, replacement, cleanup, privacy,
-default-off configuration and both relays. Combined-service CI imports the maximum
-672 readings through HTTP under its existing offline 512-MB limit. These checks
+default-off configuration and both relays. UI checks cover consent, review reset,
+loading, duplicate submission, uncertain-request read-back, rejection, expiry and
+cleanup. Actual MCP execution checks scope, source identity, bounded series and
+invalidation, including the existing agent adapter. Combined-service CI serves
+`/meter` and imports the maximum 672 readings through HTTP under its existing
+offline 512-MB limit. These checks
 are inspected regressions, not measurements of field accuracy or AI performance.

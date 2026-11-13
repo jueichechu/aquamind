@@ -5,7 +5,8 @@ read-only compatibility contract for bill facts, meter-window metadata and a
 reviewed voice query. This foundation has no HTTP endpoint, storage or provider
 calls. Existing website routes and API contracts are unchanged. A separate,
 opt-in [meter import API](meter-import.md) now binds parsed CSV data to host-owned
-session references. There is no upload UI, voice recording or combined assistant yet.
+session references. A separate `/meter` workspace supports import/review/clear;
+voice recording and combined bill/meter reasoning are not implemented yet.
 
 ## Validation and association
 

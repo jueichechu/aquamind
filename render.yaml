@@ -62,6 +62,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: AQUAMIND_METER_IMPORT_ENABLED
+        value: "1"
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
       - key: AQUAMIND_PUBLIC_MODE

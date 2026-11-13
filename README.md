@@ -11,6 +11,7 @@ The current release is a local development application. It includes household bi
 - Conservation-goal proposals with explicit approval or rejection before changes take effect.
 - PyTorch LSTM autoencoder training, frozen inference artifacts and a typed FastAPI prediction endpoint.
 - Manual-bill entry at `/analyze`, with validation and normalization for US gallons, CCF, cubic meters and liters, plus optional bill-only AI questions after explicit sharing consent.
+- Optional interval CSV workspace at `/meter`, with explicit units/timezone, session-only import, review and clear controls, and scoped read-only MCP tools. Imported readings are not sent to AI or scored by the synthetic detector. See the [meter import guide](docs/meter-import.md).
 - Manual comparison of 2–12 bills at `/compare`, with a day-weighted usage baseline, original units and explicit gaps between supplied periods. No AI configuration is required.
 - PDF and photo bill import from the homepage, with explicit OpenAI sharing consent, editable extracted fields and a required review before calculation. Supports PDF, PNG, JPEG and WebP reports up to 4 MiB.
 
@@ -90,6 +91,7 @@ The backend also runs without OpenAI configuration when `AQUAMIND_AGENT_ENABLED`
 | `OPENAI_API_KEY` | Python backend | Server-side credential for live assistant requests |
 | `OPENAI_MODEL` | Python backend | Responses-compatible model for the assistant |
 | `AQUAMIND_AGENT_ENABLED` | Python backend | Set to `1` to enable the assistant; disabled by default |
+| `AQUAMIND_METER_IMPORT_ENABLED` | Python backend | Set to `1` for the interval CSV workspace; disabled by default locally, enabled in the combined-service Blueprint |
 | `AQUAMIND_DETECTOR_PATH` | Python backend | Optional frozen detector directory, such as `ml/artifacts/detector-v1` |
 | `AQUAMIND_INFERENCE_ENABLED` | Python backend | Defaults to `1`; set `0` to run the bill/agent service without PyTorch |
 | `AQUAMIND_API_URL` | Next.js server | Backend URL used by the same-origin relay |
