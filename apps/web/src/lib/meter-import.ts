@@ -1,4 +1,6 @@
-import { BILL_UNITS } from "./bills";
+import { BILL_UNITS, createBillEntry, type BillDraft } from "./bills";
+import { checkReportSize, encodeReport, parseImportedBill } from "./bill-import";
+import { parseAgentReply } from "../app/demo/demo-client";
 
 export const METER_CSV_LIMIT = 64 * 1024;
 export type MeterOptions = { volume_unit: keyof typeof BILL_UNITS; interval_minutes: number;
@@ -8,7 +10,7 @@ export type MeterSummary = { context: { evidence_id: string; household_id: strin
   interval_minutes: number; volume_unit: keyof typeof BILL_UNITS; reading_type: MeterOptions["reading_type"] };
   timezone: string; total_us_gallons: string; inference_status: "not_enabled_for_imported_data"; limitations: string[] };
 export class MeterError extends Error {
-  constructor(message: string, readonly uncertain = false, readonly expired = false) { super(message); }
+  constructor(message: string, readonly uncertain = false, readonly expired = false, readonly selectionChanged = false) { super(message); }
 }
 const invalid = () => new MeterError("The selected readings could not be confirmed. Check the current selection before importing again.", true);
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
@@ -51,7 +53,7 @@ export function checkMeterFile(file: File) {
   }
 }
 
-/** One mounted workspace, RAM only; no retries, browser storage, cookies or model calls. */
+/** One mounted workspace, RAM only; no retries, browser storage or cookies. AI calls require explicit consent. */
 export class MeterClient {
   #token: string | null = null;
   #busy = false;
@@ -63,12 +65,18 @@ export class MeterClient {
       response = await fetch(`/api/aquamind/v1/${path}`, { method, credentials: "omit", cache: "no-store",
         keepalive: method === "DELETE" && path === "session",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(20000) });
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(path === 'agent/evidence' || path === 'bills/import' ? 150000 : 20000) });
     } catch { throw new MeterError("The request could not be confirmed. Check the current selection; it will not be retried automatically.", true); }
     if (response.status === 401) {
       if (token === this.#token) this.#token = null;
       throw new MeterError("Your meter session ended. Choose your CSV and consent again to start a new import.", false, true);
     }
+    if (path === 'agent/evidence' && (response.status === 409 || response.status === 404)) {
+      throw new MeterError("The selected readings changed or are unavailable. Check the current selection and review it again.", false, false, true);
+    }
+    if (path === 'agent/evidence' && response.status === 422) throw new MeterError("Check the bill dates, timezone and review confirmations. The meter period must be inside the bill period.");
+    if (path === 'bills/import' && !response.ok) throw new MeterError("The report could not be read. Check its format and sharing consent, or enter the bill manually; there is no automatic retry.");
     if (response.status === 404) throw new MeterError("Meter import is not enabled on this deployment. Bill calculations are still available.");
     if (response.status === 422) throw new MeterError("Check the CSV columns, volumes, timezone offsets and cadence. Readings must be ordered with no gaps or duplicates.");
     if (response.status === 413) throw new MeterError("The import is too large. Choose a CSV up to 64 KiB and 672 readings.");
@@ -129,6 +137,35 @@ export class MeterClient {
     return this.#perform(async () => {
       const response = await this.#request("meters/current", "DELETE");
       if (response.status !== 204) throw invalid();
+    });
+  }
+  importBill(file: File, shareWithAI: boolean) {
+    try { checkReportSize(file); if (shareWithAI !== true) throw new MeterError("Confirm sharing the report with the AI service first."); }
+    catch (error) { return Promise.reject(error); }
+    return this.#perform(async () => {
+      const body = await encodeReport(file);
+      const response = await this.#request('bills/import', 'POST', body);
+      return parseImportedBill(await response.json().catch(() => { throw invalid(); }));
+    });
+  }
+  askEvidence(draft: BillDraft, timezone: string, inputMethod: 'manual_entry' | 'document_import',
+    readingType: MeterOptions['reading_type'], evidenceId: string, text: string,
+    confirmations: { bill_reviewed: boolean; meter_reviewed: boolean; same_household: boolean; share_with_ai: boolean }) {
+    let bill;
+    try {
+      if (Object.values(confirmations).some(value => value !== true) || Object.keys(confirmations).length !== 4) throw new MeterError("Review both sources, confirm the same household and allow AI sharing first.");
+      bill = createBillEntry(draft);
+      if (!id(evidenceId) || !text.trim() || new TextEncoder().encode(text).length > 8192) throw new MeterError("Enter a household-water question up to 8 KiB for the selected readings.");
+      validateMeterOptions({volume_unit: 'us_gallons', interval_minutes: 15, timezone, reading_type: readingType});
+    } catch (error) { return Promise.reject(error); }
+    return this.#perform(async () => {
+      const response = await this.#request('agent/evidence', 'POST', {text, bill, bill_timezone: timezone,
+        bill_input_method: inputMethod, bill_reading_type: readingType, meter_evidence_id: evidenceId, ...confirmations});
+      const reply = parseAgentReply(await response.json().catch(() => { throw invalid(); }));
+      if (reply.pending_approval || (reply.status === 'answer' &&
+          (!reply.tool_trace.some(t => t.tool_name === 'get_meter_summary' && t.status === 'success') ||
+           reply.tool_trace.some(t => !['get_meter_summary', 'get_meter_series'].includes(t.tool_name))))) throw invalid();
+      return reply;
     });
   }
   close() {

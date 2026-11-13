@@ -82,6 +82,14 @@ checks['meter_selected_within_session']=get_json('/api/aquamind/v1/meters/curren
 checks['meter_body_bounded']=request('/api/aquamind/v1/meters/import',
     meter|{'csv_text':'x'*METER_BODY_LIMIT},token)[0]==413
 checks['meter_raw_route_not_exposed']=request('/v1/meters/current',token=token)[0]==404
+evidence={'text':'Explain this household water bill and selected meter coverage.',
+    'bill':bill,'bill_timezone':'UTC','bill_input_method':'manual_entry','bill_reading_type':'unknown',
+    'meter_evidence_id':imported['context']['evidence_id'],'bill_reviewed':True,
+    'meter_reviewed':True,'same_household':True,'share_with_ai':False}
+checks['evidence_sharing_required']=request('/api/aquamind/v1/agent/evidence',evidence,token)[0]==422
+evidence['share_with_ai']=True
+evidence['bill']=bill|{'period_start':'2024-06-01','period_end_exclusive':'2024-07-01'}
+checks['evidence_period_rejected_without_provider']=request('/api/aquamind/v1/agent/evidence',evidence,token)[0]==422
 req=urllib.request.Request(WEB+'/api/aquamind/v1/session',method='DELETE',headers={'Authorization':'Bearer '+token})
 with urllib.request.urlopen(req,timeout=20) as response:checks['session_revoked']=response.status==204
 checks['revoked_meter_unavailable']=request('/api/aquamind/v1/meters/current',token=token)[0]==401

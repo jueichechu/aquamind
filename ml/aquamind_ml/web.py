@@ -25,6 +25,7 @@ ALLOWED = frozenset({
     ('GET', 'v1/bills/readiness'), ('POST', 'v1/sessions'), ('DELETE', 'v1/session'),
     ('GET', 'v1/goals/current'), ('POST', 'v1/goals/proposals'),
     ('POST', 'v1/agent/turn'), ('POST', 'v1/agent/continue'), ('POST', 'v1/agent/bill'),
+    ('POST', 'v1/agent/evidence'),
     ('POST', 'v1/bills/normalize'), ('POST', 'v1/bills/import'), ('POST', 'v1/bills/compare'),
     ('POST', 'v1/meters/import'), ('GET', 'v1/meters/current'), ('DELETE', 'v1/meters/current'),
 })
@@ -139,7 +140,7 @@ def create_web_app(static_dir=None, *, api=None):
             active += 1
         importing = path == 'v1/bills/import'
         readiness = path == 'v1/bills/readiness'
-        new_turn = path in {'v1/agent/turn', 'v1/agent/bill'}
+        new_turn = path in {'v1/agent/turn', 'v1/agent/bill', 'v1/agent/evidence'}
         agent = new_turn or path == 'v1/agent/continue' or importing
         try:
             if not allowed(request.method, path):

@@ -6,8 +6,9 @@ is disabled by default outside configured deployments. Set
 The combined-service Blueprint enables it for `aqua` when that configuration is
 synced and deployed. No setting changes on other services are required. Existing
 bill analysis and the synthetic demo retain their behavior. No new credentials,
-storage service, provider calls or detector changes are required. Agent reasoning
-over imported readings is a separate integration, not enabled by this workspace.
+storage service, provider calls or detector changes are required for CSV import.
+The optional [bill-and-meter assistant](evidence-agent.md) uses the existing OpenAI
+configuration and requires separate evidence review and AI sharing consent.
 
 ## Website workflow
 
@@ -112,8 +113,9 @@ These are converted interval volumes, not GPM or cumulative registers;
 `context.volume_unit` still identifies the original CSV unit. Totals use the
 unrounded normalized values, so rounded individual values need not sum exactly
 to the displayed total. The existing bounded agent-tool adapter can discover and
-execute these two tools, but the current text and bill-only assistants do not
-bind this server or transmit imported readings to a provider.
+execute these two tools. Only the separate bill-and-meter assistant binds this
+server after explicit sharing consent; the synthetic-demo and bill-only assistants
+do not receive imported readings.
 
 No weather, utility, detector, goal proposal or approval tool is registered on the
 imported-data server. The existing synthetic MCP server and tools are unchanged.
@@ -128,7 +130,7 @@ Consent to process readings must be explicitly true. This does not authorize sen
 the readings to an external AI service or approving a conservation goal.
 
 Raw CSV, readings, session tokens, evidence references and dataset checksums stay
-out of application request logs. No file is written and no provider is called.
+out of application request logs. CSV import writes no file and calls no provider.
 The public response says `not_enabled_for_imported_data`: the synthetic-trained
 detector is not automatically applied to unfamiliar households. This API does not
 fabricate weather, tariffs, a household baseline or a leak/fixture diagnosis.

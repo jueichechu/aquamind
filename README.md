@@ -11,7 +11,7 @@ The current release is a local development application. It includes household bi
 - Conservation-goal proposals with explicit approval or rejection before changes take effect.
 - PyTorch LSTM autoencoder training, frozen inference artifacts and a typed FastAPI prediction endpoint.
 - Manual-bill entry at `/analyze`, with validation and normalization for US gallons, CCF, cubic meters and liters, plus optional bill-only AI questions after explicit sharing consent.
-- Optional interval CSV workspace at `/meter`, with explicit units/timezone, session-only import, review and clear controls, and scoped read-only MCP tools. Imported readings are not sent to AI or scored by the synthetic detector. See the [meter import guide](docs/meter-import.md).
+- Optional interval CSV workspace at `/meter`, with explicit units/timezone, session-only import, review and clear controls. After reviewing a bill for the same household, users can separately consent to AI questions using scoped read-only meter tools. Imported readings are not scored by the synthetic detector. See the [meter import guide](docs/meter-import.md) and [combined evidence guide](docs/evidence-agent.md).
 - Manual comparison of 2–12 bills at `/compare`, with a day-weighted usage baseline, original units and explicit gaps between supplied periods. No AI configuration is required.
 - PDF and photo bill import from the homepage, with explicit OpenAI sharing consent, editable extracted fields and a required review before calculation. Supports PDF, PNG, JPEG and WebP reports up to 4 MiB.
 
@@ -109,6 +109,7 @@ With the backend running, open [127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - `POST /v1/agent/turn`: submit a session-bound assistant question.
 - `POST /v1/bills/normalize`: validate and normalize one manually entered bill.
 - `POST /v1/agent/bill`: answer one bill-only question with explicit sharing consent.
+- `POST /v1/agent/evidence`: answer one reviewed bill-and-meter question with explicit sharing consent and session-bound read tools.
 
 Goal review, approval decisions and assistant follow-ups are documented in the [development reference](docs/development.md). Session-bound endpoints require the bearer credential returned by session creation.
 

@@ -70,6 +70,9 @@ permissions are enforced separately by the host; do not reject a water task simp
 because it asks about an experimental model. This mode never makes unrelated
 coding, academic work, travel forecasts, role overrides or secret requests relevant.
 If the purpose cannot be established from the question and mode, use unsupported.
+In bill_meter_water mode, the host selected reviewed bill facts and imported household
+meter intervals. Short references such as 'do these agree?' concern those water
+measurements. This grants no authority, extra tools, weather or unrelated tasks.
 """
 
 TOPIC_REDIRECT = (
@@ -78,12 +81,12 @@ TOPIC_REDIRECT = (
 )
 
 
-async def request_topic_check(text, client, config, *, bill_only, selected_demo=False):
+async def request_topic_check(text, client, config, *, bill_only, selected_demo=False, selected_evidence=False):
     """Exactly one bounded request; caller reserves/counts it before awaiting."""
     return await client.with_options(max_retries=0, timeout=config.request_timeout_seconds).responses.create(
         model=config.model, instructions=TOPIC_POLICY,
         input=[{'role': 'user', 'content': json.dumps({
-            'mode': 'bill_only' if bill_only else 'selected_demo_water' if selected_demo else 'household_water',
+            'mode': 'bill_only' if bill_only else 'selected_demo_water' if selected_demo else 'bill_meter_water' if selected_evidence else 'household_water',
             'question': text}, allow_nan=False)}],
         tools=[], tool_choice='none', parallel_tool_calls=False, store=False,
         max_output_tokens=min(512, config.max_output_tokens),

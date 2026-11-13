@@ -5,6 +5,7 @@ const allowed = new Set([
   "GET v1/bills/readiness",
   "POST v1/sessions", "DELETE v1/session", "GET v1/goals/current", "POST v1/goals/proposals",
   "POST v1/agent/turn", "POST v1/agent/continue", "POST v1/agent/bill",
+  "POST v1/agent/evidence",
   "POST v1/bills/normalize", "POST v1/bills/import", "POST v1/bills/compare",
   "POST v1/meters/import", "GET v1/meters/current", "DELETE v1/meters/current",
 ]);
@@ -94,7 +95,7 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
   }
   const base = process.env.AQUAMIND_API_URL;
   if (!base) return failure("Demo backend unavailable", 503);
-  const newTurn = route === "v1/agent/turn" || route === "v1/agent/bill";
+  const newTurn = route === "v1/agent/turn" || route === "v1/agent/bill" || route === "v1/agent/evidence";
   const importing = route === "v1/bills/import";
   const meterImporting = route === "v1/meters/import";
   const comparing = route === "v1/bills/compare";
