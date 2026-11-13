@@ -7,8 +7,10 @@ import { checkReportSize, REPORT_ACCEPT, type ImportedBill } from "@/lib/bill-im
 import type { DemoClient } from "@/app/demo/demo-client";
 import { useBillReadiness } from "./use-bill-readiness";
 
-export function ReportImport({ client, onImported, onSelectionChange, locked = false }: {
-  client: DemoClient; onImported: (result: ImportedBill) => void; onSelectionChange: () => void; locked?: boolean;
+export function ReportImport({ client, onImported, onSelectionChange, locked = false, onBusyChange, manualHref = "/analyze" }: {
+  client: Pick<DemoClient, 'importBill'>; onImported: (result: ImportedBill) => void; onSelectionChange: () => void; locked?: boolean;
+  onBusyChange?: (busy: boolean) => void;
+  manualHref?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const errorBox = useRef<HTMLParagraphElement>(null);
@@ -41,7 +43,7 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
   }
   async function extract() {
     if (working.current || locked || !file || !share || readiness.status !== "ready") return;
-    working.current = true; setBusy(true); setError("");
+    working.current = true; setBusy(true); setError(""); onBusyChange?.(true);
     let sent = false;
     try {
       // A tab may have been idle since its initial check. Recheck before any
@@ -58,7 +60,7 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
       if (!mounted.current) return;
       setError(cause instanceof Error ? cause.message : "The report could not be read. Enter its values manually.");
       if (sent) setShare(false);
-    } finally { working.current = false; setBusy(false); }
+    } finally { working.current = false; setBusy(false); onBusyChange?.(false); }
   }
   return <div className="report-intake">
     <Image src="/icons/file.svg" width={44} height={54} alt="" aria-hidden="true" className="report-file-icon" />
@@ -90,7 +92,7 @@ export function ReportImport({ client, onImported, onSelectionChange, locked = f
     {readiness.status === "unavailable" && <button type="button" className="desk-text-button" disabled={busy || locked}
       onClick={() => { setError(""); void readiness.check().catch(() => {}); }}>Try again</button>}
     {error && <p ref={errorBox} tabIndex={-1} role="alert" className="desk-error">{error}</p>}
-    {!busy && <Link href="/analyze" className="desk-underlined report-manual">Enter details instead</Link>}
+    {!busy && <Link href={manualHref} className="desk-underlined report-manual">Enter details instead</Link>}
     {file && <p className="report-format">PDF, PNG, JPEG or WebP. Up to 4 MiB.</p>}
   </div>;
 }

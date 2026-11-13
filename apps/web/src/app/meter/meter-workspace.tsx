@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { EvidenceAssistant } from "./evidence-assistant";
 import { BILL_UNITS } from "../../lib/bills";
 import { checkMeterFile, MeterClient, MeterError, type MeterOptions, type MeterSummary } from "../../lib/meter-import";
 
@@ -17,6 +18,7 @@ export function MeterWorkspace({ client: supplied }: { client?: MeterClient } = 
   const [selected, setSelected] = useState<MeterSummary | null>(null);
   const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState<"importing" | "checking" | "clearing" | null>(null);
+  const [assisting, setAssisting] = useState(false);
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState(false);
   const [notice, setNotice] = useState("");
@@ -26,6 +28,11 @@ export function MeterWorkspace({ client: supplied }: { client?: MeterClient } = 
   const alert = useRef<HTMLParagraphElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const focusFileAfterRequest = useRef(false);
+  const assistanceBusy = useCallback((value: boolean) => { working.current=value;setAssisting(value);if(value)setNotice(''); },[]);
+  const selectionLost = useCallback((expired:boolean)=>{
+    setSelected(null);setReviewed(false);setConsent(false);setUncertain(!expired);
+    setNotice(expired?'Your session ended. Import and review fresh readings.':'Check the current meter selection before asking again.');
+  },[]);
   useEffect(() => {
     mounted.current = true;
     const leave = () => {
@@ -107,9 +114,9 @@ export function MeterWorkspace({ client: supplied }: { client?: MeterClient } = 
         <pre className="mt-3 overflow-x-auto rounded-lg border border-rule p-3 text-xs" tabIndex={0} aria-label="Fictional CSV format example">{"interval_start,volume\n2026-06-01T00:00:00+00:00,15\n2026-06-01T00:15:00+00:00,12"}</pre>
         <p className="mt-2">Example only. Timestamps need UTC offsets matching your chosen timezone. Rows must be ordered with no gaps or duplicates; the last interval ends one cadence after its timestamp.</p>
       </details>
-      <form method="post" autoComplete="off" className="mt-5" aria-busy={!!busy}
+      <form method="post" autoComplete="off" className="mt-5" aria-busy={!!busy||assisting}
         onSubmit={(event) => { event.preventDefault(); void run("importing"); }}>
-        <fieldset disabled={!!busy} className="min-w-0 space-y-5">
+        <fieldset disabled={!!busy||assisting} className="min-w-0 space-y-5">
           <legend className="sr-only">CSV file and interval settings; all fields required</legend>
           <div><label htmlFor="meter-file" className="block text-sm">CSV file (required)</label>
             <input ref={fileInput} id="meter-file" type="file" accept=".csv,text/csv" required aria-describedby="meter-format"
@@ -135,7 +142,7 @@ export function MeterWorkspace({ client: supplied }: { client?: MeterClient } = 
               <option value="unknown">Not identified</option><option value="actual">Actual</option>
               <option value="estimated">Estimated</option><option value="mixed">Mixed</option>
             </select></div>
-          <p id="meter-processing" className="text-sm leading-6 text-ink-secondary">The entire CSV is sent to this server. Include only the two required columns and leave out personal details. Readings stay in temporary session memory for up to one hour; clear them when finished. They are not sent to an external AI service.</p>
+          <p id="meter-processing" className="text-sm leading-6 text-ink-secondary">The entire CSV is sent to this server. Include only the two required columns and leave out personal details. Readings stay in temporary session memory for up to one hour; clear them when finished. Importing does not send them to an external AI service. Asking AI about them requires separate consent.</p>
           <label className="flex min-h-11 items-start gap-3 text-sm leading-6"><input id="meter-consent" type="checkbox" required checked={consent}
             aria-describedby="meter-processing" className="mt-1 size-4 shrink-0 accent-accent" onChange={(event) => setConsent(event.target.checked)} />Allow the server to process this CSV.</label>
           <button className="ui-button ui-button-primary w-full" disabled={!!busy || uncertain}>
@@ -145,8 +152,8 @@ export function MeterWorkspace({ client: supplied }: { client?: MeterClient } = 
       <p role="status" aria-atomic="true" className="mt-3 text-sm leading-6 text-ink-secondary">{busy === "importing" ? "Validating timestamps, units and intervals…" : busy === "checking" ? "Checking the current selection…" : busy === "clearing" ? "Clearing selected readings…" : notice}</p>
       {error && <p ref={alert} tabIndex={-1} role="alert" className="mt-3 rounded-lg border border-warning bg-warning-soft p-3 text-sm leading-6 text-warning focus-visible:outline-2 focus-visible:outline-warning">{error}</p>}
       {uncertain && <div className="mt-3 flex flex-wrap gap-3">
-        <button className={secondary} disabled={!!busy} onClick={() => void run("checking")}>Check current selection</button>
-        <button className={secondary} disabled={!!busy} onClick={() => void run("clearing")}>Clear server selection</button>
+        <button className={secondary} disabled={!!busy||assisting} onClick={() => void run("checking")}>Check current selection</button>
+        <button className={secondary} disabled={!!busy||assisting} onClick={() => void run("clearing")}>Clear server selection</button>
       </div>}
       <p className="mt-4 text-xs leading-5 text-muted">A successful import replaces this session’s previous selection. Closing this workspace attempts to end the session; reloads do not restore uploads.</p>
     </section>
@@ -161,13 +168,14 @@ export function MeterWorkspace({ client: supplied }: { client?: MeterClient } = 
           <div className="border-y border-rule py-4"><dt className="text-ink-secondary">Total US gallons</dt><dd className="mt-2 break-words text-3xl font-semibold">{new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(Number(selected.total_us_gallons))}</dd></div>
         </dl>
         <label className="mt-5 flex min-h-11 items-start gap-3 text-sm leading-6"><input type="checkbox" id="meter-reviewed" checked={reviewed}
-          disabled={!!busy || !!file} className="mt-1 size-4 shrink-0 accent-accent" onChange={(event) => setReviewed(event.target.checked)} />I have checked the selected period, units and total against my export.</label>
+          disabled={!!busy || assisting || !!file} className="mt-1 size-4 shrink-0 accent-accent" onChange={(event) => setReviewed(event.target.checked)} />I have checked the selected period, units and total against my export.</label>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{reviewed ? "Reviewed by you; the readings remain unverified." : file ? "A replacement is pending. Review is available after importing or removing that file." : "Review these readings before using them as evidence."}</p>
-        {file && <button className={`${secondary} mt-3`} disabled={!!busy} onClick={() => { resetFile(); setConsent(false); fileInput.current?.focus(); }}>Remove pending file</button>}
-        <button className={`${secondary} mt-4`} disabled={!!busy} onClick={() => void run("clearing")}>Clear selected readings</button>
+        {file && <button className={`${secondary} mt-3`} disabled={!!busy||assisting} onClick={() => { resetFile(); setConsent(false); fileInput.current?.focus(); }}>Remove pending file</button>}
+        <button className={`${secondary} mt-4`} disabled={!!busy||assisting} onClick={() => void run("clearing")}>Clear selected readings</button>
       </> : <p className="mt-3 text-sm leading-6 text-ink-secondary">{uncertain ? "The current selection is unconfirmed. Use the check or clear action to resolve it." : "No readings selected. Import a CSV to review its coverage and total."}</p>}
-      <p className="mt-6 border-t border-rule pt-5 text-sm leading-6 text-ink-secondary">User-provided readings remain unverified. No leak score, historical baseline, weather or utility tariff is inferred. Bill evidence and the synthetic demo remain separate.</p>
+      <p className="mt-6 border-t border-rule pt-5 text-sm leading-6 text-ink-secondary">User-provided readings remain unverified. No leak score, historical baseline, weather or utility tariff is inferred. The synthetic demo remains separate.</p>
       <Link href="/analyze" className="ui-link mt-4 underline underline-offset-4">Use a water bill instead</Link>
     </section>
+    {selected && reviewed && !file && !uncertain && <EvidenceAssistant key={selected.context.evidence_id} client={client} selected={selected} onBusyChange={assistanceBusy} onSelectionLost={selectionLost}/>}
   </div>;
 }
