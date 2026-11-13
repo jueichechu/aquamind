@@ -28,7 +28,7 @@ ALLOWED = frozenset({
     ('POST', 'v1/bills/normalize'), ('POST', 'v1/bills/import'), ('POST', 'v1/bills/compare'),
     ('POST', 'v1/meters/import'), ('GET', 'v1/meters/current'), ('DELETE', 'v1/meters/current'),
 })
-PAGES = {'': 'index.html', 'analyze': 'analyze.html', 'compare': 'compare.html', 'demo': 'demo.html'}
+PAGES = {'': 'index.html', 'analyze': 'analyze.html', 'compare': 'compare.html', 'demo': 'demo.html', 'meter': 'meter.html'}
 BODY_SECONDS = 15
 
 

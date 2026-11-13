@@ -27,7 +27,7 @@ BILL = {'period_start': '2026-06-01', 'period_end_exclusive': '2026-07-01',
 def site():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        for page in ('index', 'analyze', 'compare', 'demo', '404'):
+        for page in ('index', 'analyze', 'compare', 'demo', 'meter', '404'):
             (root / (page + '.html')).write_text('<html>' + page + '</html>')
         (root / 'analyze.txt').write_text('static navigation payload')
         (root / 'asset.js').write_text('console.log("asset");')
@@ -57,7 +57,7 @@ class WebsiteTests(unittest.TestCase):
     def test_pages_assets_and_raw_api_isolation(self):
         with site() as root, patch.dict(os.environ, ENV), TestClient(create_web_app(root)) as client:
             for path, expected in (('/', 'index'), ('/analyze', 'analyze'),
-                    ('/compare', 'compare'), ('/demo', 'demo'), ('/analyze.txt', 'navigation'),
+                    ('/compare', 'compare'), ('/demo', 'demo'), ('/meter', 'meter'), ('/analyze.txt', 'navigation'),
                     ('/asset.js', 'asset')):
                 result = client.get(path)
                 self.assertEqual(result.status_code, 200, path)

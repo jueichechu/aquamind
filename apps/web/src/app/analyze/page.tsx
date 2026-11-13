@@ -9,6 +9,7 @@ export default function AnalyzePage() {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-rule pb-5">
         <Link href="/" className="ui-link desk-wordmark text-ink">AquaMind</Link>
         <nav aria-label="Analysis navigation" className="flex flex-wrap items-center gap-4">
+          <Link href="/meter" className="ui-link">Meter readings</Link>
           <Link href="/compare" className="ui-link">Compare bills</Link>
           <Link href="/demo" className="ui-link">Explore the synthetic demo</Link>
         </nav>
