@@ -48,7 +48,7 @@ evidence_bill=BillEvidenceContext(evidence_id='bill_capacity',household_id='hous
     bill={'period_start':'2026-03-08','period_end_exclusive':'2026-03-09',
           'usage':'0','usage_unit':'us_gallons'})
 checks['evidence_contract_timezone_available']=evidence_bill.timezone=='America/Los_Angeles'
-for path in ('/analyze','/compare','/demo'):
+for path in ('/analyze','/compare','/demo','/meter'):
     checks['page'+path]=request(path)[0]==200
 checks['health']=get_json('/api/health')==(200,{'status':'ok'})
 checks['relay_allowlist']=request('/api/aquamind/ready')[0]==404
