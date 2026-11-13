@@ -296,22 +296,22 @@ describe("approval relay", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect((await GET(new Request("http://localhost/api"), context("v1/bills/import"))).status).toBe(404);
   });
-  it("relays bill questions with a model deadline, bounded body and no browser cookies", async () => {
+  it.each(['agent/bill','agent/evidence'])("relays %s with a model deadline, bounded body and no browser cookies", async (route) => {
     vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
     const fetcher = vi.fn().mockResolvedValue(Response.json({ status: "answer" }));
     vi.stubGlobal("fetch", fetcher);
     const timeout = vi.spyOn(AbortSignal, "timeout");
     const body = JSON.stringify({ text: "q".repeat(2000), bill: { usage: "8.5" }, is_example: true, share_with_ai: true });
     expect((await POST(new Request("http://localhost/api", { method: "POST", body,
-      headers: { authorization: "Bearer test-session", cookie: "private=value" } }), context("v1/agent/bill"))).status).toBe(200);
-    expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8000/v1/agent/bill");
+      headers: { authorization: "Bearer test-session", cookie: "private=value" } }), context(`v1/${route}`))).status).toBe(200);
+    expect(fetcher.mock.calls[0][0]).toBe(`http://localhost:8000/v1/${route}`);
     expect(fetcher.mock.calls[0][1].body).toBe(body);
     expect(fetcher.mock.calls[0][1].headers.has("cookie")).toBe(false);
     expect(fetcher.mock.calls[0][1].headers.get("authorization")).toBe("Bearer test-session");
     expect(timeout).toHaveBeenCalledWith(135_000);
     timeout.mockRestore();
-    expect((await POST(new Request("http://localhost/api", { method: "POST", body: "x".repeat(16385) }), context("v1/agent/bill"))).status).toBe(413);
-    expect((await GET(new Request("http://localhost/api"), context("v1/agent/bill"))).status).toBe(404);
+    expect((await POST(new Request("http://localhost/api", { method: "POST", body: "x".repeat(16385) }), context(`v1/${route}`))).status).toBe(413);
+    expect((await GET(new Request("http://localhost/api"), context(`v1/${route}`))).status).toBe(404);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it("fails closed without backend configuration and rejects arbitrary paths", async () => {

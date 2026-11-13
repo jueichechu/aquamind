@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse
 from .bill_import import IMPORT_BODY_LIMIT
 from .meter_import import METER_BODY_LIMIT
 
-PAID_PATHS = frozenset({'/v1/agent/turn', '/v1/agent/continue', '/v1/agent/bill', '/v1/bills/import'})
+PAID_PATHS = frozenset({'/v1/agent/turn', '/v1/agent/continue', '/v1/agent/bill', '/v1/agent/evidence', '/v1/bills/import'})
 
 
 class PublicAdmission:

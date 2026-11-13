@@ -257,6 +257,45 @@ class AgentHost:
             _ = store.goal  # Never release extracted fields after revocation/expiry.
             return result
 
+    async def run_evidence(self, body, store: GoalApprovals, meters) -> AgentResult:
+        from mcp import Client
+        from .agent import run_agent
+        from .evidence_question import (EVIDENCE_TOOLS, EvidenceAgentTools,
+                                        EvidencePeriodMismatch, prepare_evidence)
+        from .meter_mcp import create_imported_meter_server
+
+        _ = store.goal
+        try:
+            facts = prepare_evidence(body, meters)
+        except LookupError:
+            raise HTTPException(404, 'Selected meter evidence unavailable') from None
+        except EvidencePeriodMismatch as error:
+            raise HTTPException(422, str(error)) from None
+        except ValueError:
+            raise HTTPException(422, 'Invalid bill dates or timezone') from None
+
+        def check_active():
+            _ = store.goal
+            try:
+                meters.selected(body.meter_evidence_id)
+            except LookupError:
+                raise HTTPException(409, 'Selected readings changed; review the current selection') from None
+
+        check_active()
+        previous = self._continuations.get(store)
+        if previous is not None and store.review(previous.approval_id).status == 'approval_required':
+            raise HTTPException(409, 'Resolve the pending goal before starting another question')
+        async with self._slot(store):
+            self._continuations.pop(store, None)
+            check_active()
+            server = create_imported_meter_server(meters, body.meter_evidence_id, frozenset({'meter:read'}))
+            async with Client(server) as mcp:
+                outcome = await run_agent(body.text, self.client,
+                    EvidenceAgentTools(mcp, EVIDENCE_TOOLS, max_calls=3), self.config,
+                    check_active=check_active, evidence_context=facts)
+            check_active()
+            return outcome
+
 
 def agent_router(sessions: DemoSessions) -> APIRouter:
     router = APIRouter()
@@ -333,6 +372,26 @@ def agent_router(sessions: DemoSessions) -> APIRouter:
         host = host_for(request)
         body = await body_for(request, AgentBillRequest, 16384)
         outcome = await host.run_bill(body.text, body.bill, body.is_example, store)
+        return AgentTurnResponse(**outcome.public_dict(), request_id=request.state.request_id)
+
+    from .evidence_question import EvidenceQuestionRequest
+    evidence_schema = EvidenceQuestionRequest.model_json_schema()
+    evidence_schema['properties']['bill'] = evidence_schema.pop('$defs')['ManualBill']
+
+    @router.post('/v1/agent/evidence', response_model=AgentTurnResponse,
+        openapi_extra={'requestBody': {'required': True, 'content': {
+            'application/json': {'schema': evidence_schema}}}})
+    async def evidence_turn(request: Request):
+        if not request.app.state.meter_import_enabled:
+            raise HTTPException(404, 'Meter import unavailable')
+        store = require_session(sessions, request)
+        body = await body_for(request, EvidenceQuestionRequest, 16384)
+        from .sessions import session_token
+        try:
+            meters = sessions.meters(session_token(request))
+        except LookupError:
+            raise HTTPException(401, 'Session unavailable') from None
+        outcome = await host_for(request).run_evidence(body, store, meters)
         return AgentTurnResponse(**outcome.public_dict(), request_id=request.state.request_id)
 
     return router

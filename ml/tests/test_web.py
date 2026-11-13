@@ -98,7 +98,7 @@ class WebsiteTests(unittest.TestCase):
             self.assertEqual(client.post(PREFIX + 'v1/bills/compare',
                 content=' ' * 2048, headers=headers).status_code, 422)
             for route, limit in (('v1/bills/normalize', 1024), ('v1/bills/compare', 12288),
-                                 ('v1/agent/bill', 16384)):
+                                 ('v1/agent/bill', 16384), ('v1/agent/evidence', 16384)):
                 result = client.post(PREFIX + route, content=(' ' * (limit - 1) + 'é').encode(),
                     headers=headers | {'Content-Length': '1'})
                 self.assertEqual(result.status_code, 413)

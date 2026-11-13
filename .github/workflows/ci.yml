@@ -106,6 +106,7 @@ jobs:
           python -m unittest -v test_lightweight_api test_remote_budget
           test_relay_authorization test_redis_budget_integration
           test_topic_guard test_topic_guard_http
+          test_evidence_agent_http
           test_model_release test_web
 
   combined:
