@@ -3,6 +3,9 @@
 from secrets import token_hex
 from threading import Lock
 from typing import Literal
+from decimal import Decimal, ROUND_HALF_UP, localcontext
+
+from pydantic import Field
 
 from .approvals import ApprovalSessionUnavailable
 from .evidence import EvidenceModel, MeterWindowContext
@@ -19,6 +22,10 @@ class ImportedMeterSummary(EvidenceModel):
         'Volumes describe intervals starting at each timestamp, not cumulative register readings.',
         'No model inference, real weather, utility tariff or fixture diagnosis is supplied.',
     )
+
+
+class ImportedMeterSeries(ImportedMeterSummary):
+    interval_volumes_us_gallons: tuple[str, ...] = Field(min_length=1, max_length=672)
 
 
 class SessionMeters:
@@ -67,6 +74,21 @@ class SessionMeters:
             if self._entry is None or self._entry[0] != evidence_id:
                 raise LookupError('Meter evidence unavailable')
             return self._entry[1]
+
+    def selected(self, evidence_id: str, *, include_series=False) -> ImportedMeterSummary:
+        """Atomically resolve the exact host-selected revision, never its replacement."""
+        with self._lock:
+            self._require_active()
+            if self._entry is None or self._entry[0] != evidence_id:
+                raise LookupError('Meter evidence unavailable')
+            summary = self._summary()
+            if not include_series:
+                return summary
+            with localcontext() as context:
+                context.prec = 40
+                values = tuple(str(value.quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP))
+                    for value in self._entry[1].gallons)
+            return ImportedMeterSeries(**summary.model_dump(), interval_volumes_us_gallons=values)
 
     def clear(self):
         with self._lock:
