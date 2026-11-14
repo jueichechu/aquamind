@@ -296,10 +296,34 @@ class AgentHost:
             check_active()
             return outcome
 
+    async def transcribe_voice(self, audio, duration_ms, store: GoalApprovals):
+        from .voice import transcribe_clip
+        _ = store.goal
+        previous = self._continuations.get(store)
+        if previous is not None and store.review(previous.approval_id).status == 'approval_required':
+            raise HTTPException(409, 'Resolve the pending goal before transcribing audio')
+        async with self._slot(store):
+            result = await transcribe_clip(self.client, self.config, audio, duration_ms)
+            _ = store.goal  # Never release a transcript after session revocation or expiry.
+            return result
+
 
 def agent_router(sessions: DemoSessions) -> APIRouter:
     router = APIRouter()
     from .bill_import import BillImportRequest, BillImportResponse, IMPORT_BODY_LIMIT
+    from .voice import VoiceRequest, VoiceResponse, AUDIO_BODY_LIMIT
+
+    @router.post('/v1/audio/transcribe', response_model=VoiceResponse,
+        openapi_extra={'requestBody': {'required': True, 'content': {
+            'application/json': {'schema': VoiceRequest.model_json_schema()}}}})
+    async def transcribe_voice(request: Request):
+        if not request.app.state.meter_import_enabled:
+            raise HTTPException(404, 'Voice input unavailable')
+        store = require_session(sessions, request)
+        body = await body_for(request, VoiceRequest, AUDIO_BODY_LIMIT)
+        audio, duration = body.checked_audio()
+        result = await host_for(request).transcribe_voice(audio, duration, store)
+        return VoiceResponse(**result, request_id=request.state.request_id)
 
     @router.get('/v1/bills/readiness')
     async def bill_readiness(request: Request):

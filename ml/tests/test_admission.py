@@ -39,7 +39,7 @@ class AdmissionTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             policy.enter('GET', '/v1/goals/current')
         policy.leave()
-        for path in ('/v1/agent/turn', '/v1/agent/continue', '/v1/agent/bill', '/v1/agent/evidence'):
+        for path in ('/v1/agent/turn', '/v1/agent/continue', '/v1/agent/bill', '/v1/agent/evidence', '/v1/audio/transcribe'):
             with self.assertRaises(HTTPException):
                 policy.enter('POST', path)
         policy.enter('GET', '/v1/goals/current')

@@ -18,6 +18,7 @@ from starlette.staticfiles import StaticFiles
 from .api import create_app
 from .bill_import import IMPORT_BODY_LIMIT
 from .meter_import import METER_BODY_LIMIT
+from .voice import AUDIO_BODY_LIMIT
 
 
 SAFE_HEADERS = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'}
@@ -26,6 +27,7 @@ ALLOWED = frozenset({
     ('GET', 'v1/goals/current'), ('POST', 'v1/goals/proposals'),
     ('POST', 'v1/agent/turn'), ('POST', 'v1/agent/continue'), ('POST', 'v1/agent/bill'),
     ('POST', 'v1/agent/evidence'),
+    ('POST', 'v1/audio/transcribe'),
     ('POST', 'v1/bills/normalize'), ('POST', 'v1/bills/import'), ('POST', 'v1/bills/compare'),
     ('POST', 'v1/meters/import'), ('GET', 'v1/meters/current'), ('DELETE', 'v1/meters/current'),
 })
@@ -139,13 +141,14 @@ def create_web_app(static_dir=None, *, api=None):
         if limited:
             active += 1
         importing = path == 'v1/bills/import'
+        transcribing = path == 'v1/audio/transcribe'
         readiness = path == 'v1/bills/readiness'
         new_turn = path in {'v1/agent/turn', 'v1/agent/bill', 'v1/agent/evidence'}
-        agent = new_turn or path == 'v1/agent/continue' or importing
+        agent = new_turn or path == 'v1/agent/continue' or importing or transcribing
         try:
             if not allowed(request.method, path):
                 return failure('Unknown endpoint', 404)
-            limit = (IMPORT_BODY_LIMIT if importing else METER_BODY_LIMIT if path == 'v1/meters/import'
+            limit = (IMPORT_BODY_LIMIT if importing else AUDIO_BODY_LIMIT if transcribing else METER_BODY_LIMIT if path == 'v1/meters/import'
                 else 16384 if new_turn else 12 * 1024 if path == 'v1/bills/compare' else 1024)
             body = bytearray()
             if request.method == 'POST':

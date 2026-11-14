@@ -12,8 +12,9 @@ from starlette.responses import JSONResponse
 
 from .bill_import import IMPORT_BODY_LIMIT
 from .meter_import import METER_BODY_LIMIT
+from .voice import AUDIO_BODY_LIMIT
 
-PAID_PATHS = frozenset({'/v1/agent/turn', '/v1/agent/continue', '/v1/agent/bill', '/v1/agent/evidence', '/v1/bills/import'})
+PAID_PATHS = frozenset({'/v1/agent/turn', '/v1/agent/continue', '/v1/agent/bill', '/v1/agent/evidence', '/v1/bills/import', '/v1/audio/transcribe'})
 
 
 class PublicAdmission:
@@ -88,6 +89,7 @@ class PublicAdmissionMiddleware:
             # Buffer once before routing, with actual-byte and whole-body time limits.
             # Existing endpoint parsers still enforce content type, consent and schema.
             limit = (IMPORT_BODY_LIMIT if path == '/v1/bills/import' else
+                     AUDIO_BODY_LIMIT if path == '/v1/audio/transcribe' else
                      METER_BODY_LIMIT if path == '/v1/meters/import' else
                      16384 if path in PAID_PATHS else
                      12 * 1024 if path == '/v1/bills/compare' else

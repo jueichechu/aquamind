@@ -90,6 +90,16 @@ checks['evidence_sharing_required']=request('/api/aquamind/v1/agent/evidence',ev
 evidence['share_with_ai']=True
 evidence['bill']=bill|{'period_start':'2024-06-01','period_end_exclusive':'2024-07-01'}
 checks['evidence_period_rejected_without_provider']=request('/api/aquamind/v1/agent/evidence',evidence,token)[0]==422
+# Audio checks remain invalid before ledger/provider work, inside the six-request window.
+from aquamind_ml.voice import MAX_AUDIO_BASE64
+checks['voice_consent_required_at_maximum_body']=request('/api/aquamind/v1/audio/transcribe',
+    {'media_type':'audio/wav','data_base64':'A'*MAX_AUDIO_BASE64,'share_with_ai':False},token)[0]==422
+import base64, struct
+pcm=bytes(48000*2*31)
+clip=(b'RIFF'+struct.pack('<I',36+len(pcm))+b'WAVEfmt '+struct.pack('<IHHIIHH',16,1,1,48000,96000,2,16)+
+      b'data'+struct.pack('<I',len(pcm))+pcm)
+checks['voice_overlong_rejected_before_provider']=request('/api/aquamind/v1/audio/transcribe',
+    {'media_type':'audio/wav','data_base64':base64.b64encode(clip).decode(),'share_with_ai':True},token)[0]==422
 req=urllib.request.Request(WEB+'/api/aquamind/v1/session',method='DELETE',headers={'Authorization':'Bearer '+token})
 with urllib.request.urlopen(req,timeout=20) as response:checks['session_revoked']=response.status==204
 checks['revoked_meter_unavailable']=request('/api/aquamind/v1/meters/current',token=token)[0]==401
