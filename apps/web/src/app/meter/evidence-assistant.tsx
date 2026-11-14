@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BillFields } from "../../components/bill-fields";
 import { BillReadingNote, BillSourceHint } from "../../components/bill-evidence";
 import { ReportImport } from "../../components/report-import";
+import { VoiceClip } from "../../components/voice-clip";
 import { IMPORT_WARNINGS, type ImportedBill } from "../../lib/bill-import";
 import type { BillDraft } from "../../lib/bills";
 import { MeterClient, MeterError, type MeterOptions, type MeterSummary } from "../../lib/meter-import";
@@ -22,24 +23,30 @@ export function EvidenceAssistant({client, selected, onBusyChange, onSelectionLo
   const [household,setHousehold]=useState(false);
   const [share,setShare]=useState(false);
   const [question,setQuestion]=useState('');
+  const [fromVoice,setFromVoice]=useState(false), [voiceReviewed,setVoiceReviewed]=useState(false);
   const [busy,setBusy]=useState(false);
   const [extracting,setExtracting]=useState(false);
   const [answer,setAnswer]=useState('');
   const [error,setError]=useState('');
   const working=useRef(false), mounted=useRef(false);
   const alert=useRef<HTMLParagraphElement>(null), answerHeading=useRef<HTMLHeadingElement>(null);
+  const questionInput=useRef<HTMLTextAreaElement>(null), focusTranscript=useRef(false);
   useEffect(()=>{mounted.current=true; return()=>{mounted.current=false;};},[]);
   useEffect(()=>{if(error) alert.current?.focus();},[error]);
   useEffect(()=>{if(answer) answerHeading.current?.focus({preventScroll:true});},[answer]);
+  useEffect(()=>{if(focusTranscript.current&&!extracting){focusTranscript.current=false;questionInput.current?.focus();}},[question,extracting]);
   const reportClient=useMemo(()=>({importBill:async(file:File,consent:boolean)=>{
     try {return await client.importBill(file,consent);}
     catch(cause){if(cause instanceof MeterError && cause.expired) onSelectionLost(true); throw cause;}
+  },transcribeVoice:async(file:File,consent:boolean)=>{
+    try{return await client.transcribeVoice(file,consent);}
+    catch(cause){if(cause instanceof MeterError&&cause.expired)onSelectionLost(true);throw cause;}
   }}),[client,onSelectionLost]);
-  function invalidate(){setBillReviewed(false);setHousehold(false);setShare(false);setAnswer('');setError('');}
+  function invalidate(){setBillReviewed(false);setHousehold(false);setShare(false);setVoiceReviewed(false);setAnswer('');setError('');}
   function changeBill(field:keyof BillDraft,value:string){if(working.current)return;setDraft(previous=>({...previous,[field]:value}));invalidate();}
-  function reportBusy(value:boolean){working.current=value;setExtracting(value);onBusyChange(value);}
+  function reportBusy(value:boolean){working.current=value;setExtracting(value);onBusyChange(value);if(value){setShare(false);setAnswer('');setError('');}}
   async function ask(){
-    if(working.current || !billReviewed || !household || !share || !question.trim()) return;
+    if(working.current || !billReviewed || !household || !share || !question.trim() || (fromVoice&&!voiceReviewed)) return;
     working.current=true;setBusy(true);onBusyChange(true);setError('');setAnswer('');
     try{
       const reply=await client.askEvidence(draft,timezone,imported?'document_import':'manual_entry',reading,
@@ -59,7 +66,7 @@ export function EvidenceAssistant({client, selected, onBusyChange, onSelectionLo
     <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-secondary">Add a bill for the same household. The selected meter period must fit inside it. Partial meter coverage cannot explain the full bill total.</p>
     <details className="mt-4 max-w-xl text-sm leading-6">
       <summary className="ui-link cursor-pointer">Read a bill document instead of typing</summary>
-      <ReportImport client={reportClient} locked={busy} onBusyChange={reportBusy} manualHref="#evidence-bill-start"
+      <ReportImport client={reportClient} locked={busy||extracting} onBusyChange={reportBusy} manualHref="#evidence-bill-start"
         onSelectionChange={()=>{setDraft(empty);setImported(null);setReading('unknown');invalidate();}}
         onImported={result=>{setDraft(result.draft);setImported(result);setReading(result.evidence?.reading_type??'unknown');invalidate();}} />
     </details>
@@ -89,14 +96,18 @@ export function EvidenceAssistant({client, selected, onBusyChange, onSelectionLo
             className="mt-1 size-4 shrink-0 accent-accent" onChange={event=>{setBillReviewed(event.target.checked);setShare(false);setAnswer('');}}/>I checked the bill dates, units, usage and optional charges against my report.</label>
           <label className="flex min-h-11 items-start gap-3 text-sm leading-6"><input id="evidence-household" type="checkbox" required checked={household}
             className="mt-1 size-4 shrink-0 accent-accent" onChange={event=>{setHousehold(event.target.checked);setShare(false);setAnswer('');}}/>This bill and the selected meter readings are for the same household.</label>
+          <VoiceClip transcribe={reportClient.transcribeVoice} locked={busy||extracting} onBusyChange={reportBusy}
+            onTranscript={text=>{focusTranscript.current=true;setQuestion(text);setFromVoice(true);setVoiceReviewed(false);setShare(false);setAnswer('');setError('');}}/>
           <div><label htmlFor="evidence-question" className="block text-sm">Your household-water question</label>
-            <textarea id="evidence-question" required rows={3} maxLength={2000} value={question} className="ui-field mt-2 resize-y"
+            <textarea ref={questionInput} id="evidence-question" required rows={3} maxLength={2000} value={question} className="ui-field mt-2 resize-y"
               placeholder="What can these readings tell me about my bill, and what is still missing?"
-              onChange={event=>{setQuestion(event.target.value);setShare(false);setAnswer('');setError('');}}/></div>
+              onChange={event=>{setQuestion(event.target.value);setVoiceReviewed(false);setShare(false);setAnswer('');setError('');}}/></div>
+          {fromVoice && <label className="flex min-h-11 items-start gap-3 text-sm leading-6"><input id="evidence-voice-reviewed" type="checkbox" required checked={voiceReviewed}
+            className="mt-1 size-4 shrink-0 accent-accent" onChange={event=>{setVoiceReviewed(event.target.checked);setShare(false);setAnswer('');}}/>I checked the transcript and corrected my question. Spoken instructions do not approve actions.</label>}
           <p id="evidence-sharing" className="text-sm leading-6 text-ink-secondary">Your bill fields, selected meter readings and question are sent to an external AI service. Leave out personal information. The original bill file is not sent again. <a className="ui-link underline underline-offset-4" href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer">Data policy</a></p>
           <label className="flex min-h-11 items-start gap-3 text-sm leading-6"><input id="evidence-sharing-consent" type="checkbox" required checked={share}
             aria-describedby="evidence-sharing" className="mt-1 size-4 shrink-0 accent-accent" onChange={event=>setShare(event.target.checked)}/>Allow AI to read this bill, these meter readings and my question.</label>
-          <button className="ui-button ui-button-primary" disabled={busy||extracting||!billReviewed||!household||!share||!question.trim()}>{busy?'Comparing the evidence…':'Ask with bill and meter'}</button>
+          <button className="ui-button ui-button-primary" disabled={busy||extracting||!billReviewed||!household||!share||!question.trim()||(fromVoice&&!voiceReviewed)}>{busy?'Comparing the evidence…':'Ask with bill and meter'}</button>
         </div>
       </fieldset>
     </form>

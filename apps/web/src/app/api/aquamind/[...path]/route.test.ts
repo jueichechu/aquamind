@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DELETE, GET, POST } from "./route";
 import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
+import { AUDIO_BODY_LIMIT } from "../../../../lib/voice";
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split("/") }) });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("approval relay", () => {
@@ -277,24 +278,24 @@ describe("approval relay", () => {
     expect(await failed.json()).toEqual({ detail: "Demo backend unavailable" });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
-  it("bounds report import separately and preserves no-store, auth and the paid request deadline", async () => {
+  it.each(['bills/import','audio/transcribe'])("bounds %s separately and preserves no-store, auth and the paid request deadline", async (route) => {
     vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");
     const fetcher = vi.fn().mockResolvedValue(Response.json({ needs_review: true }));
     vi.stubGlobal("fetch", fetcher);
     const timeout = vi.spyOn(AbortSignal, "timeout");
     const body = JSON.stringify({ media_type: "application/pdf", data_base64: "x".repeat(20000), share_with_ai: true });
     const response = await POST(new Request("http://localhost/api", { method: "POST", body,
-      headers: { authorization: "Bearer test-session", cookie: "private=value" } }), context("v1/bills/import"));
+      headers: { authorization: "Bearer test-session", cookie: "private=value" } }), context(`v1/${route}`));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8000/v1/bills/import");
+    expect(fetcher.mock.calls[0][0]).toBe(`http://localhost:8000/v1/${route}`);
     expect(fetcher.mock.calls[0][1].body).toBe(body);
     expect(fetcher.mock.calls[0][1].headers.has("cookie")).toBe(false);
     expect(timeout).toHaveBeenCalledWith(135_000); timeout.mockRestore();
-    expect((await POST(new Request("http://localhost/api", { method: "POST", body: "x".repeat(IMPORT_BODY_LIMIT + 1) }),
-      context("v1/bills/import"))).status).toBe(413);
+    expect((await POST(new Request("http://localhost/api", { method: "POST", body: "x".repeat((route==='audio/transcribe'?AUDIO_BODY_LIMIT:IMPORT_BODY_LIMIT) + 1) }),
+      context(`v1/${route}`))).status).toBe(413);
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect((await GET(new Request("http://localhost/api"), context("v1/bills/import"))).status).toBe(404);
+    expect((await GET(new Request("http://localhost/api"), context(`v1/${route}`))).status).toBe(404);
   });
   it.each(['agent/bill','agent/evidence'])("relays %s with a model deadline, bounded body and no browser cookies", async (route) => {
     vi.stubEnv("AQUAMIND_API_URL", "http://localhost:8000");

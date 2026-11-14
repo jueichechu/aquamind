@@ -1,4 +1,5 @@
 import { IMPORT_BODY_LIMIT } from "../../../../lib/bill-import";
+import { AUDIO_BODY_LIMIT } from "../../../../lib/voice";
 
 // Only these application endpoints are exposed through the same-origin relay.
 const allowed = new Set([
@@ -6,6 +7,7 @@ const allowed = new Set([
   "POST v1/sessions", "DELETE v1/session", "GET v1/goals/current", "POST v1/goals/proposals",
   "POST v1/agent/turn", "POST v1/agent/continue", "POST v1/agent/bill",
   "POST v1/agent/evidence",
+  "POST v1/audio/transcribe",
   "POST v1/bills/normalize", "POST v1/bills/import", "POST v1/bills/compare",
   "POST v1/meters/import", "GET v1/meters/current", "DELETE v1/meters/current",
 ]);
@@ -97,12 +99,13 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
   if (!base) return failure("Demo backend unavailable", 503);
   const newTurn = route === "v1/agent/turn" || route === "v1/agent/bill" || route === "v1/agent/evidence";
   const importing = route === "v1/bills/import";
+  const transcribing = route === "v1/audio/transcribe";
   const meterImporting = route === "v1/meters/import";
   const comparing = route === "v1/bills/compare";
-  const agent = newTurn || route === "v1/agent/continue" || importing;
+  const agent = newTurn || route === "v1/agent/continue" || importing || transcribing;
   const readiness = route === "v1/bills/readiness";
   try {
-    const limit = importing ? IMPORT_BODY_LIMIT : meterImporting ? 96 * 1024 : newTurn ? 16384 : comparing ? 12 * 1024 : 1024;
+    const limit = importing ? IMPORT_BODY_LIMIT : transcribing ? AUDIO_BODY_LIMIT : meterImporting ? 96 * 1024 : newTurn ? 16384 : comparing ? 12 * 1024 : 1024;
     const body = request.method === "POST" ? await boundedBody(request, limit) : undefined;
     const headers = new Headers({ "Content-Type": "application/json" });
     if (relayKey) headers.set("X-AquaMind-Relay-Key", relayKey);
