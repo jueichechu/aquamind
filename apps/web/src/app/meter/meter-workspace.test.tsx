@@ -15,6 +15,7 @@ let calls: { path: string; init: RequestInit }[];
 let importing: () => Promise<Response>;
 let reading: () => Promise<Response>;
 let answering: () => Promise<Response>;
+let transcribing: () => Promise<Response>;
 function element<T extends HTMLElement>(id: string) { return host.querySelector<T>(`#${id}`)!; }
 function button(text: string) { return [...host.querySelectorAll("button")].find((item) => item.textContent === text)!; }
 async function click(target: HTMLElement) { await act(async () => target.click()); }
@@ -47,10 +48,12 @@ beforeEach(async () => {
   reading = async () => Response.json(result());
   answering = async () => Response.json({status:'answer',answer:'The meter covers only part of the unverified bill, so the totals cannot be compared.',pending_approval:null,
     tool_trace:[{tool_name:'get_meter_summary',status:'success',elapsed_ms:1}]});
+  transcribing=async()=>Response.json({text:'What does this water bill and meter window tell me?',duration_ms:1000,source:'audio_transcription',needs_review:true,request_id:'a'.repeat(36)});
   vi.stubGlobal("fetch", vi.fn(async (path: string, init: RequestInit) => {
     calls.push({ path, init });
     if (path.endsWith('/bills/readiness')) return Response.json({status:'ready'});
     if (path.endsWith('/agent/evidence')) return answering();
+    if (path.endsWith('/audio/transcribe')) return transcribing();
     if (path.endsWith("/sessions")) return Response.json({ session_token: token });
     if (path.endsWith("/import")) return importing();
     if (init.method === "DELETE") return new Response(null, { status: 204 });
@@ -223,4 +226,65 @@ it('supports document candidates without treating extraction or user edits as ve
   expect(element<HTMLInputElement>('evidence-reviewed').checked).toBe(false);
   expect(element<HTMLInputElement>('evidence-sharing-consent').checked).toBe(false);
   expect(host.textContent).toContain('editable candidates');
+});
+
+async function chooseVoice(name='question.wav') {
+  const bytes=new Uint8Array(44);bytes.set([82,73,70,70]);bytes.set([87,65,86,69],8);
+  const file=new File([bytes],name,{type:'audio/wav'});
+  Object.defineProperty(file,'arrayBuffer',{value:async()=>bytes.buffer});
+  const input=element<HTMLInputElement>('evidence-voice-file');
+  Object.defineProperty(input,'files',{configurable:true,value:[file]});
+  await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));
+}
+
+it('transcribes only with consent, requires corrected transcript review and never auto-sends the question',async()=>{
+  await evidenceForm();await chooseVoice();
+  expect(button('Transcribe clip').disabled).toBe(true);
+  expect(calls.some(c=>c.path.endsWith('/audio/transcribe'))).toBe(false);
+  await click(element('evidence-voice-consent'));await click(button('Transcribe clip'));
+  expect(element<HTMLTextAreaElement>('evidence-question').value).toBe('What does this water bill and meter window tell me?');
+  expect(document.activeElement).toBe(element('evidence-question'));
+  expect(element<HTMLInputElement>('evidence-voice-reviewed').checked).toBe(false);
+  expect(element<HTMLInputElement>('evidence-sharing-consent').checked).toBe(false);
+  expect(calls.some(c=>c.path.endsWith('/agent/evidence'))).toBe(false);
+  expect(calls.filter(c=>c.path.endsWith('/sessions'))).toHaveLength(1);
+  await click(element('evidence-sharing-consent'));expect(button('Ask with bill and meter').disabled).toBe(true);
+  await click(element('evidence-voice-reviewed'));expect(element<HTMLInputElement>('evidence-sharing-consent').checked).toBe(false);
+  await click(element('evidence-sharing-consent'));await submitEvidence();
+  const sent=JSON.parse(calls.find(c=>c.path.endsWith('/agent/evidence'))!.init.body as string);
+  expect(sent.text).toBe('What does this water bill and meter window tell me?');
+  expect(sent.data_base64).toBeUndefined();
+  await change('evidence-question','Corrected water question');
+  expect(element<HTMLInputElement>('evidence-voice-reviewed').checked).toBe(false);
+  expect(host.querySelector('article')).toBeNull();
+});
+
+it('locks every evidence input during transcription and focuses a safe failure without retry',async()=>{
+  await evidenceForm();await chooseVoice();
+  let finish!:(response:Response)=>void;transcribing=()=>new Promise(resolve=>{finish=resolve;});
+  await click(element('evidence-voice-consent'));await click(button('Transcribe clip'));
+  expect(button('Clear selected readings').disabled).toBe(true);
+  expect(element<HTMLTextAreaElement>('evidence-question').matches(':disabled')).toBe(true);
+  expect(host.textContent).toContain('Transcribing your clip');
+  await click(button('Transcribing clip…'));
+  expect(calls.filter(c=>c.path.endsWith('/audio/transcribe'))).toHaveLength(1);
+  await act(async()=>finish(new Response('PRIVATE_PROVIDER_AUDIO',{status:503})));
+  expect(host.textContent).not.toContain('PRIVATE_PROVIDER_AUDIO');
+  expect(document.activeElement?.getAttribute('role')).toBe('alert');
+  expect(element<HTMLInputElement>('evidence-voice-consent').checked).toBe(false);
+  expect(button('Clear selected readings').disabled).toBe(false);
+  expect(element<HTMLTextAreaElement>('evidence-question').value).toContain('household bill');
+  await click(element('evidence-sharing-consent'));await submitEvidence();
+  expect(calls.filter(c=>c.path.endsWith('/agent/evidence'))).toHaveLength(1);
+});
+
+it('rejects unsupported voice files locally and expires the entire workspace without replay',async()=>{
+  await evidenceForm();await chooseVoice('question.mp3');
+  expect(host.textContent).toContain('Choose a WAV clip');
+  expect(calls.some(c=>c.path.endsWith('/audio/transcribe'))).toBe(false);
+  await chooseVoice();transcribing=async()=>new Response(null,{status:401});
+  await click(element('evidence-voice-consent'));await click(button('Transcribe clip'));
+  expect(host.querySelector('#evidence-heading')).toBeNull();
+  expect(host.textContent).toContain('Import and review fresh readings');
+  expect(calls.filter(c=>c.path.endsWith('/sessions'))).toHaveLength(1);
 });

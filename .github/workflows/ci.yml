@@ -107,6 +107,7 @@ jobs:
           test_relay_authorization test_redis_budget_integration
           test_topic_guard test_topic_guard_http
           test_evidence_agent_http
+          test_voice
           test_model_release test_web
 
   combined:

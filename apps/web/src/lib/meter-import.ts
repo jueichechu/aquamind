@@ -1,6 +1,7 @@
 import { BILL_UNITS, createBillEntry, type BillDraft } from "./bills";
 import { checkReportSize, encodeReport, parseImportedBill } from "./bill-import";
 import { parseAgentReply } from "../app/demo/demo-client";
+import { checkVoiceFile, encodeVoice, parseTranscript } from './voice';
 
 export const METER_CSV_LIMIT = 64 * 1024;
 export type MeterOptions = { volume_unit: keyof typeof BILL_UNITS; interval_minutes: number;
@@ -66,12 +67,15 @@ export class MeterClient {
         keepalive: method === "DELETE" && path === "session",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(path === 'agent/evidence' || path === 'bills/import' ? 150000 : 20000) });
+        signal: AbortSignal.timeout(path === 'agent/evidence' || path === 'bills/import' || path === 'audio/transcribe' ? 150000 : 20000) });
     } catch { throw new MeterError("The request could not be confirmed. Check the current selection; it will not be retried automatically.", true); }
     if (response.status === 401) {
       if (token === this.#token) this.#token = null;
       throw new MeterError("Your meter session ended. Choose your CSV and consent again to start a new import.", false, true);
     }
+    if (path === 'audio/transcribe' && !response.ok) throw new MeterError(response.status === 429 ?
+      'Voice transcription is busy or has reached its request limit. Type your question or try later.' :
+      'The clip could not be transcribed. Check its format or type your question; there is no automatic retry.');
     if (path === 'agent/evidence' && (response.status === 409 || response.status === 404)) {
       throw new MeterError("The selected readings changed or are unavailable. Check the current selection and review it again.", false, false, true);
     }
@@ -166,6 +170,15 @@ export class MeterClient {
           (!reply.tool_trace.some(t => t.tool_name === 'get_meter_summary' && t.status === 'success') ||
            reply.tool_trace.some(t => !['get_meter_summary', 'get_meter_series'].includes(t.tool_name))))) throw invalid();
       return reply;
+    });
+  }
+  transcribeVoice(file: File, shareWithAI: boolean) {
+    try {checkVoiceFile(file); if (shareWithAI !== true) throw new MeterError('Allow AI to transcribe this clip first.');}
+    catch (error) {return Promise.reject(error);}
+    return this.#perform(async()=>{
+      const body=await encodeVoice(file);
+      const response=await this.#request('audio/transcribe','POST',body);
+      return parseTranscript(await response.json().catch(()=>{throw new MeterError('The transcript could not be read. Type your question instead.');}));
     });
   }
   close() {

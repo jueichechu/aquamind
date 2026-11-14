@@ -30,6 +30,10 @@ replacement/clear controls are locked during extraction and answering. Loading,
 failure and answer states are announced accessibly; failures are not retried.
 Only the latest answer remains in the mounted workspace. Reload clears local state.
 
+An optional [short WAV voice clip](voice-input.md) can supply the question text.
+Transcription has separate sharing consent and produces an editable candidate;
+reviewing it and explicitly asking the question are separate actions.
+
 ## HTTP contract and source binding
 
 `POST /v1/agent/evidence` requires a bearer session and JSON up to 16 KiB:
