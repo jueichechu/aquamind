@@ -157,7 +157,7 @@ class Review(StrictModel):
     criterion: Criterion
     verdict: Literal['pass', 'fail']
     reviewer_id: Id
-    source: Literal['human', 'scripted_fixture']
+    source: Literal['human', 'assistant', 'scripted_fixture']
 
 
 class RecordedRun(Versioned):
@@ -226,7 +226,8 @@ def grade(manifest, manifest_digest, run):
         key = (review.case_id, review.criterion)
         if (key in reviews or review.case_id not in observed or review.criterion not in cases[review.case_id].quality_rubric or
                 review.artifact_sha256 != observed[review.case_id].artifact_sha256 or
-                (run.source != 'scripted' and review.source != 'human')):
+                (run.source != 'scripted' and review.source == 'scripted_fixture') or
+                (run.cohort == 'human_approval' and review.source != 'human')):
             raise ValueError('Review is duplicated or not bound to this observed artifact')
         reviews[key] = review
     rows, outcomes = [], Counter()
@@ -285,6 +286,7 @@ def grade(manifest, manifest_digest, run):
     return {'kind': 'agent_observation_grading', 'execution_performed': False,
         'observation_source_declared': run.source, 'runtime_source_sha256_declared': run.runtime_source_sha256,
         'models_declared': run.models,
+        'review_sources_declared': dict(Counter(r.source for r in run.reviews)),
         'suite_id': manifest.suite_id, 'split': manifest.split, 'cohort': run.cohort, 'complete': complete,
         'suite_cases': len(manifest.cases),
         'other_cohort_case_ids': [c.case_id for c in manifest.cases if c.cohort != run.cohort],
@@ -296,6 +298,7 @@ def grade(manifest, manifest_digest, run):
         'limitations': ['Grades supplied observations; does not execute or independently attest their origin.',
             'Inspected development cases, not a held-out or representative benchmark.',
             'Scripted observations and reviews are contract checks, not live model quality.',
+            'Assistant reviews are explicitly labeled, not independent human assessments.',
             'Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.',
             'Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.',
             'No raw answers, transcripts, fact values, reviewer names or provider errors are emitted.']}

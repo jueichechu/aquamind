@@ -2,8 +2,9 @@
 
 `evals/agent_contract.py` validates a versioned development-case manifest and grades
 supplied observations offline. It does not run an agent, open a browser, transcribe
-audio, upload images, make provider requests or approve proposals. A bounded
-observation collector and authored media artifacts are separate follow-up work.
+audio, upload images, make provider requests or approve proposals. The separate
+[collector](../evals/collect_agent.py) executes the two non-human cohorts only
+when explicitly requested; its default is also an offline plan.
 
 The initial [development manifest](../evals/fixtures/agent-development-v1.json)
 specifies the existing eight tools, bill-only isolation, partial/disjoint meter
@@ -70,8 +71,11 @@ trials or choose a favorable rerun. Freeze a new explicit protocol before adding
 repetitions or a confirmation split.
 
 Each review contains `case_id`, the observation's `artifact_sha256`, `criterion`,
-`verdict` (`pass`/`fail`), a pseudonymous `reviewer_id` and `source` (`human` or
-`scripted_fixture`). Non-scripted records require human review sources. Review the
+`verdict` (`pass`/`fail`), a pseudonymous `reviewer_id` and `source` (`human`,
+`assistant` or `scripted_fixture`). Non-scripted records reject scripted fixture
+reviews. Assistant assessments are permitted for development answers and explicitly
+counted in `review_sources_declared`; they are not independent human evaluations.
+The human-approval cohort still requires human review sources. Review the
 actual answer against the manifest's rubric; matching a keyword is insufficient.
 Unrequested, duplicate, stale-artifact or mismatched reviews are rejected.
 Keep original answer/media artifacts private unless their publication is explicitly
@@ -119,20 +123,109 @@ or incomplete grading, and `2` for invalid inputs/options. JSON is bounded to 2 
 per input; unknown fields, duplicate keys, non-finite numbers and malformed identities
 are rejected without echoing input contents. Invalid inputs do not yield a score.
 
-## Verification and next collection work
+## Bounded local collection
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --cohort host_contract --output-dir evals/reports/host-run-1
+```
+
+The host cohort uses actual session-bound MCP reads and adapter permission checks,
+plus an explicitly simulated slow transport for uncertain timeout behavior. It
+does not use OpenAI or approve a goal. The timeout is fault injection, not an
+observed provider outage.
+
+The provider cohort requires the existing ignored root `.env.local` OpenAI
+configuration, a verified frozen `ml/artifacts/detector-v1`, and these exact
+locally maintained, synthetic fixtures:
+
+| Fixture | SHA-256 | Content/provenance |
+| --- | --- | --- |
+| Fictional PNG, 70,588 bytes | `16249570f778a700bf9349040374dec0cf4d1036185a6bd6814926618240153f` | Clearly marked test bill: June 1–30 inclusive, 2026; 8.5 CCF; actual readings; USD 45.12 water and 30.00 sewer |
+| Synthetic WAV, 95,568 bytes | `4cff39f74ce0858ea48925867c424a35aa1b52c18c90278aeca4c2d6ca19d1d3` | macOS Samantha text-to-speech, 16-kHz PCM16 mono: “What can these meter readings tell me about my water bill?”; no recorded customer audio |
+
+The media bytes remain local and are not bundled with the repository; the paid
+protocol cannot be reproduced without these matching fixtures. Other media require
+a separately declared protocol before collection. Arbitrary customer uploads are
+rejected by size/hash before provider configuration is loaded.
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --cohort agent_workflow --max-provider-calls 80 --fictional-image /absolute/path/fictional-water-bill.png --synthetic-wav /absolute/path/question.wav --output-dir evals/reports/provider-run-1
+```
+
+This executes all 19 fixed agent cases sequentially using local FastAPI ASGI,
+real OpenAI requests and in-process MCP. It is not public-site/browser evidence.
+Each case gets a fresh session which is revoked afterward. The cap (1–80 requests)
+includes image, voice, topic classification, proposal preparation and continuation;
+per-case caps also apply. Counts are recorded before awaiting SDK methods, including
+uncertain attempts. SDK retries are zero; Responses use `store: false`. Audio uses
+the existing transcription endpoint without a storage option or Files API upload.
+The collector does not change hosted quotas or admission settings.
+
+Outputs require a **new** directory inside ignored `evals/reports/` or
+`.codex-local/`. An existing directory is a replay guard, including after failure;
+never delete it to retry uncertain paid work. No automatic resume or rerun selects
+a better outcome. Private JSON files use mode 0600 and newly created run directories
+0700. Keep that directory private: it contains fictional answers and tool evidence.
+Console output contains case IDs/status/counts only (plus existing sanitized service
+logs). Provider exceptions are reduced to their class, not their message.
+
+The collection plan records manifest/runtime/media/detector hashes before requests.
+The runtime fingerprint covers Python application sources, the demo dataset and
+collector; runtime changes during collection prevent finalization. Per-case artifacts
+include returned answers, actual tool outcomes, provider model identities/timings and
+sanitized staged responses. Opaque session/evidence/approval/response IDs and raw
+provider reasoning are omitted. Partial staged artifacts and per-case observations
+survive ordinary later-case failures. Normalized fact observations come from returned
+tool artifacts and independently normalized input/candidates, never copied expected
+facts. The original manifest remains unchanged after inspected outcomes.
+
+`observations.json` and `grade-unreviewed.json` deliberately leave answer quality
+pending. Read the artifacts against every requested rubric, then write a **new**
+reviewed record with the exact artifact hashes and honest reviewer source. Do not
+label assistant review as human. Grade that record with `agent_contract.py`.
+Exit 1 for pending/failed grading is expected after initial provider collection;
+it does not authorize an automatic rerun. Host and provider reports stay separate.
+The manual human approval case is neither executed nor credited by this collector.
+
+## Recorded development run
+
+The [first collected run](../evals/baselines/agent-development-run-v1.json) retains
+all first attempts from November 15, 2026: 19 agent workflows, 43 provider requests
+under an 80-request cap, zero automatic retries, and 26 explicitly labeled assistant
+quality verdicts. Fifteen agent cases passed and four failed. The separate three-case
+host cohort passed; the human-approval cohort was not collected. These are inspected
+development results, not independent human or held-out accuracy measurements.
+
+Two answers inferred steadiness from aggregate statistics without reading a series.
+The anomaly answer correctly withheld a diagnosis/probability but omitted frozen
+model identity and synthetic training provenance required by its rubric. The rejection
+continuation respected the rejected decision and left the goal unset, but the frozen
+v1 manifest lists no allowed preparation tool while requiring an agent-created
+proposal. Its actual preparation trace is retained as a protocol failure. Expectations
+were not changed after observing these outcomes. Revise a future protocol explicitly
+before collecting new runs; do not silently erase this failure or rerun for a better score.
+
+The fictional image candidates, exact synthetic transcript and combined bill/meter
+facts matched their predeclared checks in this run. That does not establish reliability
+across other bill layouts, voices or repeated attempts. Raw artifacts remain local;
+the public summary contains hashes, scoped counts, outcomes and limitations only.
+
+## Verification
 
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_agent_evaluation.py -v
+PYTHONPATH=ml:ml/tests ml/.venv/bin/python -m unittest -v test_agent_collection
 ```
 
 The tests supply explicitly scripted records to check denominators, missing cases,
 pending reviews, exact facts, tool ordering/budgets, retries, invalid tool success,
 artifact binding, manual gates, strict input and exclusive report creation. They
-exercise the grader, not the live agent. Cloud CI also runs them without PyTorch.
+exercise the grader, not the live agent. Collector tests additionally execute real
+MCP host contracts and a mocked-SDK ASGI/tool flow, check uncertain request accounting,
+caps, privacy, partial failures and replay guards. Cloud CI runs both without PyTorch.
 
-A later collector must bind model snapshots, runtime/artifact hashes and all actual
-attempts, generate or obtain the declared fictional media, preserve privacy, impose
-explicit paid budgets, disable automatic retries and hand human approvals to the
-user. Only then can collected runs and reviewed answers support scoped model-quality
-results. Do not relabel these development specifications or scripted tests as live,
-held-out, public-site or multimodal accuracy measurements.
+Collected development runs and reviewed answers support only their declared scope.
+Expand fixtures and add a separately frozen confirmation split before broader quality
+claims. Do not relabel inspected development runs, assistant reviews or scripted host
+tests as independent human, held-out, public-site or population accuracy measurements.

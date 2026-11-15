@@ -144,6 +144,20 @@ class AgentEvaluationTests(unittest.TestCase):
             else: record['observations'][0]['case_id'] = 'unknown'
             with self.subTest(mutation=mutation), self.assertRaises(ValueError): self.grade(self.manifest, record)
 
+    def test_assistant_reviews_are_disclosed_and_cannot_fill_human_gate(self):
+        manifest = self.subset('demo-summary')
+        record = self.run_record(manifest, reviews=True, source='live_provider')
+        for review in record['reviews']:
+            review['source'] = 'assistant'
+        report = self.grade(manifest, record)
+        self.assertEqual(report['review_sources_declared'], {'assistant': 2})
+        self.assertEqual(report['outcomes']['passed'], 1)
+        manifest = self.subset('human-approved-continuation')
+        record = self.run_record(manifest, reviews=True, source='browser_recording')
+        record['reviews'][0]['source'] = 'assistant'
+        with self.assertRaises(ValueError):
+            self.grade(manifest, record)
+
     def test_human_gate_cannot_be_completed_by_scripted_or_agent_approval(self):
         manifest = self.subset('human-approved-continuation')
         record = self.run_record(manifest, reviews=True)
