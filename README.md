@@ -130,6 +130,9 @@ The production frontend runs with `pnpm --filter web start` after building. If r
 
 Keep changes focused and run the relevant checks before opening a pull request. Never commit credentials, downloaded datasets or generated model weights.
 
+The [agent evaluation guide](docs/agent-evaluation.md) describes offline case planning,
+strict observation grading and the distinction between scripted checks and live results.
+
 ## Project structure
 
 ```text
