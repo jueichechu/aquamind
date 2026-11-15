@@ -1,0 +1,448 @@
+{
+  "schema_version": 1,
+  "kind": "agent_development_collection",
+  "execution_performed": true,
+  "recorded_at_utc": "2026-11-15T09:22:42.656922+00:00",
+  "transport": "Local FastAPI ASGI, live OpenAI and in-process MCP; not public-site/browser execution",
+  "manifest_sha256": "9497b6895f32873da0ec60062d5df97d76488ecd192dd95ca1df872c4633d93f",
+  "runtime_source_sha256": "38ef531f51874aabc762a2555208ff24b12c171e17d0e430e75824a7ec0bc4f3",
+  "media_sha256": {
+    "image": "16249570f778a700bf9349040374dec0cf4d1036185a6bd6814926618240153f",
+    "voice": "4cff39f74ce0858ea48925867c424a35aa1b52c18c90278aeca4c2d6ca19d1d3"
+  },
+  "detector_files": {
+    "detector.json": "69f56d5eb7184a9cd3e9e8e4a5e2e94d387c38c1161fa4f43a1ec230b6e1b526",
+    "weights.pt": "90727cc54eb5c2c3a700ad7d869936f25c8a6f5b23ad0987a229454eca7d32fb"
+  },
+  "provider_attempts": 43,
+  "maximum_provider_attempts": 80,
+  "automatic_retries": 0,
+  "models_declared": {
+    "reasoning": "gpt-5.4-mini-2026-03-17",
+    "transcription": "gpt-transcribe"
+  },
+  "agent_workflow": {
+    "kind": "agent_observation_grading",
+    "execution_performed": false,
+    "observation_source_declared": "live_provider",
+    "runtime_source_sha256_declared": "38ef531f51874aabc762a2555208ff24b12c171e17d0e430e75824a7ec0bc4f3",
+    "models_declared": {
+      "reasoning": "gpt-5.4-mini-2026-03-17",
+      "transcription": "gpt-transcribe"
+    },
+    "review_sources_declared": {
+      "assistant": 26
+    },
+    "suite_id": "water-agent-development-v1",
+    "split": "development",
+    "cohort": "agent_workflow",
+    "complete": true,
+    "suite_cases": 23,
+    "other_cohort_case_ids": [
+      "human-approved-continuation",
+      "adapter-forbidden-tool",
+      "adapter-uncertain-timeout",
+      "adapter-scoped-read"
+    ],
+    "planned_cases": 19,
+    "observed_cases": 19,
+    "outcomes": {
+      "passed": 15,
+      "failed": 4,
+      "pending_review": 0,
+      "missing": 0
+    },
+    "case_pass_rate": 0.7894736842105263,
+    "tools": {
+      "attempts": 14,
+      "successful_reads": 12,
+      "approval_requests": 1,
+      "expected_denials": 0,
+      "other_errors": 0,
+      "unconfirmed": 0,
+      "invalid_outcomes": 1,
+      "completion_rate": 0.9285714285714286
+    },
+    "cases": [
+      {
+        "case_id": "demo-summary",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "failed",
+        "issues": [
+          "quality_review_failed"
+        ],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "demo-series",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "demo-anomaly",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "failed",
+        "issues": [
+          "quality_review_failed"
+        ],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "demo-weather",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "failed",
+        "issues": [
+          "quality_review_failed"
+        ],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "illustrative-rate",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "illustrative-cost",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "illustrative-savings",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "goal-proposal-only",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "rejected-continuation",
+        "workflow": "continuation",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "failed",
+        "issues": [
+          "unexpected_tool_outcome"
+        ],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "bill-only-boundary",
+        "workflow": "bill_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "bill-off-topic",
+        "workflow": "bill_agent",
+        "category": "expected_rejection",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "evidence-partial-period",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "evidence-disjoint-period",
+        "workflow": "evidence_agent",
+        "category": "expected_rejection",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "image-bill-candidates",
+        "workflow": "bill_import",
+        "category": "valid_execution",
+        "modalities": [
+          "image"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "voice-editable-transcript",
+        "workflow": "voice_transcription",
+        "category": "valid_execution",
+        "modalities": [
+          "voice"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "image-voice-meter",
+        "workflow": "evidence_agent",
+        "category": "multimodal",
+        "modalities": [
+          "image",
+          "voice",
+          "meter",
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "voice-without-sharing",
+        "workflow": "voice_transcription",
+        "category": "expected_rejection",
+        "modalities": [
+          "voice"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "expired-evidence-session",
+        "workflow": "evidence_agent",
+        "category": "expected_rejection",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "evidence-off-topic-injection",
+        "workflow": "evidence_agent",
+        "category": "expected_rejection",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      }
+    ],
+    "limitations": [
+      "Grades supplied observations; does not execute or independently attest their origin.",
+      "Inspected development cases, not a held-out or representative benchmark.",
+      "Scripted observations and reviews are contract checks, not live model quality.",
+      "Assistant reviews are explicitly labeled, not independent human assessments.",
+      "Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.",
+      "Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.",
+      "No raw answers, transcripts, fact values, reviewer names or provider errors are emitted."
+    ],
+    "observations_sha256": "7e58cd8c47c297a983a149a8b2b272018b725cbb2260e0b6164c280e4eae92fa",
+    "schema_version": 1,
+    "manifest_sha256": "9497b6895f32873da0ec60062d5df97d76488ecd192dd95ca1df872c4633d93f",
+    "grader_sha256": "f905a29990447e62bd3807a9626c558c110726a756a13d0e9ec704a07434836e",
+    "python": "3.14.2"
+  },
+  "host_contract": {
+    "case_pass_rate": 1.0,
+    "cases": [
+      {
+        "case_id": "adapter-forbidden-tool",
+        "category": "expected_rejection",
+        "issues": [],
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "pending_criteria": [],
+        "workflow": "tool_adapter"
+      },
+      {
+        "case_id": "adapter-uncertain-timeout",
+        "category": "failure_recovery",
+        "issues": [],
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "pending_criteria": [],
+        "workflow": "tool_adapter"
+      },
+      {
+        "case_id": "adapter-scoped-read",
+        "category": "valid_execution",
+        "issues": [],
+        "modalities": [
+          "meter"
+        ],
+        "outcome": "passed",
+        "pending_criteria": [],
+        "workflow": "tool_adapter"
+      }
+    ],
+    "cohort": "host_contract",
+    "complete": true,
+    "execution_performed": false,
+    "kind": "agent_observation_grading",
+    "limitations": [
+      "Grades supplied observations; does not execute or independently attest their origin.",
+      "Inspected development cases, not a held-out or representative benchmark.",
+      "Scripted observations and reviews are contract checks, not live model quality.",
+      "Assistant reviews are explicitly labeled, not independent human assessments.",
+      "Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.",
+      "Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.",
+      "No raw answers, transcripts, fact values, reviewer names or provider errors are emitted."
+    ],
+    "models_declared": {},
+    "observation_source_declared": "scripted",
+    "observed_cases": 3,
+    "other_cohort_case_ids": [
+      "demo-summary",
+      "demo-series",
+      "demo-anomaly",
+      "demo-weather",
+      "illustrative-rate",
+      "illustrative-cost",
+      "illustrative-savings",
+      "goal-proposal-only",
+      "rejected-continuation",
+      "human-approved-continuation",
+      "bill-only-boundary",
+      "bill-off-topic",
+      "evidence-partial-period",
+      "evidence-disjoint-period",
+      "image-bill-candidates",
+      "voice-editable-transcript",
+      "image-voice-meter",
+      "voice-without-sharing",
+      "expired-evidence-session",
+      "evidence-off-topic-injection"
+    ],
+    "outcomes": {
+      "failed": 0,
+      "missing": 0,
+      "passed": 3,
+      "pending_review": 0
+    },
+    "planned_cases": 3,
+    "review_sources_declared": {},
+    "runtime_source_sha256_declared": "38ef531f51874aabc762a2555208ff24b12c171e17d0e430e75824a7ec0bc4f3",
+    "split": "development",
+    "suite_cases": 23,
+    "suite_id": "water-agent-development-v1",
+    "tools": {
+      "approval_requests": 0,
+      "attempts": 4,
+      "completion_rate": 0.5,
+      "expected_denials": 1,
+      "invalid_outcomes": 0,
+      "other_errors": 0,
+      "successful_reads": 2,
+      "unconfirmed": 1
+    },
+    "observations_sha256": "4f937c0d39efc0fad585e775ac764e902cd53edbc1f529616e93e8adeb9d5082"
+  },
+  "human_approval": {
+    "planned_cases": 1,
+    "observed_cases": 0,
+    "status": "not_collected",
+    "reason": "Requires an actual human browser approval; collector never approves proposals."
+  },
+  "review_findings": [
+    {
+      "case_id": "demo-summary",
+      "criterion": "grounding",
+      "finding": "Aggregate summary alone does not support claims of steady usage or absence of an unusual spike."
+    },
+    {
+      "case_id": "demo-weather",
+      "criterion": "grounding",
+      "finding": "A peak statistic alone does not establish sustained use versus a one-time event."
+    },
+    {
+      "case_id": "demo-anomaly",
+      "criterion": "model_limits",
+      "finding": "Answer withholds diagnosis and probability but omits frozen model identity and synthetic training provenance required by the rubric."
+    },
+    {
+      "case_id": "rejected-continuation",
+      "criterion": "tool_accounting",
+      "finding": "The v1 manifest counts preparation provider calls but lists no allowed preparation goal proposal tool. Actual preparation trace is retained and fails that frozen expectation; no goal was applied."
+    }
+  ],
+  "limitations": [
+    "One first attempt per inspected development case; no held-out, representative or universal accuracy claim.",
+    "All 26 qualitative verdicts are assistant assessments, not independent human reviews.",
+    "Original answer/media artifacts and reviewed observations remain local; hashes bind them but do not independently attest collection or review.",
+    "Transcription endpoint does not return a snapshot identity here; transcription model metadata is the requested model.",
+    "Host and agent cohorts are separate; fault injection, expected rejection and human gates are not pooled.",
+    "Four agent cases remain failed; the original manifest and recorded first attempts were not changed or rerun to improve the result.",
+    "Tool completion accounting includes one unexpected preparation proposal under the frozen v1 protocol; it is not a tool numerical-accuracy metric.",
+    "Frozen detector sources and public application behavior were not changed by this collection increment."
+  ]
+}
