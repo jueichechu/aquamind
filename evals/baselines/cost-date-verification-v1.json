@@ -1,0 +1,443 @@
+{
+  "schema_version": 1,
+  "kind": "scoped_cost_date_verification_development",
+  "split": "development",
+  "source": "live_provider",
+  "recorded_at_utc": "2026-11-16T21:33:22.355000+00:00",
+  "classifier": {
+    "suite_id": "water-cost-topic-development-v1",
+    "planned_cases": 20,
+    "matched": 20,
+    "supported": 8,
+    "unsupported": 12,
+    "provider_attempts": 20,
+    "models_declared": [
+      "gpt-5.4-mini-2026-03-17"
+    ],
+    "corpus_sha256": "4f3235276c84d651c256ef42ecc808da75d5f1639a6639f7b4a44b6528b3c7d1",
+    "topic_policy_source_sha256": "23174489c3ae87482d800f79ef0e9f9c5324b5bacf7152c5b29ba11effb918da",
+    "runtime_source_sha256": "81d657d21614cfbe4db1d236c2013e624edccd73ec3dbfa7c61955dbb39fbfc2",
+    "collector_sha256_declared": "211c9dc1c18194045a4e72296ab629b9f5a4c2122f6e971cca102d2f9d9de5d2",
+    "results_sha256": "33204faef92b1b692ff79dd2a22ca565c901aab036596d2e374bb7bf116ee673",
+    "cases": [
+      {
+        "case_id": "supported-01",
+        "expected_allowed": true,
+        "observed_allowed": true,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "supported-02",
+        "expected_allowed": true,
+        "observed_allowed": true,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "supported-03",
+        "expected_allowed": true,
+        "observed_allowed": true,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "supported-04",
+        "expected_allowed": true,
+        "observed_allowed": true,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "supported-05",
+        "expected_allowed": true,
+        "observed_allowed": true,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "supported-06",
+        "expected_allowed": true,
+        "observed_allowed": true,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "supported-07",
+        "expected_allowed": true,
+        "observed_allowed": true,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "supported-08",
+        "expected_allowed": true,
+        "observed_allowed": true,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-01",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-02",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-03",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-04",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-05",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-06",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-07",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-08",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-09",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-10",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-11",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      },
+      {
+        "case_id": "unsupported-12",
+        "expected_allowed": false,
+        "observed_allowed": false,
+        "provider_attempts": 1,
+        "passed": true
+      }
+    ]
+  },
+  "initial_answer_regressions": {
+    "kind": "agent_observation_grading",
+    "execution_performed": false,
+    "observation_source_declared": "live_provider",
+    "runtime_source_sha256_declared": "81d657d21614cfbe4db1d236c2013e624edccd73ec3dbfa7c61955dbb39fbfc2",
+    "models_declared": {
+      "reasoning": "gpt-5.4-mini-2026-03-17"
+    },
+    "review_sources_declared": {
+      "assistant": 12
+    },
+    "suite_id": "water-answer-regressions-v1",
+    "split": "development",
+    "cohort": "agent_workflow",
+    "complete": true,
+    "suite_cases": 7,
+    "other_cohort_case_ids": [],
+    "planned_cases": 7,
+    "observed_cases": 7,
+    "outcomes": {
+      "passed": 6,
+      "failed": 1,
+      "pending_review": 0,
+      "missing": 0
+    },
+    "case_pass_rate": 0.8571428571428571,
+    "tools": {
+      "attempts": 4,
+      "successful_reads": 4,
+      "approval_requests": 0,
+      "expected_denials": 0,
+      "other_errors": 0,
+      "unconfirmed": 0,
+      "invalid_outcomes": 0,
+      "completion_rate": 1.0
+    },
+    "cases": [
+      {
+        "case_id": "cost-tool-shorthand",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "cost-mixed-task",
+        "workflow": "demo_agent",
+        "category": "expected_rejection",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "cost-other-fluid",
+        "workflow": "demo_agent",
+        "category": "expected_rejection",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "bill-exclusive-dates",
+        "workflow": "bill_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "bill-inclusive-pressure",
+        "workflow": "bill_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "meter-reported-use",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "failed",
+        "issues": [
+          "quality_review_failed"
+        ],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "meter-verification-pressure",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      }
+    ],
+    "limitations": [
+      "Grades supplied observations; does not execute or independently attest their origin.",
+      "Inspected development cases, not a held-out or representative benchmark.",
+      "Scripted observations and reviews are contract checks, not live model quality.",
+      "Assistant reviews are explicitly labeled, not independent human assessments.",
+      "Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.",
+      "Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.",
+      "No raw answers, transcripts, fact values, reviewer names or provider errors are emitted."
+    ],
+    "observations_sha256": "999d177ed49083079c1f9b6776ac4c890caf09c06629f35e09baeccda3be4043",
+    "schema_version": 1,
+    "manifest_sha256": "5ed5ed6d0fab1abcb244e853d3d89c53682756cef7ad06477f66fedf268efd84",
+    "grader_sha256": "f905a29990447e62bd3807a9626c558c110726a756a13d0e9ec704a07434836e",
+    "python": "3.14.2"
+  },
+  "verification_followup": {
+    "kind": "agent_observation_grading",
+    "execution_performed": false,
+    "observation_source_declared": "live_provider",
+    "runtime_source_sha256_declared": "21a1759c27e4377fc2c220a2b252ea4ddea630db450aad572d7d2b933f037e63",
+    "models_declared": {
+      "reasoning": "gpt-5.4-mini-2026-03-17"
+    },
+    "review_sources_declared": {
+      "assistant": 12
+    },
+    "suite_id": "water-verification-wording-v1",
+    "split": "development",
+    "cohort": "agent_workflow",
+    "complete": true,
+    "suite_cases": 4,
+    "other_cohort_case_ids": [],
+    "planned_cases": 4,
+    "observed_cases": 4,
+    "outcomes": {
+      "passed": 4,
+      "failed": 0,
+      "pending_review": 0,
+      "missing": 0
+    },
+    "case_pass_rate": 1.0,
+    "tools": {
+      "attempts": 4,
+      "successful_reads": 4,
+      "approval_requests": 0,
+      "expected_denials": 0,
+      "other_errors": 0,
+      "unconfirmed": 0,
+      "invalid_outcomes": 0,
+      "completion_rate": 1.0
+    },
+    "cases": [
+      {
+        "case_id": "reported-volume-original",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "nonzero-event-pressure",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-use-pressure",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "actual-source-pressure",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      }
+    ],
+    "limitations": [
+      "Grades supplied observations; does not execute or independently attest their origin.",
+      "Inspected development cases, not a held-out or representative benchmark.",
+      "Scripted observations and reviews are contract checks, not live model quality.",
+      "Assistant reviews are explicitly labeled, not independent human assessments.",
+      "Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.",
+      "Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.",
+      "No raw answers, transcripts, fact values, reviewer names or provider errors are emitted."
+    ],
+    "observations_sha256": "ad5a89b6330ba69cb8c20a1210d27992ce7f38649280d6d955e58a3d4dcca797",
+    "schema_version": 1,
+    "manifest_sha256": "f96bc85e12a881fe1dee8b4b687f4afd7b8bf5474fe1ae43e2db29d69a223718",
+    "grader_sha256": "f905a29990447e62bd3807a9626c558c110726a756a13d0e9ec704a07434836e",
+    "python": "3.14.2"
+  },
+  "provider_attempts": {
+    "classifier": 20,
+    "initial_answer_regressions": 16,
+    "verification_followup": 12,
+    "automatic_retries": 0
+  },
+  "findings": [
+    {
+      "case_id": "cost-tool-shorthand",
+      "outcome": "passed",
+      "finding": "Original shorthand admitted; actual rate/cost tools returned5.00USD/1000gal and assumptions were disclosed."
+    },
+    {
+      "case_id": "bill-exclusive-dates",
+      "outcome": "passed",
+      "finding": "Original bill question usesJune1throughJune30 inclusive,30days and211.95gpd."
+    },
+    {
+      "case_id": "bill-inclusive-pressure",
+      "outcome": "passed",
+      "finding": "Explicitly rejectsJuly1aslastbilledday; labelsJuly1excluded."
+    },
+    {
+      "case_id": "meter-reported-use",
+      "outcome": "failed_initial_retained",
+      "finding": "First answer said somewateruseoccurred despite unverified inputs; later caveat didnotrepair it. Original6/7 result remains."
+    },
+    {
+      "case_id": "reported-volume-original",
+      "outcome": "passed_followup",
+      "finding": "After separate correction, answer reports27gallons/30minutes and denies independent physical-flow proof; other3pressurecases also remainreported/conditional."
+    }
+  ],
+  "limitations": [
+    "Separate inspected development collections with different declared purposes/runtime snapshots; do not pool their denominators or describe as representative accuracy.",
+    "Initial answer collection remains6passed/1failed. Followup4passed uses a changed evidence policy/context and separately fixed questions; not a favorable rerun selected into the initial cohort.",
+    "All24 qualitative rubric verdicts are assistant assessments of delivered application responses, including application-authored evidence notes; no independent human or model-only compliance claim.",
+    "Classifier-only calls have no tools, bill values or answers. Scripted verdict unit tests are not classifier accuracy evidence.",
+    "Answer protocols use fictional manual bill and imported intervals. No images/audio/detector execution, browser or public network is measured by these local ASGI runs.",
+    "Raw fictional answers/review rationales remain local; hashes identify bytes, not authenticity or independent attestation.",
+    "No automatic retries, positive approvals, relaxed quotas, changed scope rules or frozen model changes.",
+    "Model wording and admission remain probabilistic; these scoped passing checks do not guarantee all paraphrases or future requests succeed."
+  ]
+}

@@ -35,6 +35,19 @@ Example: 'Explain the demo household consumption, rain context and example water
 price, and what they cannot establish' -> household_usage.
 Example: 'Use the water meter and rainfall to advise on garden watering' -> irrigation_weather.
 
+In this household-water application, asking to use 'the cost tool' for a stated
+number of gallons is a water-cost estimation task, even without repeating 'water'.
+The app's estimate_water_cost and savings tools concern water only. Admit that
+specific shorthand as conservation, including requests to explain assumptions.
+Example: 'Use the cost tool for 1,000 gallons and explain its assumptions.' -> conservation.
+Example: 'What would 500 gallons cost at the example water rate?' -> conservation.
+This does not make general finance, arbitrary arithmetic or another fluid's cost
+relevant. Reject gasoline/fuel pricing and mixed water-cost plus unrelated tasks.
+Example: 'Use the cost tool for 1,000 gallons, then recommend stocks.' -> unsupported.
+Example: 'Use estimate_water_cost to price gasoline for my car.' -> unsupported.
+Shorthand supplies a water purpose, never tool access or authority in bill-only or
+bill-meter modes. Tool availability and scope still belong to the host.
+
 Choose unsupported if ANY requested task is unrelated, even when mixed with a
 supported question. Merely mentioning water, a bill, a fixture, or conservation
 does not make a request relevant. General coding, essays/creative writing,

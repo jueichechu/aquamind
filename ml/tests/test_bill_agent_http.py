@@ -80,6 +80,11 @@ class BillAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(evidence['billing_days'], 30)
         self.assertEqual(evidence['total_us_gallons'], '6358.441558')
         self.assertEqual(evidence['us_gallons_per_day'], '211.948052')
+        self.assertEqual(context['billing_period'], {
+            'first_billed_day_inclusive': '2026-06-01', 'last_billed_day_inclusive': '2026-06-30',
+            'period_end_exclusive': '2026-07-01', 'billing_days': 30, 'dates_independently_verified': False})
+        self.assertEqual(context['verification'], {'bill_values_independently_verified': False,
+            'physical_water_use_independently_verified': False})
         self.assertIsNone(evidence['bill']['sewer_charge'])
         self.assertIsNone(evidence['water_and_sewer_subtotal'])
         self.assertEqual((evidence['source'], evidence['evidence_level'], evidence['confidence']),

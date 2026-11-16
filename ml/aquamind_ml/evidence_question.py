@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator
 
-from .bills import ManualBill, normalize_bill
+from .bills import ManualBill, bill_period_context, normalize_bill
 from .evidence import (BillEvidenceContext, EvidenceContext, EvidenceModel, OpaqueId,
                        assess_evidence)
 from .meter_session import SessionMeters
@@ -69,6 +69,13 @@ def prepare_evidence(body: EvidenceQuestionRequest, meters: SessionMeters) -> di
             comparison = {'meter_minus_bill_us_gallons': str(difference.quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)),
                           'basis': 'Same complete period; displayed totals rounded to six decimals, both unverified.'}
     return {'bill': normalized.model_dump(mode='json'), 'bill_timezone': body.bill_timezone,
+        'reported_usage_statement': (f'The provided readings report {selected.total_us_gallons} US gallons; '
+            'whether water physically flowed is not independently established.'),
+        'billing_period': bill_period_context(normalized),
+        'verification': {'bill_values_independently_verified': False,
+                         'physical_water_use_independently_verified': False,
+                         'same_household_independently_verified': False,
+                         'reading_type_is_user_reported': True},
         'bill_input_method_user_reported': body.bill_input_method,
         'bill_reading_type_user_reported': body.bill_reading_type,
         'meter': without_identifiers(selected.model_dump(mode='json')),
