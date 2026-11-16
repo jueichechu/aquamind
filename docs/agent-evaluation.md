@@ -295,6 +295,20 @@ conditional, rather than relying on a later disclaimer.
 
 ## Recorded development run
 
+The separate [cost/date/verification record](../evals/baselines/cost-date-verification-v1.json)
+retains the November 16 follow-up: all 20 classifier checks matched their declared
+labels (eight supported, twelve unsupported); the initial seven answer cases had
+six passes and one physical-use wording failure. The original cost request used
+the real cost tool successfully, and both inclusive/exclusive-date cases passed.
+After a separate evidence-policy/context correction, four predeclared verification
+questions passed with reported/conditional wording. Collections used 20, 16 and 12
+provider attempts respectively, with zero automatic retries. Their denominators
+remain separate, and the initial failed answer remains failed.
+
+All 24 qualitative answer verdicts are explicitly assistant assessments, not
+independent human review. These local ASGI/model/MCP checks do not measure public
+availability, image/speech quality or universal paraphrase reliability.
+
 The [first collected run](../evals/baselines/agent-development-run-v1.json) retains
 all first attempts from November 15, 2026: 19 agent workflows, 43 provider requests
 under an 80-request cap, zero automatic retries, and 26 explicitly labeled assistant

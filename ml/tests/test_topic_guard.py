@@ -173,7 +173,12 @@ class TopicGuardTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(error=error, timeout=config.run_timeout_seconds):
                 outcome, requests, tools, _ = await self.run_script([reply], config=config)
                 self.assertEqual((outcome.status, outcome.error, outcome.model_calls), (status, error, 1))
-                self.assertEqual(len(requests), 1)
+                if reply is slow:
+                    # A 10-ms deadline may expire during SDK setup before any wire
+                    # dispatch. Both zero and one transport requests mean no retry.
+                    self.assertLessEqual(len(requests), 1)
+                else:
+                    self.assertEqual(len(requests), 1)
                 self.assertNotIn('private', json.dumps(outcome.public_dict()))
                 tools.discover.assert_not_awaited()
 
