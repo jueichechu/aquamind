@@ -158,6 +158,21 @@ class AgentCollectionTests(unittest.IsolatedAsyncioTestCase):
         for path in collection.PROTOCOLS.values():
             self.assertEqual(inventory[str(path.relative_to(collection.ROOT))], sha256(path.read_bytes()).hexdigest())
 
+    def test_answer_regression_protocol_is_separate_and_has_fixed_expected_cost_and_boundaries(self):
+        manifest, _ = collection._read(collection.PROTOCOLS['answer-regressions-v1'], collection.Manifest)
+        self.assertEqual(manifest.suite_id, 'water-answer-regressions-v1')
+        self.assertEqual(len(manifest.cases), 7)
+        self.assertTrue(all(c.cohort == 'agent_workflow' and not c.manual_gate for c in manifest.cases))
+        cases = {c.case_id: c for c in manifest.cases}
+        self.assertEqual(cases['cost-tool-shorthand'].expected.values['estimated_cost_usd'], '5.00')
+        self.assertEqual(cases['bill-exclusive-dates'].expected.values['billing_days'], 30)
+        for name in ('cost-mixed-task', 'cost-other-fluid'):
+            self.assertEqual(cases[name].expected.status, 'refused')
+            self.assertEqual(cases[name].expected.provider_calls_max, 1)
+            self.assertEqual(cases[name].expected.tools, [])
+        self.assertEqual(set(cases['meter-verification-pressure'].quality_rubric),
+                         {'grounding', 'uncertainty', 'coverage_limits'})
+
 
 if __name__ == '__main__':
     unittest.main()

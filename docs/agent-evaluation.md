@@ -199,7 +199,7 @@ rejection, or an automated positive approval still fails. All other case questio
 rubrics, facts, cohorts and bounds remain unchanged. The original v1 manifest,
 recorded failures and default CLI selection are preserved.
 
-Select v2 explicitly before collection; the collector fingerprints both known
+Select v2 explicitly before collection; the collector fingerprints the known
 protocol files and still has no human-approval execution option:
 
 ```sh
@@ -229,6 +229,57 @@ notes. They must not be described as proof that the model independently disclose
 the limitations, or that an appended note repairs contradictory/unsupported analysis.
 V2 corrects a known protocol defect and uses revised application behavior; its
 results must remain separate from v1, with no pooled or causal-improvement claim.
+
+### Cost, date and verification regressions
+
+The separate [answer regression protocol](../evals/fixtures/agent-answer-regressions-v1.json)
+fixes seven development cases before collection: the original cost-tool shorthand,
+mixed-task and gasoline-cost denials, the original bill-only question, pressure to
+include an excluded date, reported partial meter use and pressure to treat an
+“actual” reading type as physical verification. This is a targeted regression suite,
+not a replacement or rescore of the historical v1/v2 cohorts. Its rubric and exact
+facts use the existing strict observation contract. All first attempts remain in
+its denominator; qualitative reviews must assess the complete answer, including
+contradictions that a later disclaimer cannot repair.
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --protocol answer-regressions-v1
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --protocol answer-regressions-v1 --cohort agent_workflow --max-provider-calls 24 --fictional-image /absolute/path/fictional-water-bill.png --synthetic-wav /absolute/path/question.wav --output-dir evals/reports/answer-regressions-run-1
+PYTHONPATH=ml ml/.venv/bin/python evals/agent_contract.py --manifest evals/fixtures/agent-answer-regressions-v1.json --observations evals/reports/answer-regressions-run-1/observations-reviewed.json --output evals/reports/answer-regressions-run-1/grade-reviewed.json
+```
+
+The shared collector still requires its pinned local media and frozen detector at
+startup; this seven-case protocol does **not** upload images, transcribe audio or
+run the detector. It uses the declared fictional bill and two imported intervals.
+Its result therefore cannot establish vision, speech or detector performance.
+
+Cost admission clarifies the household-water meaning of “the cost tool” plus
+gallons without overriding classifier denials, retrying a rejected verdict or
+granting tool scopes. The separate [20-question topic corpus](../evals/fixtures/cost-topic-regressions-v1.json)
+defines eight supported and twelve unsupported questions. Classification-only
+checks call the actual `request_topic_check`/`topic_allowed` boundary once per
+question, in `household_water` mode, with no answer/tools or bill data. Scripted
+unit-test verdicts do not measure classifier accuracy. Any paid topic collection
+must declare its cap, retain each attempt, record model/source/corpus hashes and
+keep uncertain outcomes without automatic retry. These inspected examples are
+development checks, not a representative guardrail benchmark.
+
+Bill answer context now includes host-calculated inclusive first/last billed days
+and the explicitly excluded end date, including leap days and single-day periods.
+These are derived from the entered dates, not independent verification. Separate
+verification flags state that bill values, physical water use and same-household
+association are unverified; “actual” is a user-reported reading classification.
+The answer policy requires reported quantities rather than claims that the inputs
+confirm physical water flow. These internal context fields cannot be supplied or
+overridden through the public request schema. Public normalization/agent response
+fields, scope/consent checks, quotas, approval controls and frozen sources remain
+unchanged. Model wording still needs actual answer review; instructions and facts
+do not guarantee every generated assertion is correct.
+
+Live validation must separate intentional invalid AI-route probes from paid/browser
+acceptance by at least the existing rolling-window cooldown. Invalid probes also
+count toward that admission window. Preserve any rejection and never increase the
+limit or automatically repeat uncertain paid work to obtain a passing screenshot.
 
 ## Recorded development run
 

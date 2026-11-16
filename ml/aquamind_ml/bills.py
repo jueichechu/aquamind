@@ -1,6 +1,6 @@
 """Validate manual bill entries and normalize aggregate usage; no diagnosis or tariff inference."""
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP, localcontext
 import re
 from typing import Annotated, Literal
@@ -110,6 +110,14 @@ def normalize_bill(bill: ManualBill) -> NormalizedBill:
             total_us_gallons=str(gallons.quantize(Decimal('0.000001'))),
             us_gallons_per_day=str((gallons / days).quantize(Decimal('0.000001'))),
             water_and_sewer_subtotal=subtotal)
+
+
+def bill_period_context(bill: NormalizedBill) -> dict:
+    """Internal answer context; public normalization fields/contracts stay unchanged."""
+    return {'first_billed_day_inclusive': bill.bill.period_start.isoformat(),
+            'last_billed_day_inclusive': (bill.bill.period_end_exclusive - timedelta(days=1)).isoformat(),
+            'period_end_exclusive': bill.bill.period_end_exclusive.isoformat(),
+            'billing_days': bill.billing_days, 'dates_independently_verified': False}
 
 
 class BillComparisonRequest(BaseModel):

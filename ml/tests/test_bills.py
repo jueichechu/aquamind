@@ -5,10 +5,30 @@ import unittest
 
 from pydantic import ValidationError
 
-from aquamind_ml.bills import ManualBill, normalize_bill
+from aquamind_ml.bills import ManualBill, bill_period_context, normalize_bill
 
 
 class BillTests(unittest.TestCase):
+    def test_answer_date_context_resolves_inclusive_last_day_without_changing_public_bill(self):
+        for start, end, last, days in (
+            ('2026-06-01', '2026-07-01', '2026-06-30', 30),
+            ('2024-02-01', '2024-03-01', '2024-02-29', 29),
+            ('2025-02-01', '2025-03-01', '2025-02-28', 28),
+            ('2026-12-31', '2027-01-01', '2026-12-31', 1),
+            ('0001-01-01', '0001-01-02', '0001-01-01', 1),
+        ):
+            with self.subTest(start=start, end=end):
+                bill = normalize_bill(self.bill(period_start=start, period_end_exclusive=end))
+                public = bill.model_dump(mode='json')
+                context = bill_period_context(bill)
+                self.assertEqual(context, {'first_billed_day_inclusive': start,
+                    'last_billed_day_inclusive': last, 'period_end_exclusive': end,
+                    'billing_days': days, 'dates_independently_verified': False})
+                context['last_billed_day_inclusive'] = 'modified'
+                self.assertEqual(bill.model_dump(mode='json'), public)
+                self.assertNotIn('billing_period', public)
+                self.assertNotIn('verification', public)
+
     def bill(self, **updates):
         return ManualBill.model_validate({
             'period_start': '2026-06-01', 'period_end_exclusive': '2026-07-01',
