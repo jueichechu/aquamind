@@ -9,7 +9,7 @@ import httpx
 import httpx2
 from openai import AsyncOpenAI
 
-from aquamind_ml.agent import AgentConfig, EVIDENCE_POLICY, POLICY
+from aquamind_ml.agent import AgentConfig, EVIDENCE_POLICY, IMPORTED_EVIDENCE_NOTE, POLICY
 from aquamind_ml.agent_http import AgentHost
 from aquamind_ml.api import create_app
 from aquamind_ml.meter_import import MeterImportRequest, parse_meter_csv
@@ -70,6 +70,7 @@ class EvidenceAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         value = result.json()
         self.assertEqual(value['status'], 'answer')
         self.assertEqual(value['model_calls'], 3)
+        self.assertTrue(value['answer'].endswith(IMPORTED_EVIDENCE_NOTE))
         self.assertIsNone(value['pending_approval'])
         self.assertEqual([(t['tool_name'], t['status']) for t in value['tool_trace']], [('get_meter_summary', 'success')])
         facts = json.loads(self.requests[0]['input'][0]['content'])['combined_evidence']
@@ -90,6 +91,16 @@ class EvidenceAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('810', str(logs.output))
         self.assertIsNone(self.sessions.approvals(self.token).goal)
         self.assertEqual(self.sessions.approvals(self.token)._entries, {})
+
+    async def test_answer_keeps_host_disclosure_when_provider_omits_it(self):
+        # The provider answer intentionally omits uncertainty. The delivered answer
+        # must still disclose unverified inputs without another paid request.
+        self.reply = lambda body: response([call(name='get_meter_summary', arguments='{}')]) if body.get('tool_choice') else response([message('The selected window totals 96 gallons.')])
+        value = (await self.post()).json()
+        self.assertEqual(value['status'], 'answer')
+        self.assertEqual(value['model_calls'], 3)
+        self.assertEqual(value['answer'], 'The selected window totals 96 gallons.\n\n' + IMPORTED_EVIDENCE_NOTE)
+        self.assertIsNone(value['pending_approval'])
 
     async def test_equal_periods_have_host_calculated_total_difference(self):
         body = self.body | {'bill': self.body['bill'] | {'period_end_exclusive': '2026-06-02', 'usage': '90'}}

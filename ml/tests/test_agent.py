@@ -6,7 +6,8 @@ import httpx2
 from mcp import Client
 from openai import AsyncOpenAI
 
-from aquamind_ml.agent import AgentConfig, POLICY, run_agent
+from aquamind_ml.agent import AgentConfig, POLICY, _anomaly_disclosure, run_agent
+from aquamind_ml.agent_tools import ToolOutcome
 from aquamind_ml.agent_tools import McpAgentTools
 from aquamind_ml.approvals import GoalApprovals
 from aquamind_ml.mcp_server import create_server
@@ -39,6 +40,14 @@ def is_topic_request(request):
 
 
 class AgentTests(unittest.IsolatedAsyncioTestCase):
+    def test_anomaly_disclosure_never_invents_provenance_from_failed_or_untrusted_metadata(self):
+        valid = {'model_version': 'detector-0123456789abcdef', 'training_data': 'synthetic', 'source': 'synthetic'}
+        for status, data in [('error', valid), ('unconfirmed', valid), ('success', None),
+                             ('success', valid | {'training_data': 'unknown'}),
+                             ('success', valid | {'source': 'user_provided'}),
+                             ('success', valid | {'model_version': '<script>private</script>'})]:
+            self.assertEqual(_anomaly_disclosure(ToolOutcome('test', status, {'result': data})), '')
+
     async def run_script(self, replies, *, allowed=frozenset({'estimate_water_cost'}),
                          scopes=frozenset({'utility:read'}), config=None, store=None):
         requests = []
