@@ -323,6 +323,35 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
         evidence = json.loads(self.requests[-1]['input'][-1]['output'])
         self.assertEqual(evidence, {'status': 'error', 'error': 'mcp_tool_error'})
         self.assertNotIn('private detector detail', result.text)
+        self.assertNotIn('Model evidence:', result.json()['answer'])
+
+    async def test_successful_anomaly_answer_discloses_actual_model_even_if_provider_omits_it(self):
+        version = 'detector-0123456789abcdef'
+        detector = SimpleNamespace(manifest={'threshold': 2.0}, predict=Mock(return_value=[{
+            'score': 3.0, 'is_leak': True, 'model_version': version}]))
+        self.app.state.agent_host = AgentHost(self.provider, AgentConfig(model='test-model'), detector=detector)
+        _, headers = await self.session()
+        self.reply = lambda index: response([call('anomaly', 'detect_water_anomaly', '{}')]) \
+            if index == 1 else response([message('The selected day exceeded the detector threshold.')])
+        value = (await self.http.post('/v1/agent/turn', headers=headers,
+            json={'text': 'Check this synthetic day.', 'scenario_id': 'normal'})).json()
+        self.assertEqual(value['status'], 'answer')
+        self.assertEqual(value['model_calls'], 3)
+        self.assertIn('Frozen detector ' + version + ', trained on synthetic data.', value['answer'])
+        self.assertIn('not a leak probability or a fixture diagnosis', value['answer'])
+        self.assertIn('applicability to a real household is not established', value['answer'])
+        self.assertEqual(len(value['tool_trace']), 1)
+        self.assertEqual(detector.predict.call_count, 1)
+
+    async def test_plain_summary_answer_does_not_claim_anomaly_model_was_run(self):
+        _, headers = await self.session()
+        self.reply = lambda index: response([call('summary', 'get_meter_summary', '{}')]) \
+            if index == 1 else response([message('This aggregate cannot establish a temporal pattern.')])
+        value = (await self.http.post('/v1/agent/turn', headers=headers,
+            json={'text': 'Summarize this day.', 'scenario_id': 'normal'})).json()
+        self.assertEqual(value['status'], 'answer')
+        self.assertNotIn('Model evidence:', value['answer'])
+        self.assertNotIn('Evidence note:', value['answer'])
 
     async def test_app_lifespan_shares_loaded_detector_and_lock_with_agent(self):
         detector, lock = object(), Lock()

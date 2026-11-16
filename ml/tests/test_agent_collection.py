@@ -146,6 +146,18 @@ class AgentCollectionTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             collection.private_output(EVALS / 'fixtures/new-public-artifacts')
 
+    def test_v2_protocol_is_an_explicit_offline_selection_and_fingerprinted(self):
+        run = subprocess.run([sys.executable, str(EVALS / 'collect_agent.py'), '--protocol', 'development-v2'],
+            capture_output=True, text=True, env={**os.environ, 'OPENAI_API_KEY': '', 'OPENAI_MODEL': ''})
+        self.assertEqual(run.returncode, 0, run.stderr)
+        value = json.loads(run.stdout)
+        self.assertEqual(value['suite_id'], 'water-agent-development-v2')
+        self.assertFalse(value['execution_performed'])
+        self.assertEqual(value['cohorts'], {'agent_workflow': 19, 'host_contract': 3, 'human_approval': 1})
+        _, inventory = collection.fingerprint()
+        for path in collection.PROTOCOLS.values():
+            self.assertEqual(inventory[str(path.relative_to(collection.ROOT))], sha256(path.read_bytes()).hexdigest())
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -60,6 +60,25 @@ class AgentEvaluationTests(unittest.TestCase):
         self.assertIn('image-voice-meter', {c['case_id'] for c in result['cases']})
         self.assertEqual(self.manifest.split, 'development')
 
+    def test_v2_only_changes_suite_identity_and_counts_required_continuation_preparation(self):
+        self.assertEqual(self.digest, '9497b6895f32873da0ec60062d5df97d76488ecd192dd95ca1df872c4633d93f')
+        raw = json.loads(self.raw)
+        raw['suite_id'] = 'water-agent-development-v2'
+        rule = dict(tool_name='set_conservation_goal', status='approval_required', minimum=1, maximum=1, expected_denial=False)
+        for case in raw['cases']:
+            if case['case_id'] in ('rejected-continuation', 'human-approved-continuation'):
+                case['expected']['tools'] = [rule]
+        v2, digest = evaluation._read(evaluation.DEFAULT_MANIFEST.with_name('agent-development-v2.json'), evaluation.Manifest)
+        self.assertEqual(v2, evaluation.Manifest.model_validate(raw))
+        case = next(c for c in v2.cases if c.case_id == 'rejected-continuation')
+        # Declared scripted observations test protocol accounting only; no model or approval action.
+        subset = v2.model_copy(update={'cases': [case]})
+        record = self.run_record(subset, reviews=True)
+        record['manifest_sha256'] = digest
+        self.assertEqual(evaluation.grade(subset, digest, evaluation.RecordedRun.model_validate(record))['outcomes']['passed'], 1)
+        record['observations'][0]['tool_trace'].append(dict(tool_name='set_conservation_goal', status='approval_required'))
+        self.assertIn('tool_count_mismatch', evaluation.grade(subset, digest, evaluation.RecordedRun.model_validate(record))['cases'][0]['issues'])
+
     def test_missing_cases_and_unreviewed_answers_cannot_produce_a_final_rate(self):
         record = self.run_record(self.manifest)
         record['observations'] = record['observations'][:1]

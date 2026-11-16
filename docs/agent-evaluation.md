@@ -188,6 +188,48 @@ Exit 1 for pending/failed grading is expected after initial provider collection;
 it does not authorize an automatic rerun. Host and provider reports stay separate.
 The manual human approval case is neither executed nor credited by this collector.
 
+### Explicit continuation protocol v2
+
+[Development v2](../evals/fixtures/agent-development-v2.json) has a new suite ID.
+Its only case-expectation changes are the two continuation cases: each must record
+exactly one pending `set_conservation_goal` proposal during preparation. Provider
+counts already included preparation in v1; v2 now also permits and requires that
+preparation tool event. A second proposal, a successful write, an applied goal after
+rejection, or an automated positive approval still fails. All other case questions,
+rubrics, facts, cohorts and bounds remain unchanged. The original v1 manifest,
+recorded failures and default CLI selection are preserved.
+
+Select v2 explicitly before collection; the collector fingerprints both known
+protocol files and still has no human-approval execution option:
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --protocol development-v2
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --protocol development-v2 --cohort host_contract --output-dir evals/reports/host-v2-run-1
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --protocol development-v2 --cohort agent_workflow --max-provider-calls 80 --fictional-image /absolute/path/fictional-water-bill.png --synthetic-wav /absolute/path/question.wav --output-dir evals/reports/provider-v2-run-1
+PYTHONPATH=ml ml/.venv/bin/python evals/agent_contract.py --manifest evals/fixtures/agent-development-v2.json --observations evals/reports/provider-v2-run-1/observations-reviewed.json --output evals/reports/provider-v2-run-1/grade-reviewed.json
+```
+
+The answer policy now distinguishes aggregate totals/means/peaks from temporal
+patterns. Timing, duration and steadiness require appropriate series evidence;
+weather and a higher daily total alone cannot establish irrigation as the cause.
+This remains a model instruction, not a guarantee that every generated inference
+is correct. Review actual answers and preserve any failures.
+
+Delivered bill-and-meter answers additionally include an **application-authored**
+note that the bill, readings and same-household association remain user-provided
+and unverified. A successful synthetic anomaly read supplies a bounded model ID
+and training provenance for an application-authored model-limits note. Failed or
+unconfirmed reads cannot create that note. Refusals, proposal pauses and ordinary
+summary answers are not annotated as successful anomaly analyses. These notes
+require no new provider/tool calls and do not change status/trace/API fields or
+approval authority. Frozen detector sources and artifacts are unchanged.
+
+Answer reviews assess the delivered application response, including those explicit
+notes. They must not be described as proof that the model independently disclosed
+the limitations, or that an appended note repairs contradictory/unsupported analysis.
+V2 corrects a known protocol defect and uses revised application behavior; its
+results must remain separate from v1, with no pooled or causal-improvement claim.
+
 ## Recorded development run
 
 The [first collected run](../evals/baselines/agent-development-run-v1.json) retains
@@ -212,6 +254,27 @@ across other bill layouts, voices or repeated attempts. Raw artifacts remain loc
 the public summary contains hashes, scoped counts, outcomes and limitations only.
 
 ## Verification
+
+### Recorded v2 follow-up
+
+The separate [v2 collection](../evals/baselines/agent-development-run-v2.json)
+recorded all 19 workflow first attempts on November 16, 2026, using 40 provider
+requests, zero automatic retries and 26 assistant rubric verdicts. Seventeen cases
+passed and two failed. The separate three host cases passed; the human gate remains
+uncollected. Earlier summary/weather grounding, anomaly disclosure and rejected
+continuation cases passed this run. The frozen detector and v1 evidence are unchanged.
+
+The valid cost question was refused by topic admission before its cost tool ran.
+One bill-only answer gave the correct 30 days and daily average but used “through
+July 1” for an exclusive July 1 end; it was conservatively failed for ambiguous
+date-boundary presentation. Both failures remain recorded, without retries or
+post-outcome expectation changes. A tool-completion fraction over the 12 observed
+attempts does not establish coverage or correctness for the unexercised cost tool.
+
+Image fields, the exact synthetic transcript and the combined bill/meter facts
+matched this run's checks. Qualitative reviews include application-authored notes;
+they are assistant assessments of delivered responses, not independent human or
+model-only compliance evidence. V1 and v2 remain separate protocols and results.
 
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_agent_evaluation.py -v

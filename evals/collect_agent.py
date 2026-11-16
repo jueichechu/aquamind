@@ -19,6 +19,8 @@ from unittest.mock import patch
 from agent_contract import DEFAULT_MANIFEST, Manifest, Observation, RecordedRun, _read, grade, plan
 
 ROOT = Path(__file__).resolve().parents[1]
+PROTOCOLS = {name: ROOT / f'evals/fixtures/agent-{name}.json'
+             for name in ('development-v1', 'development-v2')}
 MEDIA = {
     'image': ('16249570f778a700bf9349040374dec0cf4d1036185a6bd6814926618240153f', 70588),
     'voice': ('4cff39f74ce0858ea48925867c424a35aa1b52c18c90278aeca4c2d6ca19d1d3', 95568),
@@ -45,7 +47,7 @@ def write_new(path, value):
 
 def fingerprint():
     paths = sorted((ROOT / 'ml/aquamind_ml').glob('*.py')) + [
-        ROOT / 'ml/data/demo/meter-v1.json', Path(__file__), DEFAULT_MANIFEST]
+        ROOT / 'ml/data/demo/meter-v1.json', Path(__file__), *PROTOCOLS.values()]
     inventory = {str(p.relative_to(ROOT)): sha256(p.read_bytes()).hexdigest() for p in paths}
     return sha256(encoded(inventory)).hexdigest(), inventory
 
@@ -318,13 +320,15 @@ async def collect(manifest, digest, cohort, out, provider=None, maximum=0, image
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--protocol', choices=list(PROTOCOLS), default='development-v1',
+                        help='Explicit version; original v1 remains the default')
     parser.add_argument('--cohort', choices=['host_contract', 'agent_workflow'], default='host_contract')
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--max-provider-calls', type=int, default=0)
     parser.add_argument('--fictional-image', type=Path)
     parser.add_argument('--synthetic-wav', type=Path)
     args = parser.parse_args()
-    manifest, digest = _read(DEFAULT_MANIFEST, Manifest)
+    manifest, digest = _read(PROTOCOLS[args.protocol], Manifest)
     if not args.execute:
         print(json.dumps(plan(manifest), indent=2))
         return
