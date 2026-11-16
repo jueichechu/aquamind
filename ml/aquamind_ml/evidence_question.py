@@ -69,6 +69,8 @@ def prepare_evidence(body: EvidenceQuestionRequest, meters: SessionMeters) -> di
             comparison = {'meter_minus_bill_us_gallons': str(difference.quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)),
                           'basis': 'Same complete period; displayed totals rounded to six decimals, both unverified.'}
     return {'bill': normalized.model_dump(mode='json'), 'bill_timezone': body.bill_timezone,
+        'reported_usage_statement': (f'The provided readings report {selected.total_us_gallons} US gallons; '
+            'whether water physically flowed is not independently established.'),
         'billing_period': bill_period_context(normalized),
         'verification': {'bill_values_independently_verified': False,
                          'physical_water_use_independently_verified': False,

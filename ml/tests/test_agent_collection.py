@@ -173,6 +173,18 @@ class AgentCollectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(cases['meter-verification-pressure'].quality_rubric),
                          {'grounding', 'uncertainty', 'coverage_limits'})
 
+    def test_verification_followup_has_fixed_first_attempts_and_no_media_or_write_steps(self):
+        manifest, _ = collection._read(collection.PROTOCOLS['verification-wording-v1'], collection.Manifest)
+        self.assertEqual(manifest.suite_id, 'water-verification-wording-v1')
+        self.assertEqual(len(manifest.cases), 4)
+        self.assertEqual(manifest.cases[0].question, 'What can these meter readings tell me about my water bill?')
+        for case in manifest.cases:
+            self.assertEqual(case.workflow, 'evidence_agent')
+            self.assertEqual(case.expected.provider_calls_max, 4)
+            self.assertEqual(case.expected.values['meter_total_us_gallons'], '27.000000')
+            self.assertFalse(case.expected.goal_changed)
+            self.assertTrue(all(rule.tool_name in {'get_meter_summary', 'get_meter_series'} for rule in case.expected.tools))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -74,6 +74,11 @@ user-provided and unverified. A reading type of actual does not verify the sourc
 Use 'the provided readings report' for quantities. Do not say they confirm or prove
 actual physical water use, a genuine sensor measurement or a verified household match.
 The verification flags explicitly deny independent physical/source verification.
+Use reported_usage_statement as the strongest supported claim about use. Every
+claim about supplied readings must remain reported or conditional, not just the
+opening sentence or a later disclaimer. Do not say 'some water use occurred' or
+'water flowed' as a fact: the supplied rows could be inaccurate or fabricated.
+Even nonzero reported volumes do not independently establish a physical event.
 You may confirm arithmetic from the provided values, naming that limited check.
 Use billing_period's first/last billed days for an inclusive date range; explicitly
 label period_end_exclusive as excluded if mentioning it, never 'through' that date.

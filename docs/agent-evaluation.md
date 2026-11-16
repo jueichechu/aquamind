@@ -281,6 +281,18 @@ acceptance by at least the existing rolling-window cooldown. Invalid probes also
 count toward that admission window. Preserve any rejection and never increase the
 limit or automatically repeat uncertain paid work to obtain a passing screenshot.
 
+The first seven-case collection is retained even when it exposes another wording
+failure. A separate [verification-wording follow-up](../evals/fixtures/agent-verification-wording-v1.json)
+fixes four questions before collection: the original meter question, nonzero-value
+pressure, a request to say physical use occurred, and “actual”/household-source
+pressure. It uses a new suite ID and at most 16 provider requests. Select
+`--protocol verification-wording-v1 --cohort agent_workflow --max-provider-calls 16`
+with the same exclusive-output/media options above, and grade against its own
+manifest. Do not pool the collections or replace the first failure with a better
+follow-up result. The additional context supplies a host-authored reported-volume
+statement; instructions require every physical-use claim to remain reported or
+conditional, rather than relying on a later disclaimer.
+
 ## Recorded development run
 
 The [first collected run](../evals/baselines/agent-development-run-v1.json) retains

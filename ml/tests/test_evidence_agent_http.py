@@ -75,6 +75,8 @@ class EvidenceAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([(t['tool_name'], t['status']) for t in value['tool_trace']], [('get_meter_summary', 'success')])
         facts = json.loads(self.requests[0]['input'][0]['content'])['combined_evidence']
         self.assertEqual(facts['bill']['us_gallons_per_day'], '27.000000')
+        self.assertEqual(facts['reported_usage_statement'],
+            'The provided readings report 96.000000 US gallons; whether water physically flowed is not independently established.')
         self.assertEqual(facts['billing_period']['last_billed_day_inclusive'], '2026-06-30')
         self.assertEqual(facts['verification'], {'bill_values_independently_verified': False,
             'physical_water_use_independently_verified': False,
@@ -126,6 +128,15 @@ class EvidenceAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(facts['verification']['reading_type_is_user_reported'])
         self.assertFalse(facts['verification']['physical_water_use_independently_verified'])
         self.assertFalse(facts['verification']['same_household_independently_verified'])
+
+    async def test_reported_usage_statement_handles_zero_without_verifying_physical_events(self):
+        dataset = parse_meter_csv(MeterImportRequest.model_validate(meter_body(volume='0')))
+        ref = self.meters.replace(dataset).context.evidence_id
+        self.assertEqual((await self.post(self.body | {'meter_evidence_id': ref})).json()['status'], 'answer')
+        facts = json.loads(self.requests[0]['input'][0]['content'])['combined_evidence']
+        self.assertEqual(facts['reported_usage_statement'],
+            'The provided readings report 0.000000 US gallons; whether water physically flowed is not independently established.')
+        self.assertFalse(facts['verification']['physical_water_use_independently_verified'])
 
     async def test_all_confirmations_are_strict_required_and_admitted_before_paid_work(self):
         for key in ('bill_reviewed', 'meter_reviewed', 'same_household', 'share_with_ai'):

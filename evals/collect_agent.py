@@ -20,7 +20,7 @@ from agent_contract import DEFAULT_MANIFEST, Manifest, Observation, RecordedRun,
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOLS = {name: ROOT / f'evals/fixtures/agent-{name}.json'
-             for name in ('development-v1', 'development-v2', 'answer-regressions-v1')}
+             for name in ('development-v1', 'development-v2', 'answer-regressions-v1', 'verification-wording-v1')}
 MEDIA = {
     'image': ('16249570f778a700bf9349040374dec0cf4d1036185a6bd6814926618240153f', 70588),
     'voice': ('4cff39f74ce0858ea48925867c424a35aa1b52c18c90278aeca4c2d6ca19d1d3', 95568),
