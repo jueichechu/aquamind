@@ -16,6 +16,19 @@ from test_agent import call, is_topic_request, message, response, topic_response
 
 
 class TopicGuardTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cost_shorthand_still_requires_valid_classifier_admission(self):
+        text = 'Use the cost tool for 1,000 gallons and explain its assumptions.'
+        denied, requests, tools, _ = await self.run_script([topic_response('unsupported')], text=text)
+        self.assertEqual(denied.status, 'refused')
+        self.assertEqual(denied.model_calls, 1)
+        tools.discover.assert_not_awaited()
+        self.assertEqual(json.loads(requests[0]['input'][0]['content']), {'mode': 'household_water', 'question': text})
+        admitted, requests, tools, _ = await self.run_script([
+            topic_response('conservation'), response([message('Water cost needs a stated rate.')])], text=text)
+        self.assertEqual(admitted.status, 'answer')
+        self.assertEqual(admitted.model_calls, 2)
+        tools.discover.assert_awaited_once()
+
     async def run_script(self, replies, *, text='Why does the toilet tank keep refilling?',
                          bill=False, config=None, check_active=None, selected_demo=False):
         requests, pauses = [], []
