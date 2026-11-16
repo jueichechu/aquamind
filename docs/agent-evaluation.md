@@ -255,6 +255,27 @@ the public summary contains hashes, scoped counts, outcomes and limitations only
 
 ## Verification
 
+### Recorded v2 follow-up
+
+The separate [v2 collection](../evals/baselines/agent-development-run-v2.json)
+recorded all 19 workflow first attempts on November 16, 2026, using 40 provider
+requests, zero automatic retries and 26 assistant rubric verdicts. Seventeen cases
+passed and two failed. The separate three host cases passed; the human gate remains
+uncollected. Earlier summary/weather grounding, anomaly disclosure and rejected
+continuation cases passed this run. The frozen detector and v1 evidence are unchanged.
+
+The valid cost question was refused by topic admission before its cost tool ran.
+One bill-only answer gave the correct 30 days and daily average but used “through
+July 1” for an exclusive July 1 end; it was conservatively failed for ambiguous
+date-boundary presentation. Both failures remain recorded, without retries or
+post-outcome expectation changes. A tool-completion fraction over the 12 observed
+attempts does not establish coverage or correctness for the unexercised cost tool.
+
+Image fields, the exact synthetic transcript and the combined bill/meter facts
+matched this run's checks. Qualitative reviews include application-authored notes;
+they are assistant assessments of delivered responses, not independent human or
+model-only compliance evidence. V1 and v2 remain separate protocols and results.
+
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m unittest discover -s ml/tests -p test_agent_evaluation.py -v
 PYTHONPATH=ml:ml/tests ml/.venv/bin/python -m unittest -v test_agent_collection
