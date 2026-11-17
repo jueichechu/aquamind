@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "kind": "prospective_agent_confirmation",
+  "execution_performed": true,
+  "split": "confirmation",
+  "recorded_at_utc": "2026-11-17T21:23:01.806855+00:00",
+  "transport": "Local FastAPI ASGI, live OpenAI, actual in-process MCP; not browser/public-network execution",
+  "application_source_sha256": "215a39b28e1b57049dbc787548abe73447e65ff7f26739da1f3c210084c6356c",
+  "detector_files_sha256": {
+    "detector.json": "69f56d5eb7184a9cd3e9e8e4a5e2e94d387c38c1161fa4f43a1ec230b6e1b526",
+    "weights.pt": "90727cc54eb5c2c3a700ad7d869936f25c8a6f5b23ad0987a229454eca7d32fb"
+  },
+  "manifest_sha256": "6b3a2a033056fe1df5812c353b23f306b3570f9ad659c4f7ac6b9211883b72b6",
+  "collection_source_sha256": "076074641d6bfd6efe7dd34a493b90a208ee27f8ce9f398da8c23b832f65069b",
+  "confirmation_pin_sha256": "0eedc66083fcc665722b4b646a23373b0ad80b3a4ebf4c6d7a1dcab29801abcd",
+  "local_first_attempt_receipt_sha256": "86620b66abd761f50b9218da42afdc2dc0525033717b119d1d563b8c21f8a44d",
+  "reasoning_model_requested": "gpt-5.4-mini",
+  "models_declared": {
+    "reasoning": "gpt-5.4-mini-2026-03-17"
+  },
+  "provider_attempts": 35,
+  "predeclared_provider_cap": 49,
+  "automatic_retries": 0,
+  "graded_observations": {
+    "kind": "agent_observation_grading",
+    "execution_performed": false,
+    "observation_source_declared": "live_provider",
+    "runtime_source_sha256_declared": "076074641d6bfd6efe7dd34a493b90a208ee27f8ce9f398da8c23b832f65069b",
+    "models_declared": {
+      "reasoning": "gpt-5.4-mini-2026-03-17"
+    },
+    "confirmation_pin_sha256_declared": "0eedc66083fcc665722b4b646a23373b0ad80b3a4ebf4c6d7a1dcab29801abcd",
+    "confirmation_claim_sha256_declared": "86620b66abd761f50b9218da42afdc2dc0525033717b119d1d563b8c21f8a44d",
+    "review_sources_declared": {
+      "assistant": 27
+    },
+    "suite_id": "water-agent-confirmation-v1",
+    "split": "confirmation",
+    "cohort": "agent_workflow",
+    "complete": true,
+    "suite_cases": 12,
+    "other_cohort_case_ids": [],
+    "planned_cases": 12,
+    "observed_cases": 12,
+    "outcomes": {
+      "passed": 10,
+      "failed": 2,
+      "pending_review": 0,
+      "missing": 0
+    },
+    "case_pass_rate": 0.8333333333333334,
+    "tools": {
+      "attempts": 12,
+      "successful_reads": 12,
+      "approval_requests": 0,
+      "expected_denials": 0,
+      "other_errors": 0,
+      "unconfirmed": 0,
+      "invalid_outcomes": 0,
+      "completion_rate": 1.0
+    },
+    "cases": [
+      {
+        "case_id": "confirm-toilet-summary",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-rain-context",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "failed",
+        "issues": [
+          "quality_review_failed"
+        ],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-normal-detector",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-water-cost",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-conservation",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-leap-liters",
+        "workflow": "bill_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-year-cubic-meters",
+        "workflow": "bill_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-zero-bill",
+        "workflow": "bill_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-estimated-liters",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-complete-new-york",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-zero-intervals",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "failed",
+        "issues": [
+          "quality_review_failed"
+        ],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "confirm-mixed-request",
+        "workflow": "demo_agent",
+        "category": "expected_rejection",
+        "modalities": [
+          "text"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      }
+    ],
+    "limitations": [
+      "Grades supplied observations; does not execute or independently attest their origin.",
+      "Predeclared confirmation on a pinned runtime; not independent human or representative benchmark evidence.",
+      "Scripted observations and reviews are contract checks, not live model quality.",
+      "Assistant reviews are explicitly labeled, not independent human assessments.",
+      "Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.",
+      "Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.",
+      "No raw answers, transcripts, fact values, reviewer names or provider errors are emitted."
+    ],
+    "observations_sha256": "f9764ec70992885417a0b331b39cdd194b05a69f3e230802b4f697ad9f008cb5",
+    "schema_version": 1,
+    "manifest_sha256": "6b3a2a033056fe1df5812c353b23f306b3570f9ad659c4f7ac6b9211883b72b6",
+    "grader_sha256": "24da4198ad9aa447f7d4cf7853a4a18341714a4d1bea892e8d55406c5093c59e",
+    "python": "3.14.2"
+  },
+  "read_tools_observed": [
+    "detect_water_anomaly",
+    "estimate_conservation_savings",
+    "estimate_water_cost",
+    "get_meter_series",
+    "get_meter_summary",
+    "get_utility_rate",
+    "get_weather_context"
+  ],
+  "findings": [
+    {
+      "case_id": "confirm-rain-context",
+      "criterion": "uncertainty",
+      "finding": "Answer omits synthetic/static provenance of weather and meter context; could be read as a real last24hour weather report."
+    },
+    {
+      "case_id": "confirm-zero-intervals",
+      "criterion": "grounding",
+      "finding": "Answer calls imported interval volumes hourly averages; supplied USgallon volumes are not flow-rate averages."
+    }
+  ],
+  "limitations": [
+    "Author-designed fictional prospective cases, not an independent hidden evaluator, real-household sample, unseen provider-training data or representative benchmark.",
+    "Application sources, demo data and detector artifacts were pinned before provider outcomes; no runtime or expectation was changed to improve this result.",
+    "All12 first attempts remain in denominator, including2failedqualitycases. No replay, automatic retry, selected favorable outcome or pooling with development suites.",
+    "All27 qualitative verdicts are assistant reviews of delivered responses, including application-authored notes; not independent human or model-only compliance evidence.",
+    "All12 observed read-tool attempts succeeded across7readtools; this does not mean every answer interpreted those results correctly or establish independent numeric-tool accuracy.",
+    "No image/voice, positive approval, fault-injection or public availability measurement was collected here.",
+    "Local first-attempt receipt prevents accidental replay in this checkout; hashes/declared metadata are not tamper-proof or cross-machine independent attestation.",
+    "Provider models are recorded, not independently attested or frozen cloud implementations.",
+    "Raw fictional artifacts and reviewer rationales remain local; public summary omits answers, transcripts, fact values and reviewer identities.",
+    "Any follow-up application fix belongs to a later development increment and a separately versioned study; historical results/pins must not be edited."
+  ]
+}

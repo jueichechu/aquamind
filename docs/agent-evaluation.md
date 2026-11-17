@@ -1,6 +1,6 @@
 # Agent evaluation contracts
 
-`evals/agent_contract.py` validates a versioned development-case manifest and grades
+`evals/agent_contract.py` validates a versioned case manifest and grades
 supplied observations offline. It does not run an agent, open a browser, transcribe
 audio, upload images, make provider requests or approve proposals. The separate
 [collector](../evals/collect_agent.py) executes the two non-human cohorts only
@@ -11,7 +11,8 @@ specifies the existing eight tools, bill-only isolation, partial/disjoint meter
 coverage, image candidates, voice review, cross-modal reasoning, topic redirection,
 expiry, expected denials, uncertain outcomes and approval continuation. These are
 inspected development specifications, not held-out cases or a representative
-speech, vision or reasoning benchmark. There is no confirmation split yet.
+speech, vision or reasoning benchmark. A separate prospective confirmation protocol
+is described below; historical development results remain unchanged.
 
 ## Plan without execution
 
@@ -40,6 +41,7 @@ a normalized collection record. Its top-level fields are:
 | `cohort` | A fixed manifest group: `agent_workflow`, `host_contract` or `human_approval` |
 | `source` | Declared `scripted`, `live_provider` or `browser_recording`; never pool these as equivalent evidence |
 | `runtime_source_sha256` | Collector-declared fingerprint of the code actually exercised, separate from the grader's hash |
+| `confirmation_pin_sha256`, `confirmation_claim_sha256` | Optional paired declarations binding confirmation observations to the runtime/artifact pin and local first-attempt receipt; not independent attestation |
 | `models` | Declared reasoning/transcription model identities; required for non-scripted records with provider calls |
 | `observations` | One record per observed case; omitted cases remain missing |
 | `reviews` | Optional explicit quality verdicts, bound to the exact observed artifact hash |
@@ -84,6 +86,80 @@ authorized; this grader emits neither answers, fact values, transcripts nor revi
 The collector and review metadata are **declared**, not independently attested by
 this offline program. Hashes identify exact bytes and detect accidental mixing;
 they do not prove a provider call, a human action, honest collection or correctness.
+
+## Prospective confirmation
+
+The separate [12-case confirmation protocol](../evals/fixtures/agent-confirmation-v1.json)
+is authored before collecting its provider outcomes. It pins application Python
+sources and the synthetic demo data, plus both frozen detector files. Collection
+checks those pins before execution, before each case and before finalization.
+This increment changes evaluation code only; the tested application remains the
+same runtime used after the earlier development fixes. A failed confirmation case
+must be retained; it must not be fixed and rerun into this same result.
+
+These are author-designed, fictional cases with known specifications, **not** an
+independent hidden evaluator, unseen provider-training data, real-household sample
+or representative accuracy benchmark. Assistant reviews remain explicitly labeled.
+Prospective means outcomes are not used to tune the pinned application. It does
+not establish reviewer independence or generalization across all households.
+
+Explicit typed `inputs` now declare each case's scenario, bill, imported interval
+CSV, timezone and reading type. Historical protocols without inputs keep their
+original execution behavior. The new suite varies liters/cubic meters/US gallons,
+leap-month/year-boundary/single-day bills, zero reported volumes, estimated/mixed
+readings, partial coverage and a complete New York local-day comparison. It also
+specifies the seven read tools, illustrative cost/savings assumptions, synthetic
+weather/model limits and mixed-task rejection. It does not collect image, voice,
+positive approval, fault-injection or independent human-review measurements.
+
+All imported fixtures are parsed and period compatibility is checked before any
+provider work. Each request still uses the actual existing API/MCP scope and
+consent boundaries. The suite's expected tools are read-only; an unexpected model
+proposal would fail grading and is never approved. The application tool catalog
+is not altered to make the evaluation easier.
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --protocol confirmation-v1
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --protocol confirmation-v1 --cohort agent_workflow --max-provider-calls 49 --fictional-image /absolute/path/fictional-water-bill.png --synthetic-wav /absolute/path/question.wav --output-dir evals/reports/confirmation-v1-first
+PYTHONPATH=ml ml/.venv/bin/python evals/agent_contract.py --manifest evals/fixtures/agent-confirmation-v1.json --observations evals/reports/confirmation-v1-first/observations-reviewed.json --output evals/reports/confirmation-v1-first/grade-reviewed.json
+```
+
+The exact 49-request whole-suite cap is predeclared; smaller or larger caps cannot
+select a partial confirmation run. SDK retries remain zero and every first attempt,
+including unknown outcomes, is retained. The shared collector still requires the
+pinned local media at startup, although this protocol never sends those media.
+Actual response models and the requested reasoning model are recorded.
+
+Before provider execution, collection exclusively creates a mode-0600 local
+receipt at `evals/reports/.confirmation-<manifest-sha256>.started`. This guard applies
+even if a caller chooses a different output directory. **Never delete the receipt
+to replay a failed or uncertain run.** Keep partial artifacts and propose a new,
+explicitly versioned protocol for any later study. A changed application or model
+artifact fails before provider work; do not edit the old pin to match new code.
+The receipt is a local replay guard, not tamper-proof or cross-machine attestation.
+
+Confirmation grading requires declared live-provider observations with matching
+pin/receipt metadata. Scripted tests cannot count as confirmation. Missing cases
+stay in the full fixed denominator; answers still await every requested quality
+review. Original development suites, rates and failures are neither changed nor
+pooled with confirmation. Tests exercise pin mismatches, replay/budget guards,
+partial-run preservation and varied-input wiring with explicitly scripted fixtures;
+they are not provider quality evidence. Cloud CI runs these tests without PyTorch.
+
+The [first collected confirmation result](../evals/baselines/agent-confirmation-v1.json)
+retains all twelve first attempts: ten passed and two failed after 27 explicitly
+labeled assistant rubric verdicts. Collection used 35 provider attempts under the
+predeclared 49-request cap, with zero automatic retries. All twelve observed read
+tool attempts succeeded across the seven read tools; successful execution alone
+does not establish that an answer interpreted the evidence correctly.
+
+One answer omitted that its weather/meter context was synthetic and static. Another
+described imported US-gallon interval volumes as hourly averages, confusing volume
+with averaged flow rate. Both failures remain in the result. No application policy,
+fixture expectation, model artifact or runtime pin was changed after these outcomes.
+Later fixes must be developed separately and cannot replace this confirmation run.
+The authored fictional suite and assistant reviews do not support independent,
+held-out-population, real-household or universal-reliability claims.
 
 ## Grade a collected record
 
