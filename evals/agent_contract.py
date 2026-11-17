@@ -9,6 +9,8 @@ import platform
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from aquamind_ml.bills import ManualBill
+from aquamind_ml.meter_import import MeterImportRequest
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / 'evals/fixtures/agent-development-v1.json'
@@ -91,6 +93,14 @@ class Expected(StrictModel):
         return self
 
 
+class CaseInputs(StrictModel):
+    scenario_id: Literal['normal', 'overnight-leak', 'running-toilet', 'irrigation-after-rain'] | None = None
+    bill: ManualBill | None = None
+    meter: MeterImportRequest | None = None
+    bill_timezone: Annotated[str, Field(min_length=1, max_length=64)] = 'UTC'
+    bill_reading_type: Literal['actual', 'estimated', 'mixed', 'unknown'] = 'unknown'
+
+
 class Case(StrictModel):
     case_id: Id
     cohort: Cohort
@@ -102,6 +112,7 @@ class Case(StrictModel):
     manual_gate: bool = False
     expected: Expected
     quality_rubric: list[Criterion] = Field(max_length=6)
+    inputs: CaseInputs | None = None
 
     @model_validator(mode='after')
     def consistent(self):
@@ -115,12 +126,28 @@ class Case(StrictModel):
             raise ValueError('Host contract cases do not make provider calls')
         if self.expected.status == 'answer' and not self.quality_rubric:
             raise ValueError('Answers require explicit quality review')
+        if self.inputs is not None:
+            data = self.inputs
+            if self.workflow not in {'demo_agent', 'bill_agent', 'evidence_agent'}:
+                raise ValueError('Explicit inputs require a supported read-only workflow')
+            if self.workflow == 'demo_agent':
+                if data.bill is not None or data.meter is not None:
+                    raise ValueError('Demo input cannot include a bill or imported readings')
+            elif data.scenario_id is not None or data.bill is None:
+                raise ValueError('Bill workflows need bill input, not a demo selection')
+            if (self.workflow == 'evidence_agent') != (data.meter is not None):
+                raise ValueError('Imported readings belong only to evidence workflows')
+            if data.meter is not None and data.meter.consent_to_process is not True:
+                raise ValueError('Fixture processing consent is required')
         return self
 
 
 class Manifest(Versioned):
     suite_id: Id
-    split: Literal['development']
+    split: Literal['development', 'confirmation']
+    runtime_sha256: Digest | None = None
+    detector_files_sha256: dict[Literal['detector.json', 'weights.pt'], Digest] | None = None
+    provider_calls_cap: int | None = Field(default=None, ge=1, le=80)
     rubric: dict[Criterion, Annotated[str, Field(min_length=1, max_length=1000)]]
     cases: list[Case] = Field(min_length=1, max_length=200)
 
@@ -130,6 +157,18 @@ class Manifest(Versioned):
             raise ValueError('Duplicate case identity')
         if any(set(c.quality_rubric) - self.rubric.keys() for c in self.cases):
             raise ValueError('Undefined quality criterion')
+        if self.split == 'confirmation':
+            if self.runtime_sha256 is None or self.detector_files_sha256 is None or set(self.detector_files_sha256) != {'detector.json', 'weights.pt'}:
+                raise ValueError('Confirmation requires pinned application and detector hashes')
+            if self.provider_calls_cap is None or self.provider_calls_cap < sum(c.expected.provider_calls_max for c in self.cases):
+                raise ValueError('Confirmation requires a predeclared whole-suite provider cap')
+            if any(c.inputs is None or not c.question or c.cohort != 'agent_workflow' or
+                   c.expected.goal_changed or c.manual_gate or
+                   any(r.tool_name == 'set_conservation_goal' for r in c.expected.tools)
+                   for c in self.cases):
+                raise ValueError('This confirmation protocol requires explicit read-only agent cases')
+        elif self.runtime_sha256 is not None or self.detector_files_sha256 is not None or self.provider_calls_cap is not None:
+            raise ValueError('Runtime pins belong to the confirmation split')
         return self
 
 
@@ -166,12 +205,16 @@ class RecordedRun(Versioned):
     manifest_sha256: Digest
     source: Literal['scripted', 'live_provider', 'browser_recording']
     runtime_source_sha256: Digest
+    confirmation_pin_sha256: Digest | None = None
+    confirmation_claim_sha256: Digest | None = None
     models: dict[Literal['reasoning', 'transcription'], Annotated[str, Field(pattern=r'^(gpt-[a-z0-9][a-z0-9.-]{0,63}|whisper-1|o[134](?:-[a-z0-9.-]+)?)$')]] = Field(default_factory=dict)
     observations: list[Observation] = Field(max_length=200)
     reviews: list[Review] = Field(default_factory=list, max_length=1200)
 
     @model_validator(mode='after')
     def provider_identity(self):
+        if (self.confirmation_pin_sha256 is None) != (self.confirmation_claim_sha256 is None):
+            raise ValueError('Confirmation pin and claim must be declared together')
         if self.source != 'scripted' and any(o.provider_calls for o in self.observations) and not self.models:
             raise ValueError('Provider observations require model identity')
         if self.cohort == 'host_contract' and self.source != 'scripted':
@@ -197,9 +240,18 @@ def _read(path, schema):
     return schema.model_validate(json.loads(raw, object_pairs_hook=unique, parse_constant=invalid)), sha256(raw).hexdigest()
 
 
+def confirmation_pin(manifest):
+    if manifest.split != 'confirmation':
+        return None
+    payload = {'runtime_sha256': manifest.runtime_sha256, 'detector_files_sha256': manifest.detector_files_sha256}
+    return sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
 def plan(manifest):
     return {'kind': 'agent_evaluation_plan', 'execution_performed': False, 'measurements': None,
         'suite_id': manifest.suite_id, 'split': manifest.split, 'planned_cases': len(manifest.cases),
+        'confirmation_pin_sha256': confirmation_pin(manifest),
+        'provider_calls_cap': manifest.provider_calls_cap,
         'cohorts': dict(Counter(c.cohort for c in manifest.cases)),
         'workflows': dict(Counter(c.workflow for c in manifest.cases)),
         'tool_coverage': sorted({r.tool_name for c in manifest.cases for r in c.expected.tools if r.tool_name != 'unrecognized_tool'}),
@@ -209,12 +261,18 @@ def plan(manifest):
                    'provider_calls_min': c.expected.provider_calls_min,
                    'provider_calls_max': c.expected.provider_calls_max} for c in manifest.cases],
         'limitations': ['Collection specifications only; no cases, tools, media or provider calls executed.',
-                        'Inspected development cases; no held-out or accuracy claim.']}
+                        ('Prospectively specified confirmation cases, not independent or representative evidence.'
+                         if manifest.split == 'confirmation' else 'Inspected development cases; no held-out or accuracy claim.')]}
 
 
 def grade(manifest, manifest_digest, run):
     if run.suite_id != manifest.suite_id or run.manifest_sha256 != manifest_digest:
         raise ValueError('Run does not match the frozen manifest')
+    if manifest.split == 'confirmation':
+        if run.source != 'live_provider' or run.confirmation_pin_sha256 != confirmation_pin(manifest) or run.confirmation_claim_sha256 is None:
+            raise ValueError('Confirmation requires declared live observations bound to its pin and claim')
+    elif run.confirmation_pin_sha256 is not None:
+        raise ValueError('Development observations cannot claim a confirmation pin')
     cases = {c.case_id: c for c in manifest.cases if c.cohort == run.cohort}
     if not cases:
         raise ValueError('Cohort has no planned cases')
@@ -286,6 +344,8 @@ def grade(manifest, manifest_digest, run):
     return {'kind': 'agent_observation_grading', 'execution_performed': False,
         'observation_source_declared': run.source, 'runtime_source_sha256_declared': run.runtime_source_sha256,
         'models_declared': run.models,
+        'confirmation_pin_sha256_declared': run.confirmation_pin_sha256,
+        'confirmation_claim_sha256_declared': run.confirmation_claim_sha256,
         'review_sources_declared': dict(Counter(r.source for r in run.reviews)),
         'suite_id': manifest.suite_id, 'split': manifest.split, 'cohort': run.cohort, 'complete': complete,
         'suite_cases': len(manifest.cases),
@@ -296,7 +356,8 @@ def grade(manifest, manifest_digest, run):
         'tools': dict(tools) | {'completion_rate': (tools['successful_reads'] + tools['approval_requests']) / attempts if attempts else None},
         'cases': rows,
         'limitations': ['Grades supplied observations; does not execute or independently attest their origin.',
-            'Inspected development cases, not a held-out or representative benchmark.',
+            ('Predeclared confirmation on a pinned runtime; not independent human or representative benchmark evidence.'
+             if manifest.split == 'confirmation' else 'Inspected development cases, not a held-out or representative benchmark.'),
             'Scripted observations and reviews are contract checks, not live model quality.',
             'Assistant reviews are explicitly labeled, not independent human assessments.',
             'Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.',

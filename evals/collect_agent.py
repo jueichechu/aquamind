@@ -16,11 +16,11 @@ from time import monotonic
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from agent_contract import DEFAULT_MANIFEST, Manifest, Observation, RecordedRun, _read, grade, plan
+from agent_contract import DEFAULT_MANIFEST, Manifest, Observation, RecordedRun, _read, confirmation_pin, grade, plan
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOLS = {name: ROOT / f'evals/fixtures/agent-{name}.json'
-             for name in ('development-v1', 'development-v2', 'answer-regressions-v1', 'verification-wording-v1')}
+             for name in ('development-v1', 'development-v2', 'answer-regressions-v1', 'verification-wording-v1', 'confirmation-v1')}
 MEDIA = {
     'image': ('16249570f778a700bf9349040374dec0cf4d1036185a6bd6814926618240153f', 70588),
     'voice': ('4cff39f74ce0858ea48925867c424a35aa1b52c18c90278aeca4c2d6ca19d1d3', 95568),
@@ -47,9 +47,65 @@ def write_new(path, value):
 
 def fingerprint():
     paths = sorted((ROOT / 'ml/aquamind_ml').glob('*.py')) + [
-        ROOT / 'ml/data/demo/meter-v1.json', Path(__file__), *PROTOCOLS.values()]
+        ROOT / 'ml/data/demo/meter-v1.json', Path(__file__), ROOT / 'evals/agent_contract.py', *PROTOCOLS.values()]
     inventory = {str(p.relative_to(ROOT)): sha256(p.read_bytes()).hexdigest() for p in paths}
     return sha256(encoded(inventory)).hexdigest(), inventory
+
+
+def application_fingerprint():
+    paths = sorted((ROOT / 'ml/aquamind_ml').glob('*.py')) + [ROOT / 'ml/data/demo/meter-v1.json']
+    inventory = {str(p.relative_to(ROOT)): sha256(p.read_bytes()).hexdigest() for p in paths}
+    return sha256(encoded(inventory)).hexdigest(), inventory
+
+
+def verify_confirmation(manifest):
+    """Fail before provider work when application/artifacts differ from the sealed protocol."""
+    if manifest.split != 'confirmation':
+        return
+    if application_fingerprint()[0] != manifest.runtime_sha256:
+        raise ValueError('Confirmation application source differs from its pin')
+    for name, digest in manifest.detector_files_sha256.items():
+        if sha256((ROOT / 'ml/artifacts/detector-v1' / name).read_bytes()).hexdigest() != digest:
+            raise ValueError('Confirmation detector differs from its pin')
+
+
+def claim_confirmation(manifest, digest):
+    if manifest.split != 'confirmation':
+        return None
+    directory = ROOT / 'evals/reports'
+    directory.mkdir(parents=True, exist_ok=True)
+    receipt = {'manifest_sha256': digest, 'confirmation_pin_sha256': confirmation_pin(manifest),
+               'claimed_at': datetime.now(timezone.utc).isoformat()}
+    # A new output directory must not silently replay the same confirmation protocol.
+    write_new(directory / ('.confirmation-' + digest + '.started'), receipt)
+    return sha256(encoded(receipt)).hexdigest()
+
+
+def validate_confirmation_inputs(manifest):
+    if manifest.split != 'confirmation':
+        return
+    from aquamind_ml.evidence_question import EvidenceQuestionRequest, prepare_evidence
+    from aquamind_ml.meter_import import parse_meter_csv
+    from aquamind_ml.sessions import DemoSessions
+    sessions = DemoSessions()
+    try:
+        for case in manifest.cases:
+            data = case.inputs
+            if data.meter is None:
+                continue
+            token = sessions.create()
+            try:
+                meters = sessions.meters(token)
+                ref = meters.replace(parse_meter_csv(data.meter)).context.evidence_id
+                prepare_evidence(EvidenceQuestionRequest.model_validate({
+                    'text': case.question, 'bill': data.bill.model_dump(mode='json'),
+                    'bill_timezone': data.bill_timezone, 'bill_input_method': 'manual_entry',
+                    'bill_reading_type': data.bill_reading_type, 'meter_evidence_id': ref,
+                    'bill_reviewed': True, 'meter_reviewed': True, 'same_household': True, 'share_with_ai': True}), meters)
+            finally:
+                sessions.revoke(token)
+    finally:
+        sessions.close()
 
 
 def media_bytes(path, kind):
@@ -172,9 +228,13 @@ async def workflow_case(case, http, sessions, token, image, voice, artifact):
             'data_base64': base64.b64encode(voice).decode(), 'share_with_ai': share})
 
     cid, question = case.case_id, case.question
+    inputs = case.inputs
+    entered_bill = inputs.bill.model_dump(mode='json') if inputs and inputs.bill else dict(BILL)
     if case.workflow == 'demo_agent':
         scenario = {'demo-summary': 'normal', 'demo-series': 'normal',
                     'demo-anomaly': 'overnight-leak', 'demo-weather': 'irrigation-after-rain'}.get(cid)
+        if inputs is not None:
+            scenario = inputs.scenario_id
         r, data = await post('/v1/agent/turn', {'text': question, **({'scenario_id': scenario} if scenario else {})})
         if cid == 'goal-proposal-only':
             values['goal_daily_gallons'] = (await http.get('/v1/goals/current', headers=auth)).json()['goal']
@@ -187,8 +247,8 @@ async def workflow_case(case, http, sessions, token, image, voice, artifact):
             if decision.get('status') == 'rejected':
                 r, data = await post('/v1/agent/continue', {'approval_id': pending['approval_id']})
     elif case.workflow == 'bill_agent':
-        values.update(normalized_values(BILL))
-        r, data = await post('/v1/agent/bill', {'text': question, 'bill': BILL, 'is_example': True, 'share_with_ai': True})
+        values.update(normalized_values(entered_bill))
+        r, data = await post('/v1/agent/bill', {'text': question, 'bill': entered_bill, 'is_example': True, 'share_with_ai': True})
     elif case.workflow == 'bill_import':
         r, data = await imported_image()
         if r.status_code == 200:
@@ -202,9 +262,10 @@ async def workflow_case(case, http, sessions, token, image, voice, artifact):
         if r.status_code == 200:
             values.update(needs_review=data.get('needs_review'), source=data.get('source'), transcript=data.get('text'))
     else:
-        r, meter = await post('/v1/meters/import', METER)
+        meter_body = inputs.meter.model_dump(mode='json') if inputs and inputs.meter else METER
+        r, meter = await post('/v1/meters/import', meter_body)
         r.raise_for_status()
-        bill, method, reading_type = dict(BILL), 'manual_entry', 'actual'
+        bill, method, reading_type = entered_bill, 'manual_entry', inputs.bill_reading_type if inputs else 'actual'
         if cid == 'image-voice-meter':
             r, imported = await imported_image()
             r.raise_for_status()
@@ -214,7 +275,7 @@ async def workflow_case(case, http, sessions, token, image, voice, artifact):
             question = spoken['text']  # Actual returned transcript, never the expected text.
         if cid == 'evidence-disjoint-period':
             bill.update(period_start='2024-06-01', period_end_exclusive='2024-07-01')
-        body = {'text': question, 'bill': bill, 'bill_timezone': 'UTC', 'bill_input_method': method,
+        body = {'text': question, 'bill': bill, 'bill_timezone': inputs.bill_timezone if inputs else 'UTC', 'bill_input_method': method,
                 'bill_reading_type': reading_type, 'meter_evidence_id': meter['context']['evidence_id'],
                 'bill_reviewed': True, 'meter_reviewed': True, 'same_household': True, 'share_with_ai': True}
         if cid not in {'evidence-disjoint-period', 'expired-evidence-session'}:
@@ -238,17 +299,30 @@ async def collect(manifest, digest, cohort, out, provider=None, maximum=0, image
     from aquamind_ml.api import create_app
     from aquamind_ml.sessions import DemoSessions
 
+    verify_confirmation(manifest)
+    validate_confirmation_inputs(manifest)
+    if manifest.split == 'confirmation' and (provider is None or cohort != 'agent_workflow' or maximum != manifest.provider_calls_cap):
+        raise ValueError('Confirmation collection requires a live-provider workflow cohort')
+    if manifest.split == 'confirmation' and detector is None and any(
+            rule.tool_name == 'detect_water_anomaly' for case in manifest.cases for rule in case.expected.tools):
+        raise ValueError('Confirmation requires its loaded frozen detector')
     runtime, inventory = fingerprint()
     ledger = {'maximum': maximum, 'total': 0, 'case_maximum': 0, 'events': []}
     wrapped = CountedProvider(provider, ledger) if provider is not None else None
     sessions = DemoSessions()
     host = AgentHost(wrapped, AgentConfig(model=os.environ.get('OPENAI_MODEL', 'gpt-unconfigured')),
                      detector=detector) if wrapped else None
+    claim = claim_confirmation(manifest, digest)
     run = {'schema_version': 1, 'suite_id': manifest.suite_id, 'manifest_sha256': digest,
            'cohort': cohort, 'source': 'live_provider' if wrapped else 'scripted',
            'runtime_source_sha256': runtime, 'models': {}, 'observations': [], 'reviews': []}
+    if claim is not None:
+        run.update(confirmation_pin_sha256=confirmation_pin(manifest), confirmation_claim_sha256=claim)
     write_new(out / 'collection-plan.json', {'manifest_sha256': digest, 'runtime_source_sha256': runtime,
         'runtime_inventory': inventory, 'cohort': cohort, 'maximum_provider_attempts': maximum,
+        'split': manifest.split, 'pinned_application_sha256': manifest.runtime_sha256,
+        'reasoning_model_requested': host.config.model if host else None,
+        'confirmation_pin_sha256': confirmation_pin(manifest), 'confirmation_claim_sha256': claim,
         'media_sha256': {k: v[0] for k, v in MEDIA.items()} if wrapped else {},
         'detector_files': {p.name: sha256(p.read_bytes()).hexdigest() for p in sorted((ROOT / 'ml/artifacts/detector-v1').glob('*')) if p.is_file()} if detector else {},
         'started_at': datetime.now(timezone.utc).isoformat(), 'automatic_retries': 0})
@@ -267,6 +341,7 @@ async def collect(manifest, digest, cohort, out, provider=None, maximum=0, image
             for case in manifest.cases:
                 if case.cohort != cohort:
                     continue
+                verify_confirmation(manifest)
                 token = sessions.create()
                 ledger.update(events=[], case_maximum=case.expected.provider_calls_max)
                 captured.clear()
@@ -310,6 +385,7 @@ async def collect(manifest, digest, cohort, out, provider=None, maximum=0, image
                 print(json.dumps({'case_id': case.case_id, 'status': status, 'provider_attempts': len(ledger['events'])}), flush=True)
     if fingerprint()[0] != runtime:
         raise ValueError('Runtime changed during collection; artifacts retained, run not finalized')
+    verify_confirmation(manifest)
     record = RecordedRun.model_validate(run)
     report = grade(manifest, digest, record)
     write_new(out / 'observations.json', run)
@@ -335,7 +411,11 @@ def main():
     try:
         if args.output_dir is None:
             raise ValueError('A new private output directory is required')
+        verify_confirmation(manifest)
+        validate_confirmation_inputs(manifest)
         if args.cohort == 'agent_workflow':
+            if manifest.split == 'confirmation' and args.max_provider_calls != manifest.provider_calls_cap:
+                raise ValueError('Use the exact predeclared confirmation budget')
             if not 1 <= args.max_provider_calls <= 80 or not args.fictional_image or not args.synthetic_wav:
                 raise ValueError('Supply pinned fictional media and a provider cap from 1 to 80')
             image, voice = media_bytes(args.fictional_image, 'image'), media_bytes(args.synthetic_wav, 'voice')
