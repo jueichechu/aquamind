@@ -71,6 +71,12 @@ def prepare_evidence(body: EvidenceQuestionRequest, meters: SessionMeters) -> di
     return {'bill': normalized.model_dump(mode='json'), 'bill_timezone': body.bill_timezone,
         'reported_usage_statement': (f'The provided readings report {selected.total_us_gallons} US gallons; '
             'whether water physically flowed is not independently established.'),
+        'meter_quantity_context': {
+            'quantity': 'interval_volume', 'normalized_volume_unit': 'us_gallons',
+            'interval_minutes': selected.context.interval_minutes,
+            'reading_count': selected.context.reading_count,
+            'value_meaning': 'Reported volume accumulated over each whole declared interval, not an average flow rate or instantaneous sample.',
+            'temporal_limit': 'No distribution or event timing within an interval is supplied.'},
         'billing_period': bill_period_context(normalized),
         'verification': {'bill_values_independently_verified': False,
                          'physical_water_use_independently_verified': False,

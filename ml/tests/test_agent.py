@@ -6,7 +6,7 @@ import httpx2
 from mcp import Client
 from openai import AsyncOpenAI
 
-from aquamind_ml.agent import AgentConfig, POLICY, _anomaly_disclosure, run_agent
+from aquamind_ml.agent import AgentConfig, POLICY, _anomaly_disclosure, _synthetic_disclosure, run_agent
 from aquamind_ml.agent_tools import ToolOutcome
 from aquamind_ml.agent_tools import McpAgentTools
 from aquamind_ml.approvals import GoalApprovals
@@ -40,6 +40,20 @@ def is_topic_request(request):
 
 
 class AgentTests(unittest.IsolatedAsyncioTestCase):
+    def test_synthetic_notes_require_successful_known_tool_provenance(self):
+        weather = {'source': 'synthetic', 'scenario_id': 'normal', 'snapshot_sha256': 'a' * 64,
+                   'temporal_scope': 'Static scenario context; no observation time or real location'}
+        for status, data, name in (
+            ('error', weather, 'get_weather_context'), ('unconfirmed', weather, 'get_weather_context'),
+            ('success', weather | {'source': 'live'}, 'get_weather_context'),
+            ('success', weather | {'scenario_id': 'private'}, 'get_weather_context'),
+            ('success', weather | {'temporal_scope': 'live observation'}, 'get_weather_context'),
+            ('success', weather | {'snapshot_sha256': 'PRIVATE'}, 'get_weather_context'),
+            ('success', weather, 'unrecognized_tool'),
+            ('success', {'context': {'origin': 'user_provided'}}, 'get_meter_summary'),
+        ):
+            self.assertIsNone(_synthetic_disclosure(name, ToolOutcome('test', status, {'result': data})))
+
     def test_anomaly_disclosure_never_invents_provenance_from_failed_or_untrusted_metadata(self):
         valid = {'model_version': 'detector-0123456789abcdef', 'training_data': 'synthetic', 'source': 'synthetic'}
         for status, data in [('error', valid), ('unconfirmed', valid), ('success', None),

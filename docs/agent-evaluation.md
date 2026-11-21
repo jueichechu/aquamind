@@ -161,6 +161,56 @@ Later fixes must be developed separately and cannot replace this confirmation ru
 The authored fictional suite and assistant reviews do not support independent,
 held-out-population, real-household or universal-reliability claims.
 
+### Development regressions after confirmation
+
+The separate [weather/volume regression protocol](../evals/fixtures/agent-weather-volume-regressions-v1.json)
+treats the two surfaced failures as known development cases, without changing the
+original confirmation fixture, pin, receipt or 10/12 result. Its six first-attempt
+cases cover combined meter/weather context, weather alone, zero hourly volumes,
+positive fifteen-minute volumes, half-hour liter conversion and the synthetic demo's
+average-GPM series. These are regression checks, not another hidden confirmation set.
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --protocol weather-volume-regressions-v1
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --protocol weather-volume-regressions-v1 --cohort agent_workflow --max-provider-calls 30 --fictional-image /absolute/path/fictional-water-bill.png --synthetic-wav /absolute/path/question.wav --output-dir evals/reports/weather-volume-first
+PYTHONPATH=ml ml/.venv/bin/python evals/agent_contract.py --manifest evals/fixtures/agent-weather-volume-regressions-v1.json --observations evals/reports/weather-volume-first/observations-reviewed.json --output evals/reports/weather-volume-first/grade-reviewed.json
+```
+
+Successful synthetic meter/weather tool reads now supply application-authored
+provenance notes in delivered answers. Weather notes require known synthetic
+scenario/source metadata, the static temporal scope and a valid snapshot digest;
+failed or unconfirmed reads cannot create a successful-provenance note. Imported
+user readings are not labeled synthetic. These notes require no extra model/tool
+calls and must not be described as independent model disclosure compliance.
+
+Imported-meter answer context explicitly identifies normalized US-gallon values as
+whole-interval volumes. They are not average flow rates or instantaneous samples.
+An average flow may be derived as volume divided by duration only when separately
+labeled with units and its time window. Zero reported totals must not be explained
+as bursts hidden by averaging; unverified sources and unobserved periods still
+prevent physical absence/no-leak conclusions. Synthetic demo `flow_rates_gpm` values
+remain fifteen-minute average flow rates. Public request/response fields, numerical
+conversion, scope/consent/approval controls and frozen detector artifacts are unchanged.
+Qualitative review must inspect the complete answer, not just find a disclaimer.
+
+The [recorded development results](../evals/baselines/weather-volume-regressions-v1.json)
+retain the first six-case run: five passed and one failed. Weather provenance and
+imported-volume cases passed, but a demo explanation incorrectly divided by 60
+when converting GPM to interval gallons. Explicit guidance now distinguishes
+`GPM × minutes = gallons` from `GPH × minutes / 60 = gallons`; numerical tool
+calculations themselves were unchanged. A separately predeclared three-case
+[units follow-up](../evals/fixtures/agent-weather-volume-units-v1.json) passed after
+that correction, including `0.6128 GPM × 15 minutes = 9.192 gallons` and separate
+derived rates for supplied interval volumes. Collect it with
+`--protocol weather-volume-units-v1 --cohort agent_workflow --max-provider-calls 16`
+and the same media/exclusive-output options above; grade against its own manifest.
+The first failed result is not replaced or pooled with the follow-up.
+
+The two development collections used 20 and 10 provider attempts respectively,
+zero automatic retries, and 22 explicitly labeled assistant rubric verdicts. They
+do not rescore the frozen confirmation, establish independent human review or
+guarantee arbitrary future model wording/conversions.
+
 ## Grade a collected record
 
 ```sh

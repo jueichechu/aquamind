@@ -77,6 +77,10 @@ class EvidenceAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(facts['bill']['us_gallons_per_day'], '27.000000')
         self.assertEqual(facts['reported_usage_statement'],
             'The provided readings report 96.000000 US gallons; whether water physically flowed is not independently established.')
+        self.assertEqual(facts['meter_quantity_context']['quantity'], 'interval_volume')
+        self.assertEqual(facts['meter_quantity_context']['normalized_volume_unit'], 'us_gallons')
+        self.assertEqual(facts['meter_quantity_context']['interval_minutes'], 15)
+        self.assertEqual(facts['meter_quantity_context']['reading_count'], 96)
         self.assertEqual(facts['billing_period']['last_billed_day_inclusive'], '2026-06-30')
         self.assertEqual(facts['verification'], {'bill_values_independently_verified': False,
             'physical_water_use_independently_verified': False,
@@ -138,6 +142,23 @@ class EvidenceAgentHttpTests(unittest.IsolatedAsyncioTestCase):
             'The provided readings report 0.000000 US gallons; whether water physically flowed is not independently established.')
         self.assertFalse(facts['verification']['physical_water_use_independently_verified'])
 
+    async def test_hourly_liter_totals_have_volume_semantics_without_changing_tool_or_api_fields(self):
+        dataset = parse_meter_csv(MeterImportRequest.model_validate(meter_body(
+            count=2, minutes=60, volume='10', volume_unit='liters', reading_type='mixed')))
+        ref = self.meters.replace(dataset).context.evidence_id
+        value = (await self.post(self.body | {'meter_evidence_id': ref, 'bill_reading_type': 'mixed'})).json()
+        self.assertEqual(value['status'], 'answer')
+        self.assertEqual(value['model_calls'], 3)
+        facts = json.loads(self.requests[0]['input'][0]['content'])['combined_evidence']
+        self.assertEqual(facts['meter']['total_us_gallons'], '5.283441')
+        self.assertEqual(facts['meter']['context']['volume_unit'], 'liters')
+        self.assertEqual(facts['meter_quantity_context']['normalized_volume_unit'], 'us_gallons')
+        self.assertEqual(facts['meter_quantity_context']['interval_minutes'], 60)
+        self.assertEqual(facts['meter_quantity_context']['reading_count'], 2)
+        self.assertEqual(facts['meter_quantity_context']['quantity'], 'interval_volume')
+        # Interpretation context is server-owned; it is not a public response field.
+        self.assertNotIn('meter_quantity_context', value)
+
     async def test_all_confirmations_are_strict_required_and_admitted_before_paid_work(self):
         for key in ('bill_reviewed', 'meter_reviewed', 'same_household', 'share_with_ai'):
             for value in (False, 1, 'true', None):
@@ -147,7 +168,8 @@ class EvidenceAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         for changes in ({'household_id': 'house_forged'}, {'is_example': True}, {'tools': ['set_conservation_goal']},
                         {'bill_timezone': 'Unknown/Zone'}, {'normalized_bill': {'usage': '0'}},
                         {'verification': {'physical_water_use_independently_verified': True}},
-                        {'billing_period': {'last_billed_day_inclusive': '2026-07-01'}}):
+                        {'billing_period': {'last_billed_day_inclusive': '2026-07-01'}},
+                        {'meter_quantity_context': {'quantity': 'average_flow_rate'}}):
             self.assertEqual((await self.post(self.body | changes)).status_code, 422)
         self.assertEqual(self.requests + self.topics, [])
         self.assertEqual(self.host._total, 0)
