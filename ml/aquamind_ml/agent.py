@@ -29,6 +29,9 @@ Read the series only when the requested temporal analysis needs it; otherwise ex
 that the summary cannot establish the pattern. For averaged flow readings, interval
 averages cannot resolve events within an interval. Synthetic demo flow_rates_gpm are
 15-minute average flow rates; imported meter volumes are a different quantity.
+Keep units explicit: GPM multiplied by interval minutes gives gallons, with no
+division by 60. GPH uses interval minutes / 60. Conversely, gallons divided by
+interval minutes gives a derived average GPM, not an instantaneous flow.
 Rain and higher total use alone do not establish irrigation as the cause.
 Anomaly scores are not probabilities or fixture diagnoses. Explain uncertainty and assumptions.
 For an anomaly result, distinguish the frozen model's threshold from the household's

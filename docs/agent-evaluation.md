@@ -193,6 +193,24 @@ remain fifteen-minute average flow rates. Public request/response fields, numeri
 conversion, scope/consent/approval controls and frozen detector artifacts are unchanged.
 Qualitative review must inspect the complete answer, not just find a disclaimer.
 
+The [recorded development results](../evals/baselines/weather-volume-regressions-v1.json)
+retain the first six-case run: five passed and one failed. Weather provenance and
+imported-volume cases passed, but a demo explanation incorrectly divided by 60
+when converting GPM to interval gallons. Explicit guidance now distinguishes
+`GPM × minutes = gallons` from `GPH × minutes / 60 = gallons`; numerical tool
+calculations themselves were unchanged. A separately predeclared three-case
+[units follow-up](../evals/fixtures/agent-weather-volume-units-v1.json) passed after
+that correction, including `0.6128 GPM × 15 minutes = 9.192 gallons` and separate
+derived rates for supplied interval volumes. Collect it with
+`--protocol weather-volume-units-v1 --cohort agent_workflow --max-provider-calls 16`
+and the same media/exclusive-output options above; grade against its own manifest.
+The first failed result is not replaced or pooled with the follow-up.
+
+The two development collections used 20 and 10 provider attempts respectively,
+zero automatic retries, and 22 explicitly labeled assistant rubric verdicts. They
+do not rescore the frozen confirmation, establish independent human review or
+guarantee arbitrary future model wording/conversions.
+
 ## Grade a collected record
 
 ```sh

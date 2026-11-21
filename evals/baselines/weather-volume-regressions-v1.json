@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "kind": "weather_volume_development_regressions",
+  "split": "development",
+  "source": "live_provider",
+  "initial_regressions": {
+    "kind": "agent_observation_grading",
+    "execution_performed": false,
+    "observation_source_declared": "live_provider",
+    "runtime_source_sha256_declared": "aea756cee4d958d820fe69cdb83659fe44a20c89e3e9f567674e60a1d0da8583",
+    "models_declared": {
+      "reasoning": "gpt-5.4-mini-2026-03-17"
+    },
+    "confirmation_pin_sha256_declared": null,
+    "confirmation_claim_sha256_declared": null,
+    "review_sources_declared": {
+      "assistant": 15
+    },
+    "suite_id": "water-weather-volume-regressions-v1",
+    "split": "development",
+    "cohort": "agent_workflow",
+    "complete": true,
+    "suite_cases": 6,
+    "other_cohort_case_ids": [],
+    "planned_cases": 6,
+    "observed_cases": 6,
+    "outcomes": {
+      "passed": 5,
+      "failed": 1,
+      "pending_review": 0,
+      "missing": 0
+    },
+    "case_pass_rate": 0.8333333333333334,
+    "tools": {
+      "attempts": 8,
+      "successful_reads": 8,
+      "approval_requests": 0,
+      "expected_denials": 0,
+      "other_errors": 0,
+      "unconfirmed": 0,
+      "invalid_outcomes": 0,
+      "completion_rate": 1.0
+    },
+    "cases": [
+      {
+        "case_id": "regress-synthetic-rain",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "regress-weather-only",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "regress-hourly-zero-volume",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "regress-quarter-hour-volumes",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "regress-half-hour-liters",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "regress-demo-average-gpm",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "failed",
+        "issues": [
+          "quality_review_failed"
+        ],
+        "pending_criteria": []
+      }
+    ],
+    "limitations": [
+      "Grades supplied observations; does not execute or independently attest their origin.",
+      "Inspected development cases, not a held-out or representative benchmark.",
+      "Scripted observations and reviews are contract checks, not live model quality.",
+      "Assistant reviews are explicitly labeled, not independent human assessments.",
+      "Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.",
+      "Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.",
+      "No raw answers, transcripts, fact values, reviewer names or provider errors are emitted."
+    ],
+    "observations_sha256": "64d19cae2fb736649fafe850523a71b1624b83d988bbbbb14acf77352c306596",
+    "schema_version": 1,
+    "manifest_sha256": "9b68aeec6b91d39731d4270ab26b943d775043d46cbf067948b9649ed0c6ff7a",
+    "grader_sha256": "24da4198ad9aa447f7d4cf7853a4a18341714a4d1bea892e8d55406c5093c59e",
+    "python": "3.14.2"
+  },
+  "units_followup": {
+    "kind": "agent_observation_grading",
+    "execution_performed": false,
+    "observation_source_declared": "live_provider",
+    "runtime_source_sha256_declared": "e1fb42ab93f35b9058737491ce00dff98e460d5b09f624d2a33cebbadd217ed4",
+    "models_declared": {
+      "reasoning": "gpt-5.4-mini-2026-03-17"
+    },
+    "confirmation_pin_sha256_declared": null,
+    "confirmation_claim_sha256_declared": null,
+    "review_sources_declared": {
+      "assistant": 7
+    },
+    "suite_id": "water-weather-volume-units-v1",
+    "split": "development",
+    "cohort": "agent_workflow",
+    "complete": true,
+    "suite_cases": 3,
+    "other_cohort_case_ids": [],
+    "planned_cases": 3,
+    "observed_cases": 3,
+    "outcomes": {
+      "passed": 3,
+      "failed": 0,
+      "pending_review": 0,
+      "missing": 0
+    },
+    "case_pass_rate": 1.0,
+    "tools": {
+      "attempts": 4,
+      "successful_reads": 4,
+      "approval_requests": 0,
+      "expected_denials": 0,
+      "other_errors": 0,
+      "unconfirmed": 0,
+      "invalid_outcomes": 0,
+      "completion_rate": 1.0
+    },
+    "cases": [
+      {
+        "case_id": "units-original-demo",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "units-peak-interval",
+        "workflow": "demo_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "units-imported-average",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      }
+    ],
+    "limitations": [
+      "Grades supplied observations; does not execute or independently attest their origin.",
+      "Inspected development cases, not a held-out or representative benchmark.",
+      "Scripted observations and reviews are contract checks, not live model quality.",
+      "Assistant reviews are explicitly labeled, not independent human assessments.",
+      "Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.",
+      "Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.",
+      "No raw answers, transcripts, fact values, reviewer names or provider errors are emitted."
+    ],
+    "observations_sha256": "4c5568a2c78b1b10cf7e0451f34858b7fc3b3c977e3a81cb5c7032213c566827",
+    "schema_version": 1,
+    "manifest_sha256": "d048c86f30648e4836dc30d9cc51545229fe361a875476c6f62c222ec6c39c08",
+    "grader_sha256": "24da4198ad9aa447f7d4cf7853a4a18341714a4d1bea892e8d55406c5093c59e",
+    "python": "3.14.2"
+  },
+  "provider_attempts": {
+    "initial_regressions": 20,
+    "units_followup": 10,
+    "automatic_retries": 0
+  },
+  "predeclared_caps": {
+    "initial_regressions": 30,
+    "units_followup": 16
+  },
+  "findings": [
+    {
+      "case_id": "regress-synthetic-rain",
+      "outcome": "passed",
+      "finding": "Actualsyntheticmeter/weatherreadsanddeliveredbody/hostnotesdisclosestaticsyntheticprovenance,notlive localobservation."
+    },
+    {
+      "case_id": "regress-hourly-zero-volume",
+      "outcome": "passed",
+      "finding": "ZeroUSgallonhourlyentriesremainreportedintervaltotals, no averaging/burst explanation or whole-dayno-flowproof."
+    },
+    {
+      "case_id": "regress-demo-average-gpm",
+      "outcome": "failed_initial_retained",
+      "finding": "Correctrate/volumedistinctionbutmodelgaveanincorrect /60stepforGPM-to-interval-gallonconversion. First5/6resultretained."
+    },
+    {
+      "case_id": "units-peak-interval",
+      "outcome": "passed_followup",
+      "finding": "Afterexplicitunitformula guidance,0.6128GPM*15minutes=9.192USgallons;no /60."
+    },
+    {
+      "case_id": "units-imported-average",
+      "outcome": "passed_followup",
+      "finding": "15and12USgallonvolumesover15minuteintervalsderive1.0and0.8GPM,and27gal/30min=.9GPM,explicitlyseparatefromsuppliedvalues."
+    }
+  ],
+  "unchanged_confirmation": {
+    "manifest_sha256": "6b3a2a033056fe1df5812c353b23f306b3570f9ad659c4f7ac6b9211883b72b6",
+    "result_sha256": "52f9d2300968bd28fc6c33ebb2812e9e641e6ed6396b2e154fb34fd5af99cf96",
+    "note": "Original10/12result,pin,receiptandfailuresunchanged. Newruntimecannotrerunthatpinnedprotocol."
+  },
+  "limitations": [
+    "Known fictional development regressions after confirmation findings, not another hidden/independent confirmation set or representative accuracy measurement.",
+    "Initial5/6andseparateunitsfollowup3/3havedifferentruntimefingerprints; do not pool denominators or replace the first failed case.",
+    "All22qualitativeverdicts are assistant reviews of delivered answers, including application-authorednotes; not independent human or model-only disclosure compliance.",
+    "Context and tool-description guidance do not guarantee every generated unit conversion or assertion is correct; later disclaimers cannot repair contradictory analysis.",
+    "Noimage/voice/detectorinference orpositivehumanapproval is measured; the collector requires pinned media/model forstartupbuttheseprotocolsdonotsendmediaorrundetector.",
+    "Rawfictionalartifacts/reviewrationalesremainlocal; hashes identifybytes,notindependentattestation.",
+    "NoautomaticSDKretries,relaxedquotas,newscopes ormodelweights/calibration changes."
+  ]
+}

@@ -198,6 +198,15 @@ class AgentCollectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cases['regress-demo-average-gpm'].inputs.scenario_id, 'normal')
         self.assertEqual(cases['regress-weather-only'].expected.tools[0].tool_name, 'get_weather_context')
 
+    def test_units_followup_is_separate_and_retains_both_rate_and_volume_contexts(self):
+        manifest, _ = collection._read(collection.PROTOCOLS['weather-volume-units-v1'], collection.Manifest)
+        self.assertEqual(manifest.split, 'development')
+        self.assertEqual(len(manifest.cases), 3)
+        self.assertEqual(manifest.cases[0].inputs.scenario_id, 'normal')
+        self.assertEqual(manifest.cases[1].inputs.scenario_id, 'normal')
+        self.assertEqual(manifest.cases[2].inputs.meter.interval_minutes, 15)
+        self.assertEqual(manifest.cases[2].inputs.meter.volume_unit, 'us_gallons')
+
 
 if __name__ == '__main__':
     unittest.main()

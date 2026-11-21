@@ -175,6 +175,7 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
 
         Requires meter:read. Select by generator seed, scenario ID and UTC start.
         Values start at start_timestamp; end_timestamp_exclusive is one day later.
+        Interval gallons = average GPM * interval minutes (15); no division by 60.
         Missing windows are errors; no readings or anomaly labels are fabricated.
         """
         store = meter_store()
@@ -216,6 +217,7 @@ def create_server(detector_path: Path | None, scopes: frozenset[str] = frozenset
 
             Requires meter:read. Starts at start_timestamp, ends before
             end_timestamp_exclusive. No fixture identities or simulator anomaly labels.
+            Interval gallons = average GPM * 15 minutes; no division by 60.
             """
             require_demo_meter()
             return demo_meter.series(demo_scenario)
