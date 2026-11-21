@@ -185,6 +185,19 @@ class AgentCollectionTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(case.expected.goal_changed)
             self.assertTrue(all(rule.tool_name in {'get_meter_summary', 'get_meter_series'} for rule in case.expected.tools))
 
+    def test_weather_volume_regressions_are_separate_development_with_distinct_quantities(self):
+        manifest, _ = collection._read(collection.PROTOCOLS['weather-volume-regressions-v1'], collection.Manifest)
+        self.assertEqual(manifest.split, 'development')
+        self.assertIsNone(manifest.runtime_sha256)
+        self.assertEqual(len(manifest.cases), 6)
+        cases = {c.case_id: c for c in manifest.cases}
+        self.assertEqual(cases['regress-hourly-zero-volume'].inputs.meter.interval_minutes, 60)
+        self.assertEqual(cases['regress-quarter-hour-volumes'].inputs.meter.interval_minutes, 15)
+        self.assertEqual(cases['regress-half-hour-liters'].inputs.meter.interval_minutes, 30)
+        self.assertEqual(cases['regress-half-hour-liters'].inputs.meter.volume_unit, 'liters')
+        self.assertEqual(cases['regress-demo-average-gpm'].inputs.scenario_id, 'normal')
+        self.assertEqual(cases['regress-weather-only'].expected.tools[0].tool_name, 'get_weather_context')
+
 
 if __name__ == '__main__':
     unittest.main()
