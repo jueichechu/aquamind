@@ -13,7 +13,7 @@ import httpx
 import httpx2
 from openai import AsyncOpenAI
 
-from aquamind_ml.agent import AgentConfig
+from aquamind_ml.agent import AgentConfig, SYNTHETIC_METER_NOTE, SYNTHETIC_WEATHER_NOTE
 from aquamind_ml.agent_http import AgentHost
 from aquamind_ml.api import create_app
 from aquamind_ml.sessions import DemoSessions
@@ -187,6 +187,8 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
                 json={'text': 'Explain the selected synthetic day.', 'scenario_id': scenario})
             self.assertEqual(result.status_code, 200)
             self.assertEqual(result.json()['status'], 'answer')
+            self.assertEqual(result.json()['answer'].count(SYNTHETIC_METER_NOTE), 1)
+            self.assertEqual(result.json()['answer'].count(SYNTHETIC_WEATHER_NOTE), 1)
             self.assertEqual([item['status'] for item in result.json()['tool_trace']], ['success'] * 3)
             requests = self.requests[before:]
             for name in names:
@@ -203,6 +205,30 @@ class AgentHttpTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(evidence, meter.series(scenario).model_dump())
                 for label in ('hasLeak', 'isAnomaly', 'fixtures', 'excessGallons'):
                     self.assertNotIn(label, evidence)
+
+    async def test_weather_answer_keeps_static_provenance_when_provider_omits_it(self):
+        _, headers = await self.session()
+        self.reply = lambda index: response([call('weather', 'get_weather_context', '{}')]) \
+            if index == 1 else response([message('Rain is reported as 0.68 inches.')])
+        value = (await self.http.post('/v1/agent/turn', headers=headers,
+            json={'text': 'Read this household weather context.', 'scenario_id': 'irrigation-after-rain'})).json()
+        self.assertEqual(value['status'], 'answer')
+        self.assertEqual(value['model_calls'], 3)
+        self.assertEqual(value['answer'], 'Rain is reported as 0.68 inches.\n\n' + SYNTHETIC_WEATHER_NOTE)
+        self.assertNotIn(SYNTHETIC_METER_NOTE, value['answer'])
+        self.assertEqual(value['tool_trace'][0]['status'], 'success')
+
+    async def test_failed_weather_does_not_create_successful_provenance_note(self):
+        from aquamind_ml.weather import WeatherStore
+        _, headers = await self.session()
+        self.reply = lambda index: response([call('weather', 'get_weather_context', '{}')]) \
+            if index == 1 else response([message('Weather could not be read.')])
+        with patch.object(WeatherStore, 'context', side_effect=RuntimeError('private weather detail')):
+            value = (await self.http.post('/v1/agent/turn', headers=headers,
+                json={'text': 'Read this household weather context.', 'scenario_id': 'normal'})).json()
+        self.assertEqual(value['tool_trace'][0]['status'], 'error')
+        self.assertNotIn(SYNTHETIC_WEATHER_NOTE, value['answer'])
+        self.assertNotIn('private weather detail', value['answer'])
 
     async def test_meter_selection_requires_valid_request_and_cannot_be_overridden_by_model(self):
         _, headers = await self.session()

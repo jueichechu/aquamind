@@ -35,7 +35,8 @@ def create_imported_meter_server(store: SessionMeters, evidence_id: str,
 
         Requires meter:read. Selection cannot be changed by a tool argument.
         This is the imported period only, with no historical baseline, model
-        inference, weather, tariff or leak/fixture diagnosis. Totals are US gallons.
+        inference, weather, tariff or leak/fixture diagnosis. Totals are US gallons,
+        summed from interval-volume entries, not averaged flow rates or GPM samples.
         """
         return selected()
 
@@ -45,8 +46,10 @@ def create_imported_meter_server(store: SessionMeters, evidence_id: str,
 
         Requires meter:read. Values begin at context.start at the declared cadence;
         context.end_exclusive is excluded. context.volume_unit is the original
-        CSV unit; interval_volumes_us_gallons are converted volumes, not GPM or
-        cumulative register readings. No interpolation, labels or model prediction.
+        CSV unit; interval_volumes_us_gallons are whole-interval converted volumes,
+        not average flow rates, GPM samples or cumulative register readings. A derived
+        average flow must be separately labeled volume/duration, not a supplied value.
+        No interpolation, labels or model prediction.
         """
         return selected(True)
 
