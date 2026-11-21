@@ -132,6 +132,8 @@ Keep changes focused and run the relevant checks before opening a pull request. 
 
 The [agent evaluation guide](docs/agent-evaluation.md) describes offline case planning,
 strict observation grading and the distinction between scripted checks and live results.
+The [measurement runbook](docs/measurements.md) covers setup, commands, outputs and
+limitations for agent/tool evaluation, model metrics and HTTP latency.
 
 ## Project structure
 
@@ -149,7 +151,7 @@ docs/               Technical reference and dataset documentation
 
 Demo meter readings and weather are synthetic. Chart highlights come from simulator labels; model predictions are a separate experimental signal. Utility calculations use a disclosed illustrative rate, not a user's actual tariff. Anomaly scores do not prove a physical leak or identify its fixture.
 
-The manual bill form sends structured fields to a stateless calculation API without a model call. Document import separately requires consent to send the entire report to OpenAI; redact identifying details first. Extraction may make mistakes and its fields require review. Optional bill questions separately share the entered fields, normalized values and question with OpenAI. No bill history or uploaded files are saved by AquaMind; provider retention follows OpenAI's API data policy. Bill-only questions have no meter, weather, tariff, anomaly or goal tools. Fixture-image analysis and voice interaction are not implemented. Sessions and approved goals live in process memory; restarting the backend clears them. Use a single worker and loopback binding for local development; this configuration is not a public production deployment.
+The manual bill form sends structured fields to a stateless calculation API without a model call. Document import separately requires consent to send the entire report to OpenAI; redact identifying details first. Extraction may make mistakes and its fields require review. Optional bill questions separately share the entered fields, normalized values and question with OpenAI. No bill history or uploaded files are saved by AquaMind; provider retention follows OpenAI's API data policy. Bill-only questions have no meter, weather, tariff, anomaly or goal tools. Voice input supports short WAV files with transcript review; microphone recording, spoken output and fixture-photo analysis are not implemented. Sessions and approved goals live in process memory; restarting the backend clears them. Use a single worker and loopback binding for local development; this configuration is not a public production deployment.
 
 Assistant questions and requested evidence are sent to OpenAI. Avoid entering personal information into the demo. Application request logs omit prompts, bill values and credentials.
 
@@ -158,6 +160,7 @@ Assistant questions and requested evidence are sent to OpenAI. Avoid entering pe
 - [Continuous integration](docs/ci.md): automated checks, required merge status and local Redis integration testing.
 - [Deployment guide](docs/deployment.md): free-tier Render setup, authenticated backend relay, optional AI configuration and usage limits.
 - [Development reference](docs/development.md): data generation, model training, API contracts, MCP scopes and agent behavior.
+- [Measurement runbook](docs/measurements.md): runnable agent/tool evaluation, model metrics and FastAPI latency measurement.
 - [AMPds2 dataset and experiments](docs/datasets/ampds2.md): provenance, reproducible processing, experimental results and limitations. External data has its own license and attribution requirements.
 
 ## License
