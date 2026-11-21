@@ -14,6 +14,7 @@ from .agent_tools import McpAgentTools
 from .approvals import GoalProposal, GoalRequest
 from .bills import NormalizedBill, bill_period_context
 from .topic_guard import request_topic_check, topic_allowed, TOPIC_REDIRECT
+from .evidence_rates import discusses_rates, render_imported_rates
 
 POLICY = """You are AquaMind, a household water-intelligence assistant.
 Use available tools for measured quantities, anomaly findings, weather, rates and savings.
@@ -222,7 +223,7 @@ async def run_agent(text: str, client: AsyncOpenAI, tools: McpAgentTools, config
     return await _run(history, client, tools, config, check_active=check_active,
                       on_pause=on_pause, instructions=POLICY + (EVIDENCE_POLICY if evidence_context is not None else BILL_POLICY if bill_context is not None else ''),
                       topic_question=text, bill_only=bill_context is not None, selected_demo=selected_demo,
-                      evidence_mode=evidence_context is not None)
+                      evidence_mode=evidence_context is not None, evidence_facts=evidence_context)
 
 
 async def continue_agent(pause: AgentPause, decision: GoalProposal, current_goal: GoalRequest | None,
@@ -248,11 +249,13 @@ async def _run(history: list[dict], client: AsyncOpenAI, tools: McpAgentTools, c
                check_active: Callable[[], None] | None = None,
                on_pause: Callable[[AgentPause], None] | None = None, instructions: str = POLICY,
                topic_question: str | None = None, bill_only: bool = False,
-               selected_demo: bool = False, evidence_mode: bool = False) -> AgentResult:
+               selected_demo: bool = False, evidence_mode: bool = False,
+               evidence_facts: dict | None = None) -> AgentResult:
     model_trace = []
     calls = 0
     anomaly_note = ''
     synthetic_notes = {}
+    meter_math_evidence = None
 
     def result(status, *, answer='', approval=None, error=None):
         if status == 'answer':
@@ -320,6 +323,12 @@ async def _run(history: list[dict], client: AsyncOpenAI, tools: McpAgentTools, c
                     if evidence_mode and not any(t['tool_name'] == 'get_meter_summary' and t['status'] == 'success' for t in tools.trace):
                         return result('unavailable', error='meter_evidence_not_read')
                     if response.output_text.strip():
+                        if evidence_mode and (discusses_rates(topic_question) or discusses_rates(response.output_text)):
+                            try:
+                                answer = render_imported_rates(meter_math_evidence, evidence_facts)
+                            except (ValueError, TypeError, KeyError, ArithmeticError):
+                                return result('unavailable', error='rate_evidence_unavailable')
+                            return result('answer', answer=answer)
                         return result('answer', answer=response.output_text)
                     if any(part.get('type') == 'refusal' for item in output
                            if item['type'] == 'message' for part in item.get('content', [])):
@@ -343,6 +352,8 @@ async def _run(history: list[dict], client: AsyncOpenAI, tools: McpAgentTools, c
                     anomaly_note = _anomaly_disclosure(outcome)
                 if evidence_mode and outcome.status != 'success':
                     return result('unavailable', error='meter_evidence_unavailable')
+                if evidence_mode and (meter_math_evidence is None or tool_call['name'] == 'get_meter_series'):
+                    meter_math_evidence = outcome.data.get('result')
                 if outcome.status == 'approval_required':
                     if on_pause is not None:
                         on_pause(AgentPause(deepcopy(history), tool_call['call_id'], calls))
