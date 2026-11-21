@@ -159,6 +159,48 @@ class EvidenceAgentHttpTests(unittest.IsolatedAsyncioTestCase):
         # Interpretation context is server-owned; it is not a public response field.
         self.assertNotIn('meter_quantity_context', value)
 
+    async def test_incorrect_generated_rate_math_is_replaced_from_actual_mcp_reads(self):
+        self.reply = lambda body: response([call(name='get_meter_summary', arguments='{}')]) if body.get('tool_choice') else response([message('96 gallons / 1440 minutes * 60 = 4 GPM. WRONG GENERATED CLAIM')])
+        value = (await self.post(self.body | {'text': 'What average GPM do the provided volumes imply?'})).json()
+        self.assertEqual(value['status'], 'answer')
+        self.assertEqual(value['model_calls'], 3)
+        self.assertEqual(value['tool_trace'][0]['status'], 'success')
+        self.assertIn('0.066667 GPM (4 US gallons/hour)', value['answer'])
+        self.assertNotIn('WRONG GENERATED CLAIM', value['answer'])
+        self.assertNotIn('= 4 GPM', value['answer'])
+        self.assertTrue(value['answer'].endswith(IMPORTED_EVIDENCE_NOTE))
+        self.assertIsNone(self.sessions.approvals(self.token).goal)
+
+    async def test_rate_request_uses_host_arithmetic_even_when_generated_reply_omits_units(self):
+        self.reply = lambda body: response([call(name='get_meter_summary', arguments='{}')]) if body.get('tool_choice') else response([message('The application can explain the calculation.')])
+        value = (await self.post(self.body | {'text': 'Derive average gallons per minute from these readings.'})).json()
+        self.assertEqual(value['status'], 'answer')
+        self.assertIn('0.066667 GPM', value['answer'])
+        self.assertIn('not new sensor measurements', value['answer'])
+
+    async def test_invalid_rate_evidence_fails_closed_instead_of_releasing_model_math(self):
+        from aquamind_ml.evidence_question import EvidenceAgentTools
+        from aquamind_ml.agent_tools import ToolOutcome
+        original = EvidenceAgentTools.execute
+        async def malformed(adapter, *args):
+            result = await original(adapter, *args)
+            return ToolOutcome(result.call_id, result.status,
+                {'result': result.data['result'] | {'total_us_gallons': 'NaN'}})
+        self.reply = lambda body: response([call(name='get_meter_summary', arguments='{}')]) if body.get('tool_choice') else response([message('An invented rate is 99 GPM.')])
+        with patch.object(EvidenceAgentTools, 'execute', malformed):
+            value = (await self.post(self.body | {'text': 'Derive the average GPM.'})).json()
+        self.assertEqual(value['status'], 'unavailable')
+        self.assertEqual(value['error'], 'rate_evidence_unavailable')
+        self.assertEqual(value['answer'], '')
+        self.assertEqual(value['model_calls'], 3)
+
+    async def test_rate_request_never_bypasses_topic_admission_or_forces_a_read(self):
+        self.intent = 'unsupported'
+        value = (await self.post(self.body | {'text': 'Derive GPM and then write a stock-trading bot.'})).json()
+        self.assertEqual(value['status'], 'refused')
+        self.assertEqual(value['model_calls'], 1)
+        self.assertEqual(value['tool_trace'], [])
+
     async def test_all_confirmations_are_strict_required_and_admitted_before_paid_work(self):
         for key in ('bill_reviewed', 'meter_reviewed', 'same_household', 'share_with_ai'):
             for value in (False, 1, 'true', None):

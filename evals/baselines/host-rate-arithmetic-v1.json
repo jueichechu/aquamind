@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "kind": "application_owned_rate_development_validation",
+  "split": "development",
+  "source": "live_provider",
+  "reviewed_run": {
+    "kind": "agent_observation_grading",
+    "execution_performed": false,
+    "observation_source_declared": "live_provider",
+    "runtime_source_sha256_declared": "8a134c960c71861281d27cddee6f7a1325a73deaabbacb0b2f67cfe2a89fddab",
+    "models_declared": {
+      "reasoning": "gpt-5.4-mini-2026-03-17"
+    },
+    "confirmation_pin_sha256_declared": null,
+    "confirmation_claim_sha256_declared": null,
+    "review_sources_declared": {
+      "assistant": 12
+    },
+    "suite_id": "water-host-rate-regressions-v1",
+    "split": "development",
+    "cohort": "agent_workflow",
+    "complete": true,
+    "suite_cases": 4,
+    "other_cohort_case_ids": [],
+    "planned_cases": 4,
+    "observed_cases": 4,
+    "outcomes": {
+      "passed": 4,
+      "failed": 0,
+      "pending_review": 0,
+      "missing": 0
+    },
+    "case_pass_rate": 1.0,
+    "tools": {
+      "attempts": 7,
+      "successful_reads": 7,
+      "approval_requests": 0,
+      "expected_denials": 0,
+      "other_errors": 0,
+      "unconfirmed": 0,
+      "invalid_outcomes": 0,
+      "completion_rate": 1.0
+    },
+    "cases": [
+      {
+        "case_id": "host-rates-positive",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "host-rates-zero",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "host-rates-liters",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      },
+      {
+        "case_id": "host-rates-complete-period",
+        "workflow": "evidence_agent",
+        "category": "valid_execution",
+        "modalities": [
+          "text",
+          "meter"
+        ],
+        "outcome": "passed",
+        "issues": [],
+        "pending_criteria": []
+      }
+    ],
+    "limitations": [
+      "Grades supplied observations; does not execute or independently attest their origin.",
+      "Inspected development cases, not a held-out or representative benchmark.",
+      "Scripted observations and reviews are contract checks, not live model quality.",
+      "Assistant reviews are explicitly labeled, not independent human assessments.",
+      "Missing cases stay planned; unreviewed answers cannot pass. No final case rate until complete.",
+      "Tool completion includes reads and approval requests, never applied goals; all attempts including expected denials remain in its denominator.",
+      "No raw answers, transcripts, fact values, reviewer names or provider errors are emitted."
+    ]
+  },
+  "provider_attempts": 15,
+  "predeclared_cap": 16,
+  "automatic_retries": 0,
+  "retained_prior_live_failure": {
+    "commit": "3797e074f8b42885ffffedb4a2d5990de59bc7b5",
+    "response_artifact_sha256": "9a623d65b64386300f160f3a80327a724860b56154a91122ba1f23e5b1006510",
+    "assistant_review_sha256": "822d785ef684021f45375b398c335ede6133d700b01bad54abbfb288ebf831b5",
+    "outcome": "failed_math_despite_successful_contract_checks",
+    "finding": "Generated imported GPM calculations multiplied gallons/minutes by60. Prior weather and zero-volume interpretation passed; positive rate arithmetic failed. Original artifact unchanged."
+  },
+  "limitations": [
+    "Delivered rate discussion is application-rendered from actual successful tool results, not model-only mathematical accuracy.",
+    "Four known fictional development cases and12assistant verdicts; not independent human review or representative population accuracy.",
+    "Prior6case and3case studies and live failure remain separate; no pooled denominator, erased failure or confirmation replay.",
+    "Recognized English rate terms select presentation only; no universal language or general model-math guarantee.",
+    "No image/voice/inference, positive approval or browser coverage in this collection.",
+    "Source hashes identify bytes, not independent attestation. Raw artifacts remain local."
+  ]
+}

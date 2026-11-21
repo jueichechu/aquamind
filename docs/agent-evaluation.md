@@ -456,6 +456,47 @@ facts matched their predeclared checks in this run. That does not establish reli
 across other bill layouts, voices or repeated attempts. Raw artifacts remain local;
 the public summary contains hashes, scoped counts, outcomes and limitations only.
 
+## Application-owned imported-rate arithmetic
+
+A subsequent production API check found another factor-of-60 error: the model
+converted 6 gallons over 15 minutes to 24 GPM instead of 0.4 GPM. The earlier
+development successes and this live failure remain separate evidence. Prompt
+examples alone did not reliably prevent the error.
+
+For imported-meter conversations that mention recognized GPM/GPH or English
+flow-rate terms in the question or generated reply, the backend now replaces the
+free-form reply with a bounded, application-calculated explanation. It uses only
+successful MCP meter results and validated bill-coverage facts. Decimal arithmetic
+computes gallons/minutes, separately labels gallons/hour and derived interval
+averages, and lists at most eight individual intervals. Summary-only reads do not
+invent a series. Source units, rounded normalized volumes, partial coverage,
+reported reading quality and unverified provenance remain explicit. Invalid
+arithmetic inputs fail closed with the existing unavailable response contract.
+
+This presentation selection is not an authorization boundary or universal language
+detector. Topic admission, consent, session scoping, actual summary reads, call
+budgets and approval controls still run. It adds no model calls or retries. Other
+qualitative answers and synthetic-demo rate calculations remain model-generated.
+Delivered arithmetic from this formatter is application behavior, not evidence of
+model-only mathematical accuracy.
+
+The four-case [development protocol](../evals/fixtures/agent-host-rate-regressions-v1.json)
+specifies positive and zero volumes, converted liters and a complete-period bill
+comparison before collection. It does not replace or replay the old confirmation.
+
+```sh
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --protocol host-rate-regressions-v1
+PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --protocol host-rate-regressions-v1 --cohort agent_workflow --max-provider-calls 16 --fictional-image /absolute/path/fictional-water-bill.png --synthetic-wav /absolute/path/question.wav --output-dir evals/reports/host-rate-first
+```
+
+The [recorded first collection](../evals/baselines/host-rate-arithmetic-v1.json)
+used 15 provider requests under the 16-request cap, with zero automatic retries.
+All four delivered answers passed their declared checks after twelve explicit
+assistant verdicts bound to the raw artifacts. These assess the combined
+application/tool/model workflow, including backend-rendered answers, rather than
+independent human review or model-only arithmetic. The previous live math failure
+is retained with its artifact and review hashes; the old confirmation is unchanged.
+
 ## Verification
 
 ### Recorded v2 follow-up
