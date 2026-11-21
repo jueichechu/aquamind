@@ -489,6 +489,14 @@ PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --protocol host-rate-re
 PYTHONPATH=ml ml/.venv/bin/python evals/collect_agent.py --execute --protocol host-rate-regressions-v1 --cohort agent_workflow --max-provider-calls 16 --fictional-image /absolute/path/fictional-water-bill.png --synthetic-wav /absolute/path/question.wav --output-dir evals/reports/host-rate-first
 ```
 
+The [recorded first collection](../evals/baselines/host-rate-arithmetic-v1.json)
+used 15 provider requests under the 16-request cap, with zero automatic retries.
+All four delivered answers passed their declared checks after twelve explicit
+assistant verdicts bound to the raw artifacts. These assess the combined
+application/tool/model workflow, including backend-rendered answers, rather than
+independent human review or model-only arithmetic. The previous live math failure
+is retained with its artifact and review hashes; the old confirmation is unchanged.
+
 ## Verification
 
 ### Recorded v2 follow-up
